@@ -187,3 +187,84 @@ def test_installazione_rotta_ripiega_su_tfidf(monkeypatch, capsys):
     assert index.mode == "char-tfidf"
     assert "non utilizzabile" in err
     assert index.search("primo")
+
+
+# ---------------- qualita' Schema.org: prezzi, media, rating ----------------
+
+def _pagina_jsonld(*blocchi):
+    page = sra.Page(url="https://x.it/", status=200)
+    page.jsonld_raw = list(blocchi)
+    return page
+
+
+def test_offerta_con_prezzo_sporco_e_valuta_mancante():
+    page = _pagina_jsonld({
+        "@type": "Product", "name": "Pressoterapia",
+        "offers": {"@type": "Offer", "price": "€ 50,00"},
+    })
+    findings = sra.validate_jsonld([page])
+    titoli = " | ".join(f.title for f in findings)
+    assert "prezzi delle offerte" in titoli
+    dettagli = " | ".join(f.detail for f in findings)
+    assert "non numerico" in dettagli
+    assert "ISO 4217" in dettagli
+
+
+def test_offerta_corretta_non_segnalata():
+    page = _pagina_jsonld({
+        "@type": "Product", "name": "Pressoterapia",
+        "offers": {"@type": "Offer", "price": "50.00",
+                   "priceCurrency": "EUR"},
+    })
+    findings = sra.validate_jsonld([page])
+    assert not any("prezzi" in f.title for f in findings)
+
+
+def test_product_senza_offerte_ne_giudizi():
+    page = _pagina_jsonld({"@type": "Product", "name": "Kit"})
+    findings = sra.validate_jsonld([page])
+    assert any("senza offerte" in f.title for f in findings)
+
+
+def test_video_senza_uploaddate_e_thumbnail_relativa():
+    page = _pagina_jsonld({
+        "@type": "VideoObject", "name": "Demo",
+        "thumbnailUrl": "/img/demo.jpg",
+    })
+    findings = sra.validate_jsonld([page])
+    dettagli = " | ".join(f.detail for f in findings)
+    assert "VideoObject senza uploadDate" in dettagli
+    assert any("non assoluti" in f.title for f in findings)
+
+
+def test_rating_fuori_scala_e_senza_conteggio():
+    page = _pagina_jsonld({
+        "@type": "AggregateRating", "ratingValue": "6.2",
+    })
+    findings = sra.validate_jsonld([page])
+    warn = [f for f in findings if "valutazion" in f.title]
+    assert warn
+    assert "fuori scala" in warn[0].detail
+    assert "reviewCount" in warn[0].detail
+
+
+def test_data_non_iso_segnalata():
+    page = _pagina_jsonld({
+        "@type": "Article", "headline": "T", "author": "A",
+        "datePublished": "03/08/2026",
+    })
+    findings = sra.validate_jsonld([page])
+    assert any("ISO 8601" in f.title for f in findings)
+
+
+def test_evento_completo_e_coerente_da_ok():
+    page = _pagina_jsonld({
+        "@type": "Event", "name": "Open day",
+        "startDate": "2026-09-12T10:00:00+02:00",
+        "location": {"@type": "Place", "name": "Centro Linfa"},
+        "image": "https://x.it/open-day.jpg",
+    })
+    findings = sra.validate_jsonld([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_OK
+    assert "coerente" in findings[0].title

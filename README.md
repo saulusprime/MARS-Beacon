@@ -229,8 +229,12 @@ semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5).
    "chi siamo", contatti verificabili).
 4. **Dati strutturati** — inventario dei tipi JSON-LD, entità principale,
    FAQPage, BreadcrumbList, WebSite, **validazione delle proprietà
-   minime** per tipo (es. LocalBusiness senza `address`/`telephone`,
-   Question senza `acceptedAnswer.text`).
+   minime** per 23 tipi Schema.org (LocalBusiness, Article, Product,
+   VideoObject, ImageObject, Event, Recipe, HowTo, JobPosting, Review…)
+   e **controlli di qualità sui valori**: prezzi numerici con valuta
+   ISO 4217 nelle offerte, Product senza offerte né giudizi, rating
+   dentro la scala dichiarata, date in ISO 8601, URL di media assoluti,
+   coppie domanda/risposta complete nelle FAQPage.
 5. **Simulazione RRF** — indicizza i chunk in BM25 e nell'indice vettoriale,
    esegue le query, fonde le liste e misura la sovrapposizione. Soglie di
    consenso: < 20% critico, < 45% avvertenza, altrimenti ok; le query senza

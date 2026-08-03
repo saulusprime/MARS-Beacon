@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-03.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.7.0
+## Strumento CLI — `seo_rrf_audit.py` v1.8.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -29,6 +29,14 @@ sono nel [README.md](README.md).
   datePublished, pagina "chi siamo", contatti tel:/mailto:/email);
   grafo dei link interni con pagine orfane, profondità oltre 3 click
   dalla home e anchor generiche ("clicca qui").
+- **Qualità del markup Schema.org** (v1.8.0): proprietà minime per
+  23 tipi (fra cui Product, VideoObject, ImageObject, Event, Recipe,
+  HowTo, JobPosting, Review, AggregateRating, Course, i tipi medici)
+  e controlli sui valori — prezzi delle offerte numerici con valuta
+  ISO 4217 (o priceSpecification), Product senza offerte né giudizi,
+  ratingValue dentro la scala dichiarata e conteggio recensioni,
+  date ISO 8601, URL di media assoluti, coppie domanda/risposta
+  complete nelle FAQPage.
 - **Simulazione RRF**: chunking per heading (~220 parole), doppio
   indice BM25 (Okapi, k1=1.5, b=0.75) e vettoriale
   (sentence-transformers con **auto-rilevamento** dalla v1.6.0 —

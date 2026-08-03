@@ -90,7 +90,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.7.1"
+__version__ = "1.8.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -273,19 +273,50 @@ EMAIL_RE = re.compile(
     r"\b[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}\b")
 
 # Proprieta' minime dei tipi JSON-LD piu' comuni: senza queste il
-# tipo non e' eleggibile per i risultati arricchiti.
+# tipo non e' eleggibile per i risultati arricchiti (riferimento:
+# schema.org e linee guida Google sui dati strutturati).
 JSONLD_REQUIRED: Dict[str, Tuple[str, ...]] = {
     "Organization": ("name", "url"),
     "LocalBusiness": ("name", "address", "telephone"),
     "ProfessionalService": ("name", "address", "telephone"),
+    "MedicalBusiness": ("name", "address", "telephone"),
+    "MedicalClinic": ("name", "address", "telephone"),
     "FAQPage": ("mainEntity",),
     "BreadcrumbList": ("itemListElement",),
     "WebSite": ("name", "url"),
     "Article": ("headline", "datePublished", "author"),
     "BlogPosting": ("headline", "datePublished", "author"),
+    "NewsArticle": ("headline", "datePublished", "author"),
     "Service": ("name", "provider"),
     "Person": ("name",),
+    "Product": ("name",),
+    "Review": ("author", "reviewRating"),
+    "AggregateRating": ("ratingValue",),
+    "VideoObject": ("name", "thumbnailUrl", "uploadDate"),
+    "Event": ("name", "startDate", "location"),
+    "Recipe": ("name", "image"),
+    "HowTo": ("name", "step"),
+    "JobPosting": ("title", "datePosted", "hiringOrganization",
+                   "jobLocation"),
+    "Course": ("name", "description", "provider"),
 }
+
+# Chiavi con date ISO 8601 (YYYY-MM-DD, eventualmente con orario).
+JSONLD_DATE_KEYS: Tuple[str, ...] = (
+    "datePublished", "dateModified", "uploadDate", "startDate",
+    "endDate", "datePosted", "validThrough", "priceValidUntil",
+)
+JSONLD_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ].+)?$")
+
+# Chiavi con URL di media: devono essere assoluti (http/https).
+JSONLD_URL_KEYS: Tuple[str, ...] = (
+    "thumbnailUrl", "contentUrl", "embedUrl", "image", "logo",
+)
+
+# Prezzo secondo schema.org/Google: numero con punto decimale, senza
+# simboli di valuta; la valuta va in priceCurrency (ISO 4217).
+JSONLD_PRICE_RE = re.compile(r"^\d+(\.\d+)?$")
+JSONLD_CURRENCY_RE = re.compile(r"^[A-Za-z]{3}$")
 
 # Soft-404: pagine che rispondono 200 ma il cui contenuto dice
 # "non trovato". Il segnale forte e' nel title/H1; nel corpo vale
@@ -1781,27 +1812,50 @@ def _node_types(node: Dict[str, object]) -> List[str]:
     return []
 
 
+def _as_list(value: object) -> List[object]:
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _as_number(value: object) -> Optional[float]:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
 def validate_jsonld(pages: List[Page]) -> List[Finding]:
-    """Proprieta' minime dei tipi JSON-LD, non solo inventario."""
+    """Qualita' del markup Schema.org, non solo inventario.
+
+    Due livelli: proprieta' minime per tipo (JSONLD_REQUIRED) e
+    controlli sui valori — prezzi e valute delle offerte, rating
+    dentro la scala, date ISO 8601, URL di media assoluti, coppie
+    domanda/risposta di FAQPage, Product senza offerte o giudizi.
+    """
     problems: Dict[str, Set[str]] = {}
     checked: Counter = Counter()
     faq_broken = 0
+    offer_issues: List[str] = []
+    bare_products = 0
+    rating_issues: List[str] = []
+    bad_dates: List[str] = []
+    bad_urls: List[str] = []
+
     for page in pages:
         for node in _jsonld_nodes(page.jsonld_raw):
             types = _node_types(node)
             for typ in types:
                 required = JSONLD_REQUIRED.get(typ)
-                if not required:
+                if required is None:
                     continue
                 checked[typ] += 1
                 missing = {p for p in required if not node.get(p)}
                 if missing:
                     problems.setdefault(typ, set()).update(missing)
+
             if "FAQPage" in types:
-                entities = node.get("mainEntity") or []
-                if isinstance(entities, dict):
-                    entities = [entities]
-                for question in entities:
+                for question in _as_list(node.get("mainEntity")):
                     if not isinstance(question, dict):
                         faq_broken += 1
                         continue
@@ -1810,6 +1864,71 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
                             or not isinstance(answer, dict) \
                             or not answer.get("text"):
                         faq_broken += 1
+
+            if "Offer" in types or "AggregateOffer" in types:
+                checked["Offer"] += 1
+                price = node.get("price")
+                if price is None:
+                    price = node.get("lowPrice")
+                if price is None \
+                        and not node.get("priceSpecification"):
+                    offer_issues.append(
+                        "offerta senza price ne' priceSpecification")
+                if price is not None \
+                        and not JSONLD_PRICE_RE.match(str(price)):
+                    offer_issues.append(
+                        "price \"%s\" non numerico" % price)
+                currency = node.get("priceCurrency")
+                if price is not None and (
+                        not currency
+                        or not JSONLD_CURRENCY_RE.match(
+                            str(currency))):
+                    offer_issues.append(
+                        "priceCurrency \"%s\" non ISO 4217"
+                        % (currency or "assente"))
+
+            if "Product" in types and not (
+                    node.get("offers") or node.get("review")
+                    or node.get("aggregateRating")):
+                bare_products += 1
+
+            if types and {"AggregateRating", "Rating"} & set(types):
+                value = _as_number(node.get("ratingValue"))
+                best = _as_number(node.get("bestRating"))
+                worst = _as_number(node.get("worstRating"))
+                best = 5.0 if best is None else best
+                worst = 1.0 if worst is None else worst
+                if value is not None \
+                        and not worst <= value <= best:
+                    rating_issues.append(
+                        "ratingValue %s fuori scala %g-%g"
+                        % (node.get("ratingValue"), worst, best))
+                if "AggregateRating" in types \
+                        and not node.get("reviewCount") \
+                        and not node.get("ratingCount"):
+                    rating_issues.append(
+                        "AggregateRating senza reviewCount o "
+                        "ratingCount")
+
+            if "ImageObject" in types:
+                checked["ImageObject"] += 1
+                if not node.get("contentUrl") and not node.get("url"):
+                    problems.setdefault("ImageObject", set()).add(
+                        "contentUrl")
+
+            for key in JSONLD_DATE_KEYS:
+                value = node.get(key)
+                if isinstance(value, str) and value \
+                        and not JSONLD_ISO_DATE_RE.match(value):
+                    bad_dates.append("%s=\"%s\"" % (key, value[:40]))
+
+            for key in JSONLD_URL_KEYS:
+                for item in _as_list(node.get(key)):
+                    if isinstance(item, str) and item \
+                            and not item.startswith(
+                                ("http://", "https://")):
+                        bad_urls.append(
+                            "%s=\"%s\"" % (key, item[:60]))
 
     out: List[Finding] = []
     if problems:
@@ -1822,11 +1941,6 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
             "Proprieta' minime mancanti: %s." % detail,
             "Completa le proprieta' indicate: senza, il tipo non "
             "e' eleggibile per i risultati arricchiti."))
-    elif checked:
-        out.append(Finding(
-            AREA_SD, SEV_OK,
-            "Proprieta' minime dei tipi JSON-LD presenti",
-            "Verificati: %s." % ", ".join(sorted(checked))))
     if faq_broken:
         out.append(Finding(
             AREA_SD, SEV_WARNING,
@@ -1834,6 +1948,51 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
             "Ogni voce di mainEntity richiede una Question con "
             "name e un acceptedAnswer con text.",
             "Completa le coppie domanda/risposta nel markup."))
+    if offer_issues:
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "%d problema/i nei prezzi delle offerte" %
+            len(offer_issues),
+            "; ".join(offer_issues[:4]) + ".",
+            "In price solo il numero con il punto decimale (niente "
+            "simboli di valuta); la valuta in priceCurrency (codice "
+            "ISO 4217, es. EUR)."))
+    if bare_products:
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "%d Product senza offerte ne' giudizi" % bare_products,
+            "Un Product privo di offers, review e aggregateRating "
+            "non e' eleggibile per i risultati arricchiti di "
+            "prodotto.",
+            "Aggiungi almeno offers (con price e priceCurrency) "
+            "oppure review/aggregateRating."))
+    if rating_issues:
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "%d valutazione/i incoerenti" % len(rating_issues),
+            "; ".join(rating_issues[:4]) + ".",
+            "ratingValue dentro la scala dichiarata (default 1-5) "
+            "e conteggio recensioni in reviewCount o ratingCount."))
+    if bad_dates:
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "%d data/e non in formato ISO 8601" % len(bad_dates),
+            "; ".join(bad_dates[:4]) + ".",
+            "Usa AAAA-MM-GG, con l'eventuale orario dopo la T "
+            "(es. 2026-08-03T09:30:00+02:00)."))
+    if bad_urls:
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "%d URL di media non assoluti nel markup" % len(bad_urls),
+            "; ".join(bad_urls[:4]) + ".",
+            "In image, logo, thumbnailUrl, contentUrl ed embedUrl "
+            "servono URL http(s) completi."))
+    if checked and not out:
+        out.append(Finding(
+            AREA_SD, SEV_OK,
+            "Markup Schema.org coerente (%d tipi verificati)"
+            % len(checked),
+            "Verificati: %s." % ", ".join(sorted(checked))))
     return out
 
 

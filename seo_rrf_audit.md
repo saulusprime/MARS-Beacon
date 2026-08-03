@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.7.1, ~3070 righe,
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.8.0, ~3260 righe,
 licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -79,6 +79,16 @@ sezioni si aprono e chiudono da sole seguendo il ciclo dell'audit.
 Con la 1.7.1 l'anteprima incorporata (iframe) è stata rimossa:
 faceva doppione con la pagina dei risultati, il referto HTML si
 apre in una nuova scheda.
+
+Novità 1.8.0 (2026-08-03): qualità del markup Schema.org. Proprietà
+minime estese a 23 tipi (aggiunti Product, VideoObject, ImageObject,
+Event, Recipe, HowTo, JobPosting, Review, AggregateRating,
+NewsArticle, Course, MedicalBusiness/MedicalClinic) e controlli sui
+valori: prezzi delle offerte numerici col punto e valuta ISO 4217
+(accettato anche priceSpecification), Product senza offerte né
+giudizi, ratingValue dentro la scala dichiarata con conteggio
+recensioni, date in ISO 8601, URL di media assoluti in
+image/logo/thumbnailUrl/contentUrl/embedUrl.
 
 ## Uso
 
