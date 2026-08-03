@@ -8,12 +8,23 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
 
     GET  /                  interfaccia grafica
     GET  /api/env           versione, RAM disponibile, valori suggeriti
-    POST /api/audit         avvia un audit (uno alla volta)
+    POST /api/register      registrazione (nome, email, password, ToS)
+    POST /api/login         accesso con email e password
+    POST /api/logout        chiusura della sessione
+    GET  /api/me            stato della sessione e profilo
+    POST /api/profile       completamento profilo (azienda, telefono)
+    POST /api/audit         avvia un check (richiede accesso; uno
+                            per utente ogni ora)
     POST /api/cancel        annulla l'audit in corso
-    GET  /api/status        stato, log di avanzamento, sintesi finale
-    GET  /api/report/html   referto HTML dell'ultimo audit
-    GET  /api/report/json   referto JSON
-    GET  /api/report/text   referto testuale
+    GET  /api/status        stato, log, sintesi (richiede accesso)
+    GET  /api/report/html   referto HTML (richiede profilo completo)
+    GET  /api/report/json   referto JSON (richiede profilo completo)
+    GET  /api/report/text   referto testuale (richiede profilo
+                            completo)
+
+Gli utenti sono su SQLite (seo_rrf_gui.db accanto allo script):
+la registrazione richiede l'accettazione delle condizioni di
+servizio con dichiarazione di proprieta' del sito analizzato.
 
 L'audit viene eseguito in-process (import di ``seo_rrf_audit``): una
 sola scansione del sito produce tutti e tre i formati di referto.
@@ -30,7 +41,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
+import hmac
 import json
+import re
+import secrets
+import sqlite3
 import sys
 import threading
 import time
@@ -41,9 +57,17 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "1.9.0"
+__version__ = "2.0.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
+
+# Utenti e sessioni su SQLite accanto allo script (nel .gitignore).
+DB_PATH = Path(__file__).resolve().parent / "seo_rrf_gui.db"
+SESSION_TTL_S = 7 * 24 * 3600
+CHECK_INTERVAL_S = 3600  # un check per utente ogni ora
+SESSION_COOKIE = "seo_rrf_session"
+EMAIL_RE = re.compile(r"^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$")
+PBKDF2_ROUNDS = 200_000
 
 CONTENT_TYPES: Dict[str, str] = {
     ".html": "text/html; charset=utf-8",
@@ -86,6 +110,147 @@ class LineBuffer:
         self._partial = ""
 
 
+class UserStore:
+    """Utenti, sessioni e limite orario dei check, su SQLite.
+
+    Registrazione rapida (nome, email, password, accettazione delle
+    condizioni con dichiarazione di proprieta' del sito) abilita il
+    check; il profilo completato (azienda e telefono) sblocca il
+    download dei referti. Password con PBKDF2-SHA256 e salt per
+    utente; sessioni con token casuale e scadenza.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = str(path)
+        self.lock = threading.Lock()
+        with self._connect() as con:
+            con.executescript(
+                "CREATE TABLE IF NOT EXISTS users ("
+                " id INTEGER PRIMARY KEY,"
+                " nome TEXT NOT NULL,"
+                " email TEXT NOT NULL UNIQUE,"
+                " pw_hash TEXT NOT NULL,"
+                " salt TEXT NOT NULL,"
+                " azienda TEXT NOT NULL DEFAULT '',"
+                " telefono TEXT NOT NULL DEFAULT '',"
+                " tos_at REAL NOT NULL,"
+                " created_at REAL NOT NULL,"
+                " last_check_at REAL NOT NULL DEFAULT 0);"
+                "CREATE TABLE IF NOT EXISTS sessions ("
+                " token TEXT PRIMARY KEY,"
+                " user_id INTEGER NOT NULL,"
+                " expires_at REAL NOT NULL);")
+
+    def _connect(self) -> sqlite3.Connection:
+        con = sqlite3.connect(self.path)
+        con.row_factory = sqlite3.Row
+        return con
+
+    @staticmethod
+    def _hash(password: str, salt: str) -> str:
+        return hashlib.pbkdf2_hmac(
+            "sha256", password.encode("utf-8"), salt.encode("utf-8"),
+            PBKDF2_ROUNDS).hex()
+
+    def _new_session(self, con: sqlite3.Connection,
+                     user_id: int) -> str:
+        token = secrets.token_hex(32)
+        con.execute(
+            "INSERT INTO sessions (token, user_id, expires_at) "
+            "VALUES (?, ?, ?)",
+            (token, user_id, time.time() + SESSION_TTL_S))
+        return token
+
+    def register(self, nome: str, email: str, password: str,
+                 azienda: str = "", telefono: str = ""
+                 ) -> Tuple[str, str]:
+        """Crea l'utente e apre la sessione: (token, "") o ("", err)."""
+        with self.lock, self._connect() as con:
+            exists = con.execute(
+                "SELECT 1 FROM users WHERE email = ?",
+                (email.lower(),)).fetchone()
+            if exists:
+                return "", "Esiste gia' un account con questa email."
+            salt = secrets.token_hex(16)
+            cur = con.execute(
+                "INSERT INTO users (nome, email, pw_hash, salt, "
+                "azienda, telefono, tos_at, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (nome, email.lower(), self._hash(password, salt),
+                 salt, azienda, telefono, time.time(), time.time()))
+            return self._new_session(con, cur.lastrowid), ""
+
+    def login(self, email: str, password: str) -> Tuple[str, str]:
+        with self.lock, self._connect() as con:
+            row = con.execute(
+                "SELECT id, pw_hash, salt FROM users WHERE email = ?",
+                (email.lower(),)).fetchone()
+            if row is None or not hmac.compare_digest(
+                    row["pw_hash"],
+                    self._hash(password, row["salt"])):
+                return "", "Email o password non corretti."
+            return self._new_session(con, row["id"]), ""
+
+    def logout(self, token: str) -> None:
+        with self.lock, self._connect() as con:
+            con.execute("DELETE FROM sessions WHERE token = ?",
+                        (token,))
+
+    def user_by_token(self, token: str) -> Optional[Dict[str, object]]:
+        if not token:
+            return None
+        with self.lock, self._connect() as con:
+            row = con.execute(
+                "SELECT u.* FROM users u JOIN sessions s "
+                "ON s.user_id = u.id "
+                "WHERE s.token = ? AND s.expires_at > ?",
+                (token, time.time())).fetchone()
+            if row is None:
+                return None
+            waited = time.time() - row["last_check_at"]
+            return {
+                "id": row["id"],
+                "nome": row["nome"],
+                "email": row["email"],
+                "azienda": row["azienda"],
+                "telefono": row["telefono"],
+                "profile_complete": bool(row["azienda"].strip()
+                                         and row["telefono"].strip()),
+                "next_check_in_s": max(
+                    0, int(CHECK_INTERVAL_S - waited)),
+            }
+
+    def update_profile(self, user_id: int, azienda: str,
+                       telefono: str) -> None:
+        with self.lock, self._connect() as con:
+            con.execute(
+                "UPDATE users SET azienda = ?, telefono = ? "
+                "WHERE id = ?", (azienda, telefono, user_id))
+
+    def record_check(self, user_id: int) -> None:
+        with self.lock, self._connect() as con:
+            con.execute(
+                "UPDATE users SET last_check_at = ? WHERE id = ?",
+                (time.time(), user_id))
+
+    def clear_check(self, user_id: int) -> None:
+        """Libera lo slot orario (es. dopo un audit annullato)."""
+        with self.lock, self._connect() as con:
+            con.execute(
+                "UPDATE users SET last_check_at = 0 WHERE id = ?",
+                (user_id,))
+
+
+STORE: Optional[UserStore] = None
+
+
+def get_store() -> UserStore:
+    global STORE
+    if STORE is None:
+        STORE = UserStore(DB_PATH)
+    return STORE
+
+
 class Job:
     """Stato dell'audit corrente (uno alla volta)."""
 
@@ -94,6 +259,7 @@ class Job:
         # idle | running | done | error | cancelled
         self.state = "idle"
         self.stop_event = threading.Event()
+        self.user_id = 0
         self.log: List[str] = []
         self.error = ""
         self.config: Dict[str, object] = {}
@@ -118,12 +284,14 @@ class Job:
                 "competitive": self.competitive,
             }
 
-    def start(self, config: Dict[str, object]) -> bool:
+    def start(self, config: Dict[str, object],
+              user_id: int = 0) -> bool:
         """Passa a 'running' se libero; False se un audit e' in corso."""
         with self.lock:
             if self.state == "running":
                 return False
             self.state = "running"
+            self.user_id = user_id
             self.stop_event.clear()
             self.log = []
             self.error = ""
@@ -167,6 +335,9 @@ class Job:
             buf.flush()
         except sra.AuditCancelled:
             buf.flush()
+            if self.user_id:
+                # L'annullamento non consuma lo slot orario.
+                get_store().clear_check(self.user_id)
             with self.lock:
                 self.state = "cancelled"
             return
@@ -286,22 +457,57 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "SeoRrfGui/%s" % __version__
 
     def _send(self, status: int, body: bytes, ctype: str,
-              download: str = "") -> None:
+              download: str = "", cookie: str = "") -> None:
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy", CSP)
         self.send_header("Cache-Control", "no-store")
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
         if download:
             self.send_header("Content-Disposition",
                              'attachment; filename="%s"' % download)
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_json(self, status: int, payload: Dict[str, object]) -> None:
+    def _send_json(self, status: int, payload: Dict[str, object],
+                   cookie: str = "") -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self._send(status, body, CONTENT_TYPES[".json"])
+        self._send(status, body, CONTENT_TYPES[".json"],
+                   cookie=cookie)
+
+    # ---------------- sessione ----------------
+
+    def _session_token(self) -> str:
+        header = self.headers.get("Cookie", "")
+        for part in header.split(";"):
+            name, _, value = part.strip().partition("=")
+            if name == SESSION_COOKIE:
+                return value
+        return ""
+
+    def _session_user(self) -> Optional[Dict[str, object]]:
+        return get_store().user_by_token(self._session_token())
+
+    @staticmethod
+    def _cookie(token: str, expire: bool = False) -> str:
+        base = "%s=%s; Path=/; HttpOnly; SameSite=Strict" \
+            % (SESSION_COOKIE, token)
+        return base + "; Max-Age=0" if expire else base
+
+    def _read_json(self) -> Optional[Dict[str, object]]:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(raw, dict):
+                raise ValueError("atteso un oggetto JSON")
+            return raw
+        except (ValueError, json.JSONDecodeError) as exc:
+            self._send_json(400,
+                            {"error": "corpo non valido: %s" % exc})
+            return None
 
     def _serve_static(self, path: str) -> None:
         rel = path.lstrip("/") or "index.html"
@@ -332,9 +538,30 @@ class Handler(BaseHTTPRequestHandler):
                 "default_embeddings_model":
                     sra.DEFAULT_EMBEDDINGS_MODEL,
             })
+        elif path == "/api/me":
+            user = self._session_user()
+            if user is None:
+                self._send_json(200, {"authenticated": False})
+            else:
+                self._send_json(200, {"authenticated": True,
+                                      "user": user})
         elif path == "/api/status":
+            if self._session_user() is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+                return
             self._send_json(200, JOB.snapshot())
         elif path.startswith("/api/report/"):
+            user = self._session_user()
+            if user is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+                return
+            if not user["profile_complete"]:
+                self._send_json(403, {
+                    "error": "Il download dei referti richiede la "
+                             "registrazione completa: aggiungi "
+                             "azienda e telefono al profilo.",
+                    "code": "profile_incomplete"})
+                return
             fmt = path.rsplit("/", 1)[-1]
             report = JOB.report(fmt)
             if fmt not in ("html", "json", "text") or report is None:
@@ -356,33 +583,125 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802 - firma di BaseHTTPServer
         path = self.path.split("?", 1)[0]
-        if path == "/api/cancel":
-            if JOB.cancel():
+        if path == "/api/register":
+            self._post_register()
+        elif path == "/api/login":
+            self._post_login()
+        elif path == "/api/logout":
+            get_store().logout(self._session_token())
+            self._send_json(200, {"ok": True},
+                            cookie=self._cookie("", expire=True))
+        elif path == "/api/profile":
+            self._post_profile()
+        elif path == "/api/cancel":
+            if self._session_user() is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+            elif JOB.cancel():
                 self._send_json(202, {"ok": True})
             else:
                 self._send_json(409, {"error": "Nessun audit in "
                                                "corso da annullare."})
-            return
-        if path != "/api/audit":
+        elif path == "/api/audit":
+            self._post_audit()
+        else:
             self._send_json(404, {"error": "endpoint sconosciuto"})
-            return
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-            raw = json.loads(self.rfile.read(length) or b"{}")
-            if not isinstance(raw, dict):
-                raise ValueError("atteso un oggetto JSON")
-        except (ValueError, json.JSONDecodeError) as exc:
-            self._send_json(400, {"error": "corpo non valido: %s" % exc})
-            return
 
+    def _post_register(self) -> None:
+        raw = self._read_json()
+        if raw is None:
+            return
+        nome = str(raw.get("nome", "")).strip()
+        email = str(raw.get("email", "")).strip()
+        password = str(raw.get("password", ""))
+        if not raw.get("tos"):
+            self._send_json(400, {
+                "error": "Per registrarti devi accettare le "
+                         "condizioni di servizio e dichiarare che il "
+                         "sito da analizzare e' di tua proprieta'."})
+            return
+        if len(nome) < 2:
+            self._send_json(400, {"error": "Indica il tuo nome."})
+            return
+        if not EMAIL_RE.match(email):
+            self._send_json(400, {"error": "Email non valida."})
+            return
+        if len(password) < 8:
+            self._send_json(400, {
+                "error": "La password deve avere almeno 8 caratteri."})
+            return
+        token, err = get_store().register(
+            nome, email, password,
+            azienda=str(raw.get("azienda", "")).strip(),
+            telefono=str(raw.get("telefono", "")).strip())
+        if err:
+            self._send_json(409, {"error": err})
+            return
+        user = get_store().user_by_token(token)
+        self._send_json(201, {"ok": True, "user": user},
+                        cookie=self._cookie(token))
+
+    def _post_login(self) -> None:
+        raw = self._read_json()
+        if raw is None:
+            return
+        token, err = get_store().login(
+            str(raw.get("email", "")).strip(),
+            str(raw.get("password", "")))
+        if err:
+            self._send_json(401, {"error": err})
+            return
+        user = get_store().user_by_token(token)
+        self._send_json(200, {"ok": True, "user": user},
+                        cookie=self._cookie(token))
+
+    def _post_profile(self) -> None:
+        user = self._session_user()
+        if user is None:
+            self._send_json(401, {"error": "accesso richiesto"})
+            return
+        raw = self._read_json()
+        if raw is None:
+            return
+        azienda = str(raw.get("azienda", "")).strip()
+        telefono = str(raw.get("telefono", "")).strip()
+        if not azienda or not telefono:
+            self._send_json(400, {
+                "error": "Per completare la registrazione servono "
+                         "azienda e telefono."})
+            return
+        get_store().update_profile(int(user["id"]), azienda, telefono)
+        self._send_json(200, {
+            "ok": True,
+            "user": get_store().user_by_token(
+                self._session_token())})
+
+    def _post_audit(self) -> None:
+        user = self._session_user()
+        if user is None:
+            self._send_json(401, {
+                "error": "Per avviare un check devi registrarti o "
+                         "accedere."})
+            return
+        raw = self._read_json()
+        if raw is None:
+            return
         config, err = validate_config(raw)
         if config is None:
             self._send_json(400, {"error": err})
             return
-        if not JOB.start(config):
+        wait_s = int(user["next_check_in_s"])
+        if wait_s > 0:
+            self._send_json(429, {
+                "error": "Hai gia' effettuato un check nell'ultima "
+                         "ora: potrai avviarne un altro fra %d "
+                         "minuti." % max(1, wait_s // 60),
+                "retry_in_s": wait_s})
+            return
+        if not JOB.start(config, user_id=int(user["id"])):
             self._send_json(409, {"error": "Un audit e' gia' in corso: "
                                            "attendi che finisca."})
             return
+        get_store().record_check(int(user["id"]))
         threading.Thread(target=JOB.run, daemon=True).start()
         self._send_json(202, {"ok": True})
 

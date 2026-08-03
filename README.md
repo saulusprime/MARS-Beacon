@@ -113,10 +113,18 @@ Cosa offre:
   rispetto dei `Disallow` del robots.txt, query di prova, modello di
   embedding con avviso se sentence-transformers non è installato,
   costante k) e validazione con messaggi in italiano.
+- **Account utente**: registrazione rapida (nome, email, password e
+  accettazione delle condizioni di servizio, con dichiarazione che il
+  sito analizzato è di propria proprietà) oppure login; il check
+  richiede l'accesso e ogni utente può avviarne **uno all'ora**. Il
+  download dei referti è riservato alla **registrazione completa**
+  (azienda e telefono nel profilo). Utenti e sessioni su SQLite
+  locale, password con hash PBKDF2 e salt.
 - **Avanzamento in tempo reale**: fase corrente annunciata via regione
   di stato, log di scansione completo in area scorrevole e bottone
   **"Annulla audit"** (stop cooperativo: interrompe richieste e attese
-  alla prima occasione utile, senza risultati parziali).
+  alla prima occasione utile, senza risultati parziali; non consuma
+  lo slot orario).
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, rilievi in una fisarmonica per area con gravità espressa da
   testo + simbolo (mai solo colore), tabella del consenso RRF per

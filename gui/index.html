@@ -39,8 +39,154 @@
 
     <div class="accordion lt-sections" id="sections-acc">
 
+    <!-- ================= Accesso ================= -->
+    <div class="accordion-item" id="auth-section">
+      <h2 class="accordion-header" id="auth-heading">
+        <button type="button" class="accordion-button"
+                id="auth-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-auth" aria-expanded="true"
+                aria-controls="sec-auth">
+          Accesso
+        </button>
+      </h2>
+      <div id="sec-auth" class="accordion-collapse collapse show"
+           aria-labelledby="auth-heading">
+      <div class="accordion-body">
+
+      <div id="auth-error" class="alert alert-danger" role="alert"
+           tabindex="-1" hidden></div>
+
+      <!-- Vista da autenticato -->
+      <div id="auth-in" hidden>
+        <p class="mb-2">Connesso come <strong id="auth-name"></strong>
+          (<span id="auth-email"></span>)
+          <button type="button" id="logout-btn"
+                  class="btn btn-outline-secondary btn-sm ms-2">
+            Esci</button>
+        </p>
+        <div id="profile-block" hidden>
+          <div class="alert alert-info py-2 mb-3">
+            Registrazione parziale: puoi avviare il check e leggere i
+            risultati nella pagina. Per <strong>scaricare i
+            referti</strong> completa il profilo qui sotto.
+          </div>
+          <form id="profile-form" class="row" novalidate>
+            <div class="col-12 col-md-5">
+              <div class="form-group">
+                <label for="p-azienda" class="active">Azienda</label>
+                <input type="text" class="form-control" id="p-azienda"
+                       autocomplete="organization">
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="form-group">
+                <label for="p-telefono" class="active">Telefono</label>
+                <input type="text" class="form-control" id="p-telefono"
+                       inputmode="tel" autocomplete="tel">
+              </div>
+            </div>
+            <div class="col-12 col-md-3 align-self-center">
+              <button type="submit" class="btn btn-primary">
+                Completa la registrazione</button>
+            </div>
+          </form>
+        </div>
+        <p id="profile-ok" class="text-success fw-semibold" hidden>
+          Registrazione completa: puoi scaricare i referti.
+        </p>
+      </div>
+
+      <!-- Vista anonima: login o registrazione -->
+      <div id="auth-out">
+        <p class="mb-3">
+          Per analizzare un sito di tua proprietà serve un account:
+          la registrazione è gratuita e consente
+          <strong>un check all'ora</strong>.
+        </p>
+        <div class="row">
+          <div class="col-12 col-lg-5">
+            <h3 class="h6">Hai già un account? Accedi</h3>
+            <form id="login-form" novalidate>
+              <div class="form-group">
+                <label for="l-email" class="active">Email</label>
+                <input type="email" class="form-control" id="l-email"
+                       autocomplete="email" spellcheck="false">
+              </div>
+              <div class="form-group">
+                <label for="l-password" class="active">Password</label>
+                <input type="password" class="form-control"
+                       id="l-password" autocomplete="current-password">
+              </div>
+              <button type="submit" class="btn btn-outline-primary">
+                Accedi</button>
+            </form>
+          </div>
+          <div class="col-12 col-lg-7">
+            <h3 class="h6">Nuovo account</h3>
+            <form id="register-form" novalidate>
+              <div class="row">
+                <div class="col-12 col-md-6">
+                  <div class="form-group">
+                    <label for="r-nome" class="active">Nome e
+                      cognome *</label>
+                    <input type="text" class="form-control" id="r-nome"
+                           autocomplete="name">
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="form-group">
+                    <label for="r-email" class="active">Email *</label>
+                    <input type="email" class="form-control"
+                           id="r-email" autocomplete="email"
+                           spellcheck="false">
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-12 col-md-6">
+                  <div class="form-group">
+                    <label for="r-password" class="active">Password
+                      (min 8 caratteri) *</label>
+                    <input type="password" class="form-control"
+                           id="r-password"
+                           autocomplete="new-password">
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="form-group">
+                    <label for="r-azienda" class="active">Azienda
+                      (per scaricare i referti)</label>
+                    <input type="text" class="form-control"
+                           id="r-azienda" autocomplete="organization">
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="r-telefono" class="active">Telefono
+                  (per scaricare i referti)</label>
+                <input type="text" class="form-control" id="r-telefono"
+                       inputmode="tel" autocomplete="tel">
+              </div>
+              <div class="form-check">
+                <input type="checkbox" id="r-tos">
+                <label for="r-tos">Dichiaro che il sito da analizzare
+                  è di mia proprietà (o di averne mandato) e accetto le
+                  <a href="tos.html" target="_blank" rel="noopener">
+                    condizioni di servizio</a> *</label>
+              </div>
+              <button type="submit" class="btn btn-primary mt-2">
+                Registrati</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
     <!-- ================= Configurazione ================= -->
-    <div class="accordion-item">
+    <div class="accordion-item" id="config-section" hidden>
       <h2 class="accordion-header" id="config-heading">
         <button type="button" class="accordion-button"
                 id="config-toggle" data-bs-toggle="collapse"
@@ -294,6 +440,10 @@
           <span class="visually-hidden">(si apre in una nuova scheda)</span>
         </a>
       </div>
+      <p id="download-note" class="small text-muted" hidden>
+        Il download dei referti è riservato alla registrazione
+        completa: aggiungi azienda e telefono nella sezione Accesso.
+      </p>
 
       <div id="hero" class="audit-hero border rounded mb-4"></div>
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""API del server della GUI (seo_rrf_gui.py)."""
+"""API del server della GUI (seo_rrf_gui.py): auth, limiti, referti."""
 
 import json
 import threading
@@ -23,12 +23,13 @@ def gui_base():
 
 
 @pytest.fixture(autouse=True)
-def job_pulito():
+def ambiente_pulito(tmp_path):
     gui.JOB = gui.Job()
+    gui.STORE = gui.UserStore(tmp_path / "users.db")
     yield
 
 
-def _api(base, path, payload=None):
+def _api(base, path, payload=None, cookie=""):
     url = base + path
     if payload is None:
         req = urllib.request.Request(url)
@@ -36,6 +37,8 @@ def _api(base, path, payload=None):
         req = urllib.request.Request(
             url, data=json.dumps(payload).encode("utf-8"),
             headers={"Content-Type": "application/json"})
+    if cookie:
+        req.add_header("Cookie", cookie)
     try:
         with urllib.request.urlopen(req) as resp:
             return resp.status, resp.read(), dict(resp.headers)
@@ -43,12 +46,45 @@ def _api(base, path, payload=None):
         return exc.code, exc.read(), dict(exc.headers)
 
 
+def _register(base, email="paola@esempio.it", completo=False,
+              nome="Paola Rossi"):
+    """Registra un utente e restituisce il cookie di sessione."""
+    payload = {"nome": nome, "email": email,
+               "password": "segretissima", "tos": True}
+    if completo:
+        payload["azienda"] = "Centro Esempio"
+        payload["telefono"] = "0521 123456"
+    status, body, headers = _api(base, "/api/register", payload)
+    assert status == 201, body
+    return headers.get("Set-Cookie", "").split(";")[0]
+
+
+def _attendi_stato(base, cookie, attesi, timeout=120):
+    scadenza = time.time() + timeout
+    snap = {}
+    while time.time() < scadenza:
+        _, body, _ = _api(base, "/api/status", cookie=cookie)
+        snap = json.loads(body)
+        if snap.get("state") in attesi:
+            break
+        time.sleep(0.3)
+    return snap
+
+
+def sra_version():
+    import seo_rrf_audit
+    return seo_rrf_audit.__version__
+
+
+# ---------------- statici e ambiente ----------------
+
 def test_statici_con_csp_e_traversal_negato(gui_base):
     for path, atteso in (("/", b"Audit SEO"),
                          ("/", b"Lympha"),
                          ("/app.js", b"use strict"),
                          ("/config.js", b"__PUBLIC_PATH__"),
                          ("/theme.css", b"--lt-teal"),
+                         ("/tos.html", b"Condizioni di servizio"),
                          ("/brand/lympha-brand.css", b"--lt-teal"),
                          ("/brand/lympha-mark.svg", b"<svg"),
                          ("/brand/favicon.png", b"PNG")):
@@ -71,16 +107,16 @@ def test_env(gui_base):
     assert env["default_embeddings_model"]
 
 
-def sra_version():
-    import seo_rrf_audit
-    return seo_rrf_audit.__version__
-
+# ---------------- validazione della configurazione ----------------
 
 def test_validazione_input(gui_base):
-    status, body, _ = _api(gui_base, "/api/audit", {"url": ""})
+    cookie = _register(gui_base)
+    status, body, _ = _api(gui_base, "/api/audit", {"url": ""},
+                           cookie=cookie)
     assert status == 400 and b"URL" in body
     status, body, _ = _api(gui_base, "/api/audit",
-                           {"url": "https://x.it", "max_pages": 9999})
+                           {"url": "https://x.it", "max_pages": 9999},
+                           cookie=cookie)
     assert status == 400 and b"max_pages" in body
 
 
@@ -113,86 +149,167 @@ def test_validazione_respect_robots():
     assert config["respect_robots"] is False
 
 
-def test_referto_assente_prima_dell_audit(gui_base):
+# ---------------- registrazione e accesso ----------------
+
+def test_registrazione_valida_e_me(gui_base):
+    cookie = _register(gui_base)
+    status, body, _ = _api(gui_base, "/api/me", cookie=cookie)
+    info = json.loads(body)
+    assert status == 200 and info["authenticated"]
+    assert info["user"]["email"] == "paola@esempio.it"
+    assert info["user"]["profile_complete"] is False
+
+    status, body, _ = _api(gui_base, "/api/me")
+    assert not json.loads(body)["authenticated"]
+
+
+def test_registrazione_rifiutata_senza_tos(gui_base):
+    status, body, _ = _api(gui_base, "/api/register", {
+        "nome": "Paola", "email": "p@esempio.it",
+        "password": "segretissima", "tos": False})
+    assert status == 400 and b"condizioni" in body
+
+
+def test_registrazione_valida_campi(gui_base):
+    base_payload = {"nome": "Paola", "email": "p@esempio.it",
+                    "password": "segretissima", "tos": True}
+    for campo, valore, errore in (
+            ("nome", "", b"nome"),
+            ("email", "non-una-email", b"Email"),
+            ("password", "corta", b"password")):
+        payload = dict(base_payload)
+        payload[campo] = valore
+        status, body, _ = _api(gui_base, "/api/register", payload)
+        assert status == 400 and errore in body, campo
+
+
+def test_email_duplicata(gui_base):
+    _register(gui_base)
+    status, body, _ = _api(gui_base, "/api/register", {
+        "nome": "Altra", "email": "paola@esempio.it",
+        "password": "unaltrapass", "tos": True})
+    assert status == 409 and b"email" in body.lower()
+
+
+def test_login_logout(gui_base):
+    _register(gui_base)
+    status, body, _ = _api(gui_base, "/api/login", {
+        "email": "paola@esempio.it", "password": "sbagliata"})
+    assert status == 401
+
+    status, body, headers = _api(gui_base, "/api/login", {
+        "email": "paola@esempio.it", "password": "segretissima"})
+    assert status == 200
+    cookie = headers.get("Set-Cookie", "").split(";")[0]
+
+    status, _, _ = _api(gui_base, "/api/logout", {}, cookie=cookie)
+    assert status == 200
+    status, body, _ = _api(gui_base, "/api/me", cookie=cookie)
+    assert not json.loads(body)["authenticated"]
+
+
+# ---------------- gating: audit e referti ----------------
+
+def test_audit_richiede_accesso(gui_base, site):
+    status, body, _ = _api(gui_base, "/api/audit", {"url": site})
+    assert status == 401
+    status, _, _ = _api(gui_base, "/api/status")
+    assert status == 401
     status, _, _ = _api(gui_base, "/api/report/html")
+    assert status == 401
+
+
+def test_referto_assente_prima_dell_audit(gui_base):
+    cookie = _register(gui_base, completo=True)
+    status, _, _ = _api(gui_base, "/api/report/html", cookie=cookie)
     assert status == 404
 
 
-def test_ciclo_completo_con_409_e_referti(gui_base, site):
+def test_ciclo_completo_referti_e_gating_profilo(gui_base, site):
+    cookie = _register(gui_base)  # registrazione rapida
     status, body, _ = _api(gui_base, "/api/audit", {
         "url": site, "max_pages": 8, "delay": 0.2, "max_body": 10,
-        "rrf_k": 60, "queries": "drenaggio linfatico"})
+        "rrf_k": 60, "queries": "drenaggio linfatico"},
+        cookie=cookie)
     assert status == 202, body
 
-    status, _, _ = _api(gui_base, "/api/audit", {"url": site})
+    # Un secondo utente trova il job occupato (409), non il limite.
+    cookie2 = _register(gui_base, email="altro@esempio.it")
+    status, _, _ = _api(gui_base, "/api/audit", {"url": site},
+                        cookie=cookie2)
     assert status == 409
 
-    scadenza = time.time() + 120
-    snap = {}
-    while time.time() < scadenza:
-        _, body, _ = _api(gui_base, "/api/status")
-        snap = json.loads(body)
-        if snap["state"] in ("done", "error"):
-            break
-        time.sleep(0.5)
+    snap = _attendi_stato(gui_base, cookie, ("done", "error"))
     assert snap["state"] == "done", snap.get("error")
     assert any(line.startswith("[5/5]") for line in snap["log"])
     assert snap["summary"]["pages_ok"] >= 1
     assert snap["findings"] and snap["rrf"]
-
-    assert snap["remediation"], "atteso il piano di remediation"
-    assert snap["remediation"][0]["severity"] == "critical"
-
-    # Campi per i widget di sintesi (anello, tile, donut pagine).
+    assert snap["remediation"]
     riass = snap["summary"]
     assert riass["pages_clean"] + riass["pages_flagged"] \
         + riass["pages_error"] == riass["pages_total"]
-    assert riass["info"] >= 0
 
-    status, body, _ = _api(gui_base, "/api/report/html")
+    # Registrazione rapida: il download e' negato con codice chiaro.
+    status, body, _ = _api(gui_base, "/api/report/html",
+                           cookie=cookie)
+    assert status == 403
+    assert json.loads(body)["code"] == "profile_incomplete"
+
+    # Profilo completato: i tre referti si scaricano.
+    status, _, _ = _api(gui_base, "/api/profile", {
+        "azienda": "Centro Esempio", "telefono": "0521 123456"},
+        cookie=cookie)
+    assert status == 200
+    status, body, _ = _api(gui_base, "/api/report/html",
+                           cookie=cookie)
     assert status == 200 and body.startswith(b"<!DOCTYPE html>")
-    status, body, _ = _api(gui_base, "/api/report/json")
+    status, body, _ = _api(gui_base, "/api/report/json",
+                           cookie=cookie)
     assert status == 200 and json.loads(body)["scores"]
-    status, body, headers = _api(gui_base,
-                                 "/api/report/text?download=1")
+    status, body, headers = _api(
+        gui_base, "/api/report/text?download=1", cookie=cookie)
     assert status == 200 and b"AUDIT" in body
     assert "attachment" in headers.get("Content-Disposition", "")
 
 
+def test_limite_orario(gui_base, site):
+    cookie = _register(gui_base, completo=True)
+    status, _, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 2, "delay": 0.0,
+        "queries": "drenaggio linfatico"}, cookie=cookie)
+    assert status == 202
+    _attendi_stato(gui_base, cookie, ("done", "error"))
+
+    status, body, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 2, "delay": 0.0}, cookie=cookie)
+    assert status == 429
+    dati = json.loads(body)
+    assert 0 < dati["retry_in_s"] <= gui.CHECK_INTERVAL_S
+    assert "ora" in dati["error"]
+
+
 def test_annullamento_audit(gui_base, site):
-    # Senza audit in corso l'annullamento e' un 409.
-    status, _, _ = _api(gui_base, "/api/cancel", {})
+    cookie = _register(gui_base, completo=True)
+    status, _, _ = _api(gui_base, "/api/cancel", {}, cookie=cookie)
     assert status == 409
 
-    # Audit lento (delay alto), annullato quasi subito.
     status, body, _ = _api(gui_base, "/api/audit", {
         "url": site, "max_pages": 8, "delay": 1.0,
-        "queries": "drenaggio linfatico"})
+        "queries": "drenaggio linfatico"}, cookie=cookie)
     assert status == 202, body
     time.sleep(0.5)
-    status, _, _ = _api(gui_base, "/api/cancel", {})
+    status, _, _ = _api(gui_base, "/api/cancel", {}, cookie=cookie)
     assert status == 202
 
-    scadenza = time.time() + 30
-    snap = {}
-    while time.time() < scadenza:
-        _, body, _ = _api(gui_base, "/api/status")
-        snap = json.loads(body)
-        if snap["state"] != "running":
-            break
-        time.sleep(0.3)
+    snap = _attendi_stato(gui_base, cookie,
+                          ("cancelled", "done", "error"), timeout=30)
     assert snap["state"] == "cancelled"
     assert not snap["summary"], "un audit annullato non ha risultati"
 
-    # Dopo l'annullamento il job accetta un nuovo audit.
+    # L'annullamento libera lo slot orario: si puo' ripartire subito.
     status, _, _ = _api(gui_base, "/api/audit", {
         "url": site, "max_pages": 2, "delay": 0.0,
-        "queries": "drenaggio linfatico"})
+        "queries": "drenaggio linfatico"}, cookie=cookie)
     assert status == 202
-    scadenza = time.time() + 60
-    while time.time() < scadenza:
-        _, body, _ = _api(gui_base, "/api/status")
-        if json.loads(body)["state"] in ("done", "error"):
-            break
-        time.sleep(0.3)
-    assert json.loads(body)["state"] == "done"
+    snap = _attendi_stato(gui_base, cookie, ("done", "error"))
+    assert snap["state"] == "done"

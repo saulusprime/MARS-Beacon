@@ -101,7 +101,19 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v1.9.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.0.0 + `gui/`
+
+- **Account utente** (v2.0.0): registrazione rapida (nome, email,
+  password, accettazione condizioni di servizio con dichiarazione di
+  proprietà del sito — pagina `gui/tos.html`) o login; il check
+  richiede l'accesso, con limite di **un check all'ora per utente**
+  (l'annullamento libera lo slot); il download dei referti richiede
+  la **registrazione completa** (azienda e telefono, completabili
+  dal profilo in qualsiasi momento) — vincolo applicato lato server
+  (403), non solo nella UI. Utenti e sessioni su SQLite locale
+  (`seo_rrf_gui.db`, escluso dal repo), password PBKDF2-SHA256 con
+  salt per utente, cookie di sessione HttpOnly SameSite=Strict con
+  scadenza a 7 giorni.
 
 - **Audit annullabile** (v1.9.0): bottone "Annulla audit"
   nell'avanzamento e `POST /api/cancel`; lo stop è cooperativo

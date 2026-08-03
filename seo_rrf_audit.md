@@ -111,6 +111,20 @@ blocchi, confini di fase). Nella GUI (v1.9.0): endpoint
 nella sezione Avanzamento; dopo l'annullamento il job accetta
 subito un nuovo audit.
 
+Novità GUI 2.0.0 (2026-08-03): account utente. Registrazione rapida
+(nome, email, password e accettazione delle condizioni di servizio
+con dichiarazione di proprietà del sito, pagina `tos.html`) o login;
+solo gli utenti autenticati avviano il check, con limite di **un
+check all'ora per utente** (un annullamento non consuma lo slot); il
+download dei referti richiede la **registrazione completa** (azienda
+e telefono nel profilo, completabili anche dopo). Utenti e sessioni
+su SQLite locale (`seo_rrf_gui.db`, nel `.gitignore`), password con
+PBKDF2-SHA256 e salt per utente, sessioni con cookie HttpOnly
+SameSite=Strict. Nuovi endpoint: `/api/register`, `/api/login`,
+`/api/logout`, `/api/me`, `/api/profile`; `/api/audit`, `/api/status`
+e `/api/report/*` ora richiedono la sessione (i referti anche il
+profilo completo).
+
 ## Uso
 
 ```

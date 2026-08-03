@@ -49,10 +49,146 @@
   let running = false;
   let lastPhase = "";
 
+  let me = null;
+
   el("audit-form").addEventListener("submit", onSubmit);
   el("cancel-btn").addEventListener("click", cancelAudit);
+  el("login-form").addEventListener("submit", onLogin);
+  el("register-form").addEventListener("submit", onRegister);
+  el("profile-form").addEventListener("submit", onProfile);
+  el("logout-btn").addEventListener("click", onLogout);
+  ["dl-html", "dl-json", "dl-text", "open-report"].forEach((id) => {
+    el(id).addEventListener("click", (event) => {
+      if (!me || !me.profile_complete) {
+        event.preventDefault();
+      }
+    });
+  });
   loadEnv();
-  restoreResults();
+  refreshAuth();
+
+  /* ---------------- accesso e profilo ---------------- */
+
+  function showAuthError(message) {
+    const box = el("auth-error");
+    box.textContent = message;
+    box.hidden = false;
+    box.focus();
+  }
+
+  function postJson(path, payload) {
+    return fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then((r) => r.json().then(
+      (data) => ({ status: r.status, data })));
+  }
+
+  function refreshAuth() {
+    fetch("api/me")
+      .then((r) => r.json())
+      .then((info) => {
+        applyAuth(info.authenticated ? info.user : null);
+        if (me) {
+          restoreResults();
+        }
+      })
+      .catch(() => applyAuth(null));
+  }
+
+  function applyAuth(user) {
+    me = user;
+    el("auth-error").hidden = true;
+    if (me) {
+      el("auth-out").hidden = true;
+      el("auth-in").hidden = false;
+      el("auth-name").textContent = me.nome;
+      el("auth-email").textContent = me.email;
+      el("profile-block").hidden = !!me.profile_complete;
+      el("profile-ok").hidden = !me.profile_complete;
+      el("config-section").hidden = false;
+      setOpen("sec-auth", false);
+      setOpen("sec-config", true);
+    } else {
+      el("auth-out").hidden = false;
+      el("auth-in").hidden = true;
+      el("config-section").hidden = true;
+      el("progress-section").hidden = true;
+      el("results-section").hidden = true;
+      setOpen("sec-auth", true);
+    }
+    updateDownloadGate();
+  }
+
+  function updateDownloadGate() {
+    const locked = !me || !me.profile_complete;
+    ["dl-html", "dl-json", "dl-text", "open-report"].forEach((id) => {
+      const link = el(id);
+      link.classList.toggle("disabled", locked);
+      link.setAttribute("aria-disabled", locked ? "true" : "false");
+    });
+    el("download-note").hidden = !locked;
+  }
+
+  function onLogin(event) {
+    event.preventDefault();
+    postJson("api/login", {
+      email: el("l-email").value.trim(),
+      password: el("l-password").value,
+    })
+      .then(({ status, data }) => {
+        if (status !== 200) {
+          showAuthError(data.error || "Accesso non riuscito.");
+          return;
+        }
+        applyAuth(data.user);
+        restoreResults();
+      })
+      .catch(() => showAuthError("Server locale non raggiungibile."));
+  }
+
+  function onRegister(event) {
+    event.preventDefault();
+    postJson("api/register", {
+      nome: el("r-nome").value.trim(),
+      email: el("r-email").value.trim(),
+      password: el("r-password").value,
+      azienda: el("r-azienda").value.trim(),
+      telefono: el("r-telefono").value.trim(),
+      tos: el("r-tos").checked,
+    })
+      .then(({ status, data }) => {
+        if (status !== 201) {
+          showAuthError(data.error || "Registrazione non riuscita.");
+          return;
+        }
+        applyAuth(data.user);
+        el("announcer").textContent =
+          "Registrazione completata: puoi avviare il check.";
+      })
+      .catch(() => showAuthError("Server locale non raggiungibile."));
+  }
+
+  function onProfile(event) {
+    event.preventDefault();
+    postJson("api/profile", {
+      azienda: el("p-azienda").value.trim(),
+      telefono: el("p-telefono").value.trim(),
+    })
+      .then(({ status, data }) => {
+        if (status !== 200) {
+          showAuthError(data.error || "Aggiornamento non riuscito.");
+          return;
+        }
+        applyAuth(data.user);
+      })
+      .catch(() => showAuthError("Server locale non raggiungibile."));
+  }
+
+  function onLogout() {
+    postJson("api/logout", {}).finally(() => applyAuth(null));
+  }
 
   function cancelAudit() {
     const btn = el("cancel-btn");
@@ -261,6 +397,10 @@
     fetch("api/status")
       .then((r) => r.json())
       .then((snap) => {
+        if (!snap.state) {
+          fail(snap.error || "Sessione scaduta: accedi di nuovo.");
+          return;
+        }
         renderLog(snap.log || []);
         if (snap.state === "done") {
           finish(snap);

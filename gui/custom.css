@@ -222,6 +222,14 @@
   margin: .2rem 0;
 }
 
+/* ------------------------- Accesso ------------------------- */
+/* Come per le legend: l'etichetta attiva di Bootstrap Italia trasla
+   sopra il bordo del form-group e coprirebbe il titolo del form. */
+
+#auth-out h3 {
+  margin-bottom: 2.6rem;
+}
+
 /* ------------------- Piano di remediation ------------------- */
 
 .remediation-ex {
