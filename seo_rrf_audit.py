@@ -84,9 +84,11 @@ except ImportError:  # pragma: no cover
 
 __version__ = "1.4.0"
 
+# La pagina indicata nello user agent spiega chi e' il bot e come
+# escluderlo; sovrascrivibile con --user-agent.
 USER_AGENT = (
     "Mozilla/5.0 (compatible; SeoRrfAudit/%s; "
-    "+https://example.invalid/bot)" % __version__
+    "+https://github.com/saulusprime/SEO-RRF)" % __version__
 )
 
 # Token con cui lo strumento compare nel robots.txt (gruppo
@@ -347,10 +349,11 @@ class Fetcher:
                  verbose: bool = True,
                  max_bytes: int = DEFAULT_MAX_BODY_MB * 1048576,
                  retries: int = DEFAULT_RETRIES,
-                 backoff: float = RETRY_BACKOFF_S) -> None:
+                 backoff: float = RETRY_BACKOFF_S,
+                 user_agent: str = USER_AGENT) -> None:
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": USER_AGENT,
+            "User-Agent": user_agent or USER_AGENT,
             "Accept-Language": "it,en;q=0.8",
         })
         self.delay = delay
@@ -2096,14 +2099,15 @@ def run_audit(base: str, max_pages: int, queries: List[str],
               max_body_mb: float = DEFAULT_MAX_BODY_MB,
               respect_robots: bool = False,
               retries: int = DEFAULT_RETRIES,
-              competitors: Optional[List[str]] = None) -> Tuple[
+              competitors: Optional[List[str]] = None,
+              user_agent: str = USER_AGENT) -> Tuple[
                   List[Page], List[Finding],
                   Dict[str, Optional[float]], List[QueryResult], str,
                   Optional[Dict[str, object]]]:
     """Esegue l'intero audit e restituisce i risultati grezzi."""
     fetcher = Fetcher(delay=delay, verbose=verbose,
                       max_bytes=int(max_body_mb * 1048576),
-                      retries=retries)
+                      retries=retries, user_agent=user_agent)
 
     if verbose:
         print("[1/5] robots.txt", file=sys.stderr)
@@ -2252,6 +2256,12 @@ def build_parser() -> argparse.ArgumentParser:
                              "errori di rete e HTTP 429/500/502/503/"
                              "504; rispetta Retry-After (default %d, "
                              "0 disattiva)" % DEFAULT_RETRIES)
+    parser.add_argument("--user-agent", default=USER_AGENT,
+                        metavar="UA", dest="user_agent",
+                        help="header User-Agent inviato con ogni "
+                             "richiesta; il predefinito identifica lo "
+                             "strumento e rimanda alla pagina del "
+                             "progetto (%s)" % USER_AGENT)
     parser.add_argument("--respect-robots", action="store_true",
                         help="rispetta i Disallow del robots.txt per "
                              "l'agente %s: gli URL vietati non "
@@ -2313,7 +2323,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 max_body_mb=args.max_body,
                 respect_robots=args.respect_robots,
                 retries=max(0, args.retries),
-                competitors=competitors)
+                competitors=competitors,
+                user_agent=args.user_agent)
     except KeyboardInterrupt:
         print("\nInterrotto dall'utente.", file=sys.stderr)
         return 130

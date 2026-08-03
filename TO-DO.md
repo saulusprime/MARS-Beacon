@@ -6,13 +6,6 @@ vengono spostate lì, non spuntate qui. Le voci marcate
 **[bug/rischio]** sono comportamenti osservati nel codice; il resto
 sono proposte.
 
-## P0 — Correttezza e igiene di progetto
-
-- [x] **Aggiungere `LICENSE`** (MIT è dichiarata nel docstring ma il file manca).
-- [ ] **User agent con URL reale.** `USER_AGENT` punta a
-      `https://example.invalid/bot`: sostituire con una pagina che spieghi chi
-      è il bot, o rendere l'UA configurabile (`--user-agent`).
-
 ## P1 — Robustezza del crawling
 
 - [ ] Gestione esplicita delle catene di redirect (segnalare 301/302 interni,

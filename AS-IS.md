@@ -55,9 +55,10 @@ sono nel [README.md](README.md).
   default 2) con attese 0,5 s → 1 s → 2 s (tetto 8 s) e rispetto
   dell'header `Retry-After`; gli altri stati HTTP e i corpi oltre
   `--max-body` non vengono ritentati perché sono segnali diagnostici.
-- Fetcher con user agent esplicito, throttle configurabile
-  (`--delay`), timeout 20 s; PEP8, `flake8` pulito, licenza MIT
-  dichiarata nel modulo.
+- Fetcher con user agent esplicito e configurabile (`--user-agent`;
+  il predefinito identifica lo strumento e rimanda alla pagina del
+  progetto su GitHub), throttle configurabile (`--delay`), timeout
+  20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
 ## Interfaccia grafica locale — `seo_rrf_gui.py` v1.4.0 + `gui/`
 
@@ -149,6 +150,8 @@ sono nel [README.md](README.md).
 
 - `requirements.txt` (esecuzione) e `requirements-dev.txt`
   (pytest + flake8 + SDK anthropic per i test), `pytest.ini`.
+- File `LICENSE` (MIT) alla radice del repository, coerente con la
+  licenza dichiarata nei moduli.
 - **Repository git** inizializzato su branch `main` con `.gitignore`
   (esclusi bytecode, venv, referti e storici generati a runtime;
   vendorizzati Bootstrap Italia e asset brand inclusi nel
@@ -168,4 +171,4 @@ sono nel [README.md](README.md).
 - L'audit avviato dalla GUI non è annullabile (esecuzione in-process).
 - Il recupero vettoriale reale richiede l'attivazione esplicita con
   `--embeddings`, anche quando sentence-transformers è installato.
-- Nessuna CI; file LICENSE assente (MIT dichiarata solo nei moduli).
+- Nessuna CI.
