@@ -1,0 +1,20 @@
+# Pianificazione del monitoraggio citazioni IA: una volta a settimana.
+#
+# Installazione:
+#   sudo cp deploy/seo-rrf-citations.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now seo-rrf-citations.timer
+#
+# Verifica:  systemctl list-timers seo-rrf-citations
+# Esecuzione manuale di prova:  sudo systemctl start seo-rrf-citations
+
+[Unit]
+Description=Monitoraggio citazioni IA settimanale
+
+[Timer]
+OnCalendar=Mon 07:30
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

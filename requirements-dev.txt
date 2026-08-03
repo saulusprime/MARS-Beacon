@@ -1,0 +1,5 @@
+# Dipendenze di sviluppo: lint e suite di test.
+-r requirements.txt
+pytest>=7
+flake8>=6
+anthropic>=0.120

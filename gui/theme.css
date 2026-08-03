@@ -1,0 +1,179 @@
+/* =========================================================================
+   Tema Lympha Technologies per l'interfaccia dell'audit.
+   Consuma i token --lt-* di brand/lympha-brand.css e replica i pattern
+   del sito (lymphatech.it): header bianco con marchio, bottoni teal,
+   footer teal-900, focus arancione sulle superfici scure.
+   Va caricato dopo bootstrap-italia.min.css e brand/lympha-brand.css.
+   Tutti gli accostamenti rispettano un contrasto >= 4.5:1 (WCAG 2.2 AA).
+   ========================================================================= */
+
+body {
+  font-family: var(--bs-body-font-family);
+  color: var(--lt-ink);
+}
+
+main h2,
+main h3 {
+  color: var(--lt-teal-900);
+}
+
+main a {
+  color: var(--lt-teal-700);
+}
+
+main a:hover {
+  color: var(--lt-teal-900);
+}
+
+/* ------------------------------- Header -------------------------------- */
+
+.lt-header {
+  background: #fff;
+  border-bottom: 1px solid var(--lt-border);
+}
+
+.lt-brand {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+}
+
+.lt-brand .lt-logo {
+  height: 56px;
+  width: auto;
+  flex: 0 0 auto;
+  border-radius: .5rem;
+}
+
+.lt-brand .lt-name {
+  font-weight: 700;
+  font-size: 1.45rem;
+  color: var(--lt-teal-900);
+  line-height: 1;
+}
+
+.lt-brand .lt-tag {
+  font-size: .95rem;
+  color: var(--lt-ink-soft);
+  letter-spacing: .08em;
+}
+
+.lt-app-title {
+  color: var(--lt-teal-700);
+}
+
+.lt-header .lt-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--lt-border);
+}
+
+/* ------------------------------- Bottoni ------------------------------- */
+
+.btn-primary {
+  --bs-btn-bg: var(--lt-teal);
+  --bs-btn-border-color: var(--lt-teal);
+  --bs-btn-hover-bg: var(--lt-teal-700);
+  --bs-btn-hover-border-color: var(--lt-teal-700);
+  --bs-btn-active-bg: var(--lt-teal-900);
+  --bs-btn-active-border-color: var(--lt-teal-900);
+  --bs-btn-disabled-bg: var(--lt-teal);
+  --bs-btn-disabled-border-color: var(--lt-teal);
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--lt-teal-700);
+  --bs-btn-border-color: var(--lt-teal);
+  --bs-btn-hover-bg: var(--lt-teal);
+  --bs-btn-hover-border-color: var(--lt-teal);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: var(--lt-teal-700);
+  --bs-btn-active-border-color: var(--lt-teal-700);
+  --bs-btn-active-color: #fff;
+}
+
+.btn-outline-primary .icon-primary {
+  fill: currentColor;
+}
+
+.btn-outline-secondary {
+  --bs-btn-color: var(--lt-ink-soft);
+  --bs-btn-border-color: var(--lt-ink-soft);
+  --bs-btn-hover-bg: var(--lt-ink-soft);
+  --bs-btn-hover-border-color: var(--lt-ink-soft);
+  --bs-btn-hover-color: #fff;
+}
+
+/* -------------------------------- Form --------------------------------- */
+
+/* L'etichetta attiva di Bootstrap Italia trasla di -85% (circa 2.1rem)
+   sopra il bordo del form-group: fra i gruppi lo assorbe il loro
+   margine di 3rem, ma dopo una legenda (margine ~.5rem) l'etichetta
+   finirebbe sovrapposta al titolo. Si riporta la legenda nel flusso
+   e le si lascia lo spazio che l'etichetta occupa. */
+main fieldset legend,
+main fieldset legend.h5 {
+  float: none;
+  width: auto;
+  margin-bottom: 2.75rem;
+}
+
+.form-control:focus {
+  border-color: var(--lt-teal);
+  box-shadow: 0 0 0 .25rem rgba(24, 96, 120, .25);
+}
+
+.form-check input[type="checkbox"] {
+  accent-color: var(--lt-teal);
+}
+
+/* ---------------------------- Componenti ------------------------------- */
+
+.accordion-button {
+  color: var(--lt-teal-700);
+}
+
+.accordion-button:not(.collapsed) {
+  color: var(--lt-teal-900);
+  background-color: var(--lt-mist);
+}
+
+.accordion-button:focus {
+  border-color: var(--lt-teal);
+  box-shadow: 0 0 0 .25rem rgba(24, 96, 120, .25);
+}
+
+.progress-bar {
+  background-color: var(--lt-teal);
+}
+
+.table thead th {
+  color: var(--lt-teal-900);
+}
+
+/* -------------------------------- Footer ------------------------------- */
+
+.lt-footer {
+  background: var(--lt-teal-900);
+  color: #cdd8e4;
+  border-top: 0;
+}
+
+.lt-footer .lt-name {
+  color: #fff;
+  font-weight: 700;
+}
+
+.lt-footer .lt-name span {
+  color: var(--lt-aqua);
+}
+
+.lt-footer a {
+  color: #fff;
+}
+
+.lt-footer a:focus-visible,
+.lt-header a:focus-visible {
+  outline: 2px solid var(--lt-orange) !important;
+  outline-offset: 2px;
+}

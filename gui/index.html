@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audit SEO + RRF — Lympha Technologies</title>
+  <link rel="icon" type="image/png" href="brand/favicon.png">
+  <link rel="stylesheet" href="vendor/bootstrap-italia/css/bootstrap-italia.min.css">
+  <link rel="stylesheet" href="brand/lympha-brand.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="custom.css">
+</head>
+<body>
+
+  <a class="visually-hidden-focusable skip-link" href="#main">Vai al contenuto principale</a>
+
+  <header class="lt-header py-3">
+    <div class="container d-flex flex-wrap align-items-center
+                column-gap-4 row-gap-2">
+      <div class="lt-brand">
+        <img class="lt-logo" src="brand/lympha-mark.svg" alt=""
+             aria-hidden="true">
+        <span>
+          <span class="lt-name d-block">Lympha</span>
+          <span class="lt-tag d-block">technologies</span>
+        </span>
+      </div>
+      <span class="lt-divider d-none d-sm-block" aria-hidden="true"></span>
+      <h1 class="h5 mb-0 lt-app-title">Audit SEO &amp; Reciprocal Rank
+        Fusion</h1>
+    </div>
+  </header>
+
+  <main id="main" class="container my-4">
+
+    <!-- ================= Configurazione ================= -->
+    <section aria-labelledby="config-heading" class="mb-5">
+      <h2 id="config-heading">Configurazione dell'audit</h2>
+
+      <div id="form-error" class="alert alert-danger" role="alert"
+           tabindex="-1" hidden></div>
+
+      <form id="audit-form" novalidate>
+        <fieldset class="mb-4">
+          <legend class="h5">Sito e scansione</legend>
+
+          <div class="form-group">
+            <label for="f-url" class="active">URL del sito da auditare *</label>
+            <input type="text" class="form-control" id="f-url" name="url"
+                   required autocomplete="url" spellcheck="false"
+                   aria-describedby="h-url" placeholder=" ">
+            <small id="h-url" class="form-text">
+              Esempio: https://esempio.it — se ometti lo schema viene
+              usato https://
+            </small>
+            <div class="invalid-feedback" id="e-url"></div>
+          </div>
+
+          <div class="row">
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-max-pages" class="active">Pagine massime</label>
+                <input type="number" class="form-control" id="f-max-pages"
+                       name="max_pages" value="25" min="1" max="500"
+                       step="1" inputmode="numeric"
+                       aria-describedby="h-max-pages">
+                <small id="h-max-pages" class="form-text">
+                  Da 1 a 500 (predefinito 25)
+                </small>
+                <div class="invalid-feedback" id="e-max-pages"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-delay" class="active">Pausa fra richieste
+                  (secondi)</label>
+                <input type="number" class="form-control" id="f-delay"
+                       name="delay" value="0.5" min="0" max="10" step="0.1"
+                       inputmode="decimal" aria-describedby="h-delay">
+                <small id="h-delay" class="form-text">
+                  Da 0 a 10 (predefinito 0,5)
+                </small>
+                <div class="invalid-feedback" id="e-delay"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-max-body" class="active">Dimensione massima
+                  risposta (MB)</label>
+                <input type="number" class="form-control" id="f-max-body"
+                       name="max_body" value="10" min="1" max="10240"
+                       step="1" inputmode="numeric"
+                       aria-describedby="h-max-body">
+                <small id="h-max-body" class="form-text">
+                  Tetto per ogni pagina scaricata (predefinito 10)
+                </small>
+                <div class="invalid-feedback" id="e-max-body"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-retries" class="active">Ritentativi su
+                  errori transitori</label>
+                <input type="number" class="form-control" id="f-retries"
+                       name="retries" value="2" min="0" max="10"
+                       step="1" inputmode="numeric"
+                       aria-describedby="h-retries">
+                <small id="h-retries" class="form-text">
+                  Con attesa crescente, su errori di rete e HTTP
+                  429/5xx (predefinito 2, 0 disattiva)
+                </small>
+                <div class="invalid-feedback" id="e-retries"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="f-competitors" class="active">Siti concorrenti
+              (facoltativi)</label>
+            <textarea class="form-control" id="f-competitors"
+                      name="competitors" rows="2"
+                      aria-describedby="h-competitors"></textarea>
+            <small id="h-competitors" class="form-text">
+              Da 1 a 3 URL, uno per riga. Ogni concorrente viene
+              scansionato con gli stessi limiti e confrontato sulle
+              stesse query: il referto mostra la share of voice nei
+              primi posti delle liste fuse.
+            </small>
+            <div class="invalid-feedback" id="e-competitors"></div>
+          </div>
+
+          <div class="form-check">
+            <input type="checkbox" id="f-respect-robots"
+                   aria-describedby="h-respect-robots">
+            <label for="f-respect-robots">Rispetta i Disallow del
+              robots.txt</label>
+          </div>
+          <small id="h-respect-robots" class="form-text d-block mb-2">
+            Se attivo, gli URL vietati all'agente SeoRrfAudit dal
+            robots.txt non vengono scaricati e sono elencati nel
+            referto. Se spento (predefinito) l'audit li analizza
+            comunque: utile quando il sito è tuo.
+          </small>
+        </fieldset>
+
+        <fieldset class="mb-4">
+          <legend class="h5">Recupero e fusione</legend>
+
+          <div class="form-group">
+            <label for="f-queries" class="active">Query di prova
+              (facoltative)</label>
+            <textarea class="form-control" id="f-queries" name="queries"
+                      rows="4" aria-describedby="h-queries"></textarea>
+            <small id="h-queries" class="form-text">
+              Una per riga. Se vuoto, le query vengono generate
+              automaticamente dai temi del sito.
+            </small>
+          </div>
+
+          <div class="row">
+            <div class="col-12 col-md-8">
+              <div class="form-group">
+                <label for="f-embeddings" class="active">Modello di
+                  embedding (facoltativo)</label>
+                <input type="text" class="form-control" id="f-embeddings"
+                       name="embeddings" spellcheck="false"
+                       aria-describedby="h-embeddings"
+                       list="embeddings-suggestions">
+                <datalist id="embeddings-suggestions">
+                  <option value="paraphrase-multilingual-MiniLM-L12-v2"></option>
+                  <option value="sentence-transformers/all-MiniLM-L6-v2"></option>
+                </datalist>
+                <small id="h-embeddings" class="form-text">
+                  Nome di un modello sentence-transformers per il recupero
+                  vettoriale reale.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="form-group">
+                <label for="f-rrf-k" class="active">Costante k della
+                  formula RRF</label>
+                <input type="number" class="form-control" id="f-rrf-k"
+                       name="rrf_k" value="60" min="1" max="1000" step="1"
+                       inputmode="numeric" aria-describedby="h-rrf-k">
+                <small id="h-rrf-k" class="form-text">
+                  Da 1 a 1000 (predefinito 60)
+                </small>
+                <div class="invalid-feedback" id="e-rrf-k"></div>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+          Avvia audit
+        </button>
+      </form>
+    </section>
+
+    <!-- ================= Avanzamento ================= -->
+    <section aria-labelledby="progress-heading" id="progress-section"
+             class="mb-5" hidden>
+      <h2 id="progress-heading" tabindex="-1">Avanzamento</h2>
+
+      <p id="announcer" role="status" class="fw-semibold mb-2"></p>
+
+      <div class="progress progress-indeterminate mb-3" aria-hidden="true"
+           id="progress-anim">
+        <div class="progress-bar" role="progressbar"></div>
+      </div>
+
+      <h3 class="h6">Log di scansione</h3>
+      <div class="audit-log border rounded" tabindex="0" role="group"
+           aria-label="Log di scansione, area scorrevole">
+        <pre id="log" class="mb-0 p-3"></pre>
+      </div>
+    </section>
+
+    <!-- ================= Errore audit ================= -->
+    <div id="audit-error" class="alert alert-danger" role="alert"
+         tabindex="-1" hidden></div>
+
+    <!-- ================= Risultati ================= -->
+    <section aria-labelledby="results-heading" id="results-section"
+             class="mb-5" hidden>
+      <h2 id="results-heading" tabindex="-1">Risultati dell'audit</h2>
+      <p id="results-meta" class="text-muted"></p>
+
+      <h3 class="h5">Punteggi per area</h3>
+      <div id="scores" class="mb-4"></div>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc"></div>
+
+      <h3 class="h5">Simulazione RRF per query</h3>
+      <div class="table-responsive mb-4" tabindex="0" role="group"
+           aria-label="Tabella della simulazione RRF, area scorrevole">
+        <table class="table table-striped align-middle" id="rrf-table">
+          <caption class="small">
+            Consenso: passaggi presenti sia nei primi 5 lessicali sia nei
+            primi 5 vettoriali. «Coperta» indica che la query trova
+            almeno un passaggio in ciascuna lista.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Query</th>
+              <th scope="col">Consenso</th>
+              <th scope="col">Coperta</th>
+              <th scope="col">Primo passaggio dopo la fusione</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div id="competitive-block" hidden>
+        <h3 class="h5">Confronto competitivo</h3>
+        <p class="small text-muted mb-2" id="competitive-intro"></p>
+        <div id="share-bars" class="mb-3"></div>
+        <div class="table-responsive mb-4" tabindex="0" role="group"
+             aria-label="Tabella del confronto competitivo, area
+                         scorrevole">
+          <table class="table table-striped align-middle"
+                 id="sov-table">
+            <caption class="small">
+              Per ogni query: quanti dei primi posti fusi sono
+              occupati da tuoi passaggi e la migliore posizione
+              raggiunta dal tuo sito.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Query</th>
+                <th scope="col">Tuoi passaggi</th>
+                <th scope="col">Migliore posizione</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 class="h5">Referto completo</h3>
+      <div class="mb-3 d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-primary" id="dl-html"
+           href="api/report/html?download=1">
+          <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
+          Scarica HTML
+        </a>
+        <a class="btn btn-outline-primary" id="dl-json"
+           href="api/report/json?download=1">
+          <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
+          Scarica JSON
+        </a>
+        <a class="btn btn-outline-primary" id="dl-text"
+           href="api/report/text?download=1">
+          <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
+          Scarica testo
+        </a>
+        <a class="btn btn-outline-secondary" id="open-report"
+           href="api/report/html" target="_blank" rel="noopener">
+          <svg class="icon icon-sm me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-external-link"></use></svg>
+          Apri il referto HTML
+          <span class="visually-hidden">(si apre in una nuova scheda)</span>
+        </a>
+      </div>
+      <iframe id="report-frame" class="report-frame w-100 border rounded"
+              title="Anteprima del referto HTML completo" sandbox=""
+              hidden></iframe>
+    </section>
+  </main>
+
+  <footer class="lt-footer py-4">
+    <div class="container small">
+      <p class="mb-1">
+        <span class="lt-name">Lympha <span>Technologies</span> S.r.l.</span>
+      </p>
+      <p class="mb-0" id="footer-info">
+        Strumento locale: nessun dato lascia questa macchina, tranne le
+        richieste verso il sito auditato.
+      </p>
+    </div>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="vendor/bootstrap-italia/js/bootstrap-italia.bundle.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

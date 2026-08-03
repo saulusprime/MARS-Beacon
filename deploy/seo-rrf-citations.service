@@ -1,0 +1,43 @@
+# Esecuzione singola del monitoraggio citazioni IA.
+# Attivata periodicamente da seo-rrf-citations.timer.
+#
+# Prerequisiti sulla macchina:
+#   - /opt/seorrf con il progetto e venv (vedi seo-rrf-gui.service)
+#   - /opt/seorrf/venv/bin/pip install anthropic
+#   - /etc/seorrf/citations.env con le chiavi API, ad esempio:
+#       ANTHROPIC_API_KEY=sk-ant-...
+#       PERPLEXITY_API_KEY=pplx-...
+#     (chmod 600, root:root)
+#   - /etc/seorrf/query.txt con le query target (10-15, una per riga)
+#
+# Lo storico si accumula in /var/lib/seorrf/citazioni.jsonl; con
+# --fail-under il servizio fallisce (visibile in systemctl/monitoring)
+# quando il tasso di citazione scende sotto la soglia.
+
+[Unit]
+Description=Lympha Technologies - monitoraggio citazioni IA
+Documentation=file:///opt/seorrf/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/seorrf
+EnvironmentFile=/etc/seorrf/citations.env
+StateDirectory=seorrf
+ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/seo_rrf_citations.py \
+    https://SITO-DEL-CLIENTE.it \
+    --queries /etc/seorrf/query.txt \
+    --provider anthropic \
+    --history /var/lib/seorrf/citazioni.jsonl \
+    --fail-under 20 --quiet
+
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadOnlyPaths=/opt/seorrf
+
+[Install]
+WantedBy=multi-user.target

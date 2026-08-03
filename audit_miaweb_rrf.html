@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit RRF — miaweb.art</title>
+<style>
+  :root{
+    --bg:#f7f8fa;--card:#fff;--ink:#1a1d24;--muted:#5b6472;--line:#e3e7ee;
+    --accent:#3d5afe;--accent-soft:#eef1ff;
+    --good:#0b8f6a;--warn:#c2410c;--bad:#c62828;
+    --good-bg:rgba(11,143,106,.12);--warn-bg:rgba(194,65,12,.12);--bad-bg:rgba(198,40,40,.12);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0f1218;--card:#171b23;--ink:#e8ebf1;--muted:#9aa4b4;--line:#262c38;
+      --accent:#7c93ff;--accent-soft:#1c2233;
+      --good:#34d399;--warn:#fb923c;--bad:#f87171;
+      --good-bg:rgba(52,211,153,.13);--warn-bg:rgba(251,146,60,.13);--bad-bg:rgba(248,113,113,.13);}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;padding:32px 16px}
+  .wrap{max-width:880px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:.92rem;margin:0 0 6px}
+  .meta{color:var(--muted);font-size:.78rem;margin:0 0 22px}
+  .verdict{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--bad);
+    border-radius:12px;padding:16px 20px;margin:0 0 20px}
+  .verdict h2{margin:0 0 6px;font-size:1.05rem}
+  .verdict p{margin:0 0 8px;font-size:.92rem}
+  .verdict p:last-child{margin-bottom:0}
+  .balance{display:flex;gap:14px;margin:18px 0 20px;flex-wrap:wrap}
+  .axis{flex:1;min-width:240px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .axis h3{margin:0 0 8px;font-size:.9rem;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .axmeter{height:9px;border-radius:999px;background:var(--line);overflow:hidden;margin-bottom:8px}
+  .axfill{height:100%}
+  .axis p{margin:0;font-size:.82rem;color:var(--muted)}
+  .sc-bad{color:var(--bad)} .sc-warn{color:var(--warn)}
+  section.area{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:16px}
+  .area>h2{font-size:1.03rem;margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+    border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:.85rem;font-weight:700;flex:0 0 auto}
+  .badge{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
+    padding:2px 9px;border-radius:999px;margin-left:auto}
+  .b-good{background:var(--good-bg);color:var(--good)}
+  .b-warn{background:var(--warn-bg);color:var(--warn)}
+  .b-bad{background:var(--bad-bg);color:var(--bad)}
+  .find{display:flex;gap:11px;padding:10px 0;border-top:1px solid var(--line);align-items:flex-start}
+  .find:first-of-type{border-top:none}
+  .ico{flex:0 0 auto;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:.72rem;font-weight:800;color:#fff;margin-top:2px}
+  .i-good{background:var(--good)} .i-warn{background:var(--warn)} .i-bad{background:var(--bad)}
+  .find .txt{font-size:.9rem}
+  .fix{display:block;margin-top:3px;font-size:.82rem;color:var(--muted)}
+  .fix::before{content:"→ Fix: ";color:var(--accent);font-weight:600}
+  code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.85em;
+    background:var(--accent-soft);padding:1px 5px;border-radius:5px}
+  .math{background:var(--accent-soft);border-radius:12px;padding:14px 18px;margin:0 0 20px;font-size:.87rem}
+  .math table{width:100%;border-collapse:collapse;margin-top:8px}
+  .math td{padding:4px 8px;border:none;font-size:.85rem}
+  .math td:first-child{color:var(--muted);width:38%}
+  table.plan{width:100%;border-collapse:collapse;margin-top:4px;font-size:.86rem}
+  table.plan th,table.plan td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.plan th{font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  .prio{font-weight:700;white-space:nowrap}
+  .p0{color:var(--bad)} .p1{color:var(--warn)} .p2{color:var(--accent)} .p3{color:var(--muted)}
+  .quote{border-left:3px solid var(--line);padding:2px 0 2px 12px;margin:6px 0 0;font-size:.83rem;color:var(--muted);font-style:italic}
+  footer{color:var(--muted);font-size:.78rem;margin-top:10px;padding:0 4px}
+  footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Audit RRF — www.miaweb.art</h1>
+  <p class="sub">Verifica del sito rispetto ai principi del Reciprocal Rank Fusion: quanto è pronto a essere recuperato e citato dai motori IA su entrambi gli assi (lessicale + semantico).</p>
+  <p class="meta">Analizzati: homepage, <code>/sample-page/</code>, <code>robots.txt</code>, <code>sitemap_index.xml</code>, <code>page-sitemap.xml</code>, meta/head, presenza nei risultati di ricerca. Rilevazione del 3 agosto 2026.</p>
+
+  <div class="verdict">
+    <h2>Verdetto sintetico</h2>
+    <p>Il sito è <b>tecnicamente aperto ma sostanzialmente invisibile all'RRF</b>. Il problema non è di ottimizzazione fine: è di <b>volume</b>. L'intero sito è una pagina singola da ~350–400 parole, e la sitemap contiene solo 2 URL — di cui uno è <code>/sample-page/</code>, la pagina segnaposto di default di WordPress, mai cancellata e regolarmente indicizzabile.</p>
+    <p>In termini RRF: con un solo documento reale non hai praticamente nulla da far entrare nelle liste di recupero, né in quella lessicale né in quella semantica. La somma <code>Σ 1/(k+rank)</code> non ha addendi. Non c'è squilibrio tra i due assi — sono <b>entrambi</b> scoperti.</p>
+  </div>
+
+  <div class="balance">
+    <div class="axis">
+      <h3>Asse lessicale (BM25) <span class="sc-warn">molto debole</span></h3>
+      <div class="axmeter"><div class="axfill" style="width:30%;background:var(--warn)"></div></div>
+      <p>Qualche termine utile c'è (SEO, LLM, accessibilità, Legge Stanca, hosting), ma su ~400 parole totali. <code>&lt;title&gt;</code> e meta description sprecati sul nome dominio.</p>
+    </div>
+    <div class="axis">
+      <h3>Asse semantico (vettoriale) <span class="sc-bad">quasi assente</span></h3>
+      <div class="axmeter"><div class="axfill" style="width:14%;background:var(--bad)"></div></div>
+      <p>Nessuna definizione, nessun approfondimento, nessuna FAQ, nessun caso studio, nessun portfolio. I pochi chunk estraibili sono claim promozionali, non risposte.</p>
+    </div>
+  </div>
+
+  <div class="math">
+    <b>La matematica del problema.</b> L'RRF premia chi compare in più liste <em>e</em> con più passaggi pertinenti. Il numero di "chunk" indicizzabili è il vero moltiplicatore:
+    <table>
+      <tr><td>Superficie attuale</td><td><b>1 pagina reale</b> (+1 segnaposto) ≈ 3–5 chunk, tutti generici</td></tr>
+      <tr><td>Superficie potenziale</td><td><b>6 pagine servizio</b> × ~1.000 parole + FAQ ≈ 60–90 chunk, ognuno allineato a un intento preciso</td></tr>
+      <tr><td>Effetto sull'RRF</td><td>da ~0 addendi a decine di occasioni di comparire in entrambe le liste</td></tr>
+    </table>
+  </div>
+
+  <section class="area">
+    <h2><span class="num">0</span> Prerequisiti tecnici <span class="badge b-warn">Misto</span></h2>
+    <div class="find"><span class="ico i-good">✓</span><span class="txt"><b>Contenuto server-side.</b> Il testo è nell'HTML iniziale (WordPress + W3 Total Cache), non dipendente da JavaScript: leggibile da tutti i recuperatori.</span></div>
+    <div class="find"><span class="ico i-good">✓</span><span class="txt"><b>Crawler IA pienamente ammessi.</b> <code>robots.txt</code> ha <code>Disallow:</code> vuoto: GPTBot, ClaudeBot, Google-Extended, PerplexityBot e CCBot possono accedere a tutto. Sitemap dichiarata.</span></div>
+    <div class="find"><span class="ico i-good">✓</span><span class="txt"><b>Heading semantici reali</b> (<code>h1</code>/<code>h2</code>/<code>h3</code>, non <code>div</code> stilizzati) e Yoast SEO già installato: l'infrastruttura per lavorare c'è.</span></div>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b><code>/sample-page/</code> indicizzabile.</b> È la pagina di esempio di default di WordPress, in inglese, mai rimossa, con <code>index, follow</code> attivo. Testo: <span class="quote">"This is an example page… As a new WordPress user, you should go to your dashboard to delete this page."</span> Rappresenta il 50% della superficie indicizzata del sito e segnala "sito abbandonato" sia ai crawler sia a un potenziale cliente.<span class="fix">Cancellarla subito (o almeno <code>noindex</code> + rimozione dalla sitemap).</span></span></div>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Dati strutturati totalmente assenti.</b> Nessun JSON-LD. Eppure i dati per un markup perfetto ci sono già in pagina: ragione sociale, P.IVA 03139830347, indirizzo (Via Emilia Est 216/A, Parma), email, PEC, orari.<span class="fix">Aggiungi <code>LocalBusiness</code>/<code>Organization</code> con indirizzo, P.IVA, orari e contatti; poi <code>Service</code> per ciascun servizio e <code>FAQPage</code> quando avrai le FAQ.</span></span></div>
+    <div class="find"><span class="ico i-good">✓</span><span class="txt"><b>hreflang non applicabile.</b> Il sito è monolingua italiano: la sua assenza qui non è un difetto.</span></div>
+  </section>
+
+  <section class="area">
+    <h2><span class="num">1</span> Ottimizzazione lessicale (BM25) <span class="badge b-bad">Critico</span></h2>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Title sprecato.</b> <code>&lt;title&gt;</code> = "www.miaweb.art - Mia Web Agency S.r.l.": è l'URL più la ragione sociale. Nessuno cerca "www.miaweb.art". Il title è il segnale lessicale a peso più alto e qui è a rendimento zero.<span class="fix">Es. "Web agency a Parma — siti web, SEO e visibilità sugli LLM | Mia Web Agency".</span></span></div>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Meta description = "Mia Web Agency S.r.l."</b> Yoast è installato ma non configurato: la description non contiene un solo termine di ricerca né una proposta di valore.<span class="fix">150–160 caratteri con servizi + territorio + differenziatore.</span></span></div>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Nessun ancoraggio geografico nei testi.</b> L'azienda è a Parma, ma "Parma" compare solo nell'indirizzo in fondo. Per una web agency la query reale è quasi sempre locale ("web agency Parma", "realizzazione siti web Parma").<span class="fix">Inserire il territorio in title, H1/H2 e corpo testo, in modo naturale.</span></span></div>
+    <div class="find"><span class="ico i-warn">!</span><span class="txt"><b>H1 evocativo ma privo di keyword.</b> <span class="quote">"Creiamo esperienze digitali che funzionano."</span> Bello come claim, ma non contiene nessun termine che qualcuno digiti.<span class="fix">Tenere il claim come payoff e aggiungere un H2 immediato con i termini concreti.</span></span></div>
+    <div class="find"><span class="ico i-warn">!</span><span class="txt"><b>Marchio fortemente conteso.</b> Le ricerche su "Mia Web Agency" restituiscono altri soggetti (Mia Web Roma, MiaWeb Studio Miami, MyWeb Agency): il nome non è distintivo e il TLD <code>.art</code> non aiuta il riconoscimento dell'entità.<span class="fix">Rinforzare l'entità con dati strutturati, scheda Google Business Profile e citazioni coerenti (nome + indirizzo + P.IVA identici ovunque).</span></span></div>
+  </section>
+
+  <section class="area">
+    <h2><span class="num">2</span> Ottimizzazione semantica (vettoriale) <span class="badge b-bad">Critico</span></h2>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Volume insufficiente per esistere semanticamente.</b> ~350–400 parole per <em>tutti</em> i sei servizi: significa 2–3 righe a servizio. Un embedding costruito su tre righe promozionali non si avvicina a nessuna query informativa reale.<span class="fix">Una pagina dedicata per servizio, con definizione, funzionamento, quando serve, esempio concreto.</span></span></div>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Zero prove: nessun portfolio, caso studio o prezzo.</b> Per una web agency il portfolio è il contenuto semanticamente più ricco e più cercato ("esempi siti web", "quanto costa un sito").<span class="fix">Pubblicare 4–6 lavori con problema → soluzione → risultato. Alimenta entrambi gli assi.</span></span></div>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Nessuna FAQ e nessun contenuto editoriale.</b> Non esiste blog né sezione domande: mancano completamente i formati che i motori IA citano più spesso.</span></div>
+    <div class="find"><span class="ico i-warn">!</span><span class="txt"><b>Passaggi non autoconsistenti.</b> Le descrizioni dipendono dal contesto della pagina; estratte come chunk isolato non rispondono a nulla. <span class="quote">"Lavoriamo sulla giusta collocazione nei motori di ricerca, così i tuoi clienti ti trovano senza fatica…"</span> — non contiene mai il termine "SEO" né spiega cosa venga fatto.<span class="fix">Rendere ogni paragrafo comprensibile da solo e nominare esplicitamente le cose.</span></span></div>
+  </section>
+
+  <section class="area">
+    <h2><span class="num">3</span> Struttura a chunk / "a forma di risposta" <span class="badge b-bad">Critico</span></h2>
+    <div class="find"><span class="ico i-good">✓</span><span class="txt"><b>Gerarchia pulita.</b> La struttura 01 Servizi / 02 Chi siamo / 03 Contatti con H3 per servizio è ordinata e ben marcata: è una buona base di partenza.</span></div>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Architettura one-page.</b> Tutto vive in un solo documento: i motori possono recuperare pochissimi chunk distinti e tutti competono tra loro sullo stesso URL.<span class="fix">Esplodere la one-page in pagine autonome — è l'intervento a più alto impatto in assoluto.</span></span></div>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Nessun heading in forma di domanda</b> e nessuna risposta diretta in apertura di blocco: manca del tutto il formato che i motori IA prediligono.<span class="fix">"Cos'è la Legge Stanca e chi deve rispettarla?", "Quanto costa un sito web?", "Come si viene citati da ChatGPT?" — domanda + risposta secca in 2–3 righe, poi approfondimento.</span></span></div>
+  </section>
+
+  <section class="area">
+    <h2><span class="num">4</span> Consenso &amp; misura <span class="badge b-bad">Assente</span></h2>
+    <div class="find"><span class="ico i-bad">✕</span><span class="txt"><b>Nessuna presenza rilevabile nei risultati di ricerca.</b> Le ricerche sul nome del sito e dell'azienda non restituiscono il sito: non c'è consenso da fondere perché non c'è presenza in nessuna delle due liste.</span></div>
+    <div class="find"><span class="ico i-warn">!</span><span class="txt"><b>Disallineamento tra offerta e stato del proprio sito.</b> Tra i servizi venduti c'è "Citazioni negli LLM": <span class="quote">"Abbiamo ideato un sistema che predispone il tuo sito a essere citato dalle risposte dei principali LLM (ChatGPT, Claude, Gemini)…"</span> Allo stato attuale il sito dell'agenzia non applica a sé stesso i prerequisiti minimi di quel servizio (dati strutturati, contenuti citabili, FAQ, superficie indicizzata). È un rischio di credibilità concreto: un cliente competente lo verifica in due minuti.<span class="fix">Trasformare il proprio sito nel primo caso studio dimostrabile del servizio.</span></span></div>
+  </section>
+
+  <h2 style="font-size:1.05rem;margin:26px 0 8px">Piano d'azione per priorità</h2>
+  <table class="plan">
+    <thead><tr><th>Priorità</th><th>Azione</th><th>Effetto sull'RRF</th></tr></thead>
+    <tbody>
+      <tr><td class="prio p0">P0</td><td>Cancellare <code>/sample-page/</code></td><td>Rimuove rumore e segnale di abbandono. 5 minuti.</td></tr>
+      <tr><td class="prio p0">P0</td><td><b>Esplodere la one-page in 6 pagine servizio</b> autonome (~800–1.200 parole ciascuna), in forma "cos'è / come funziona / quando serve / esempio"</td><td>È l'intervento decisivo: da ~3 a ~60+ chunk indicizzabili su entrambi gli assi.</td></tr>
+      <tr><td class="prio p1">P1</td><td>Riscrivere <b>title e meta description</b> di ogni pagina in Yoast, con servizio + territorio</td><td>Asse lessicale, quick win immediato.</td></tr>
+      <tr><td class="prio p1">P1</td><td>Aggiungere <b>JSON-LD</b>: LocalBusiness (indirizzo, P.IVA, orari), Service, FAQPage</td><td>Riconoscimento dell'entità, oggi inesistente.</td></tr>
+      <tr><td class="prio p1">P1</td><td>Inserire <b>FAQ</b> in ogni pagina servizio, con heading-domanda</td><td>Il formato più citato dai motori IA; alimenta entrambi gli assi.</td></tr>
+      <tr><td class="prio p2">P2</td><td>Pubblicare <b>portfolio / casi studio</b> (4–6 lavori, problema → soluzione → risultato)</td><td>Contenuto ad alta densità semantica e forte prova commerciale.</td></tr>
+      <tr><td class="prio p2">P2</td><td>Ancorare il sito al <b>territorio di Parma</b> in title, H1/H2 e testi + Google Business Profile</td><td>Intercetta le query locali, che per una web agency sono la maggioranza.</td></tr>
+      <tr><td class="prio p3">P3</td><td>Avviare un <b>blog tecnico</b> sui temi che già padroneggiate (Legge Stanca, accessibilità, citazioni LLM)</td><td>Crescita continua della superficie recuperabile.</td></tr>
+      <tr><td class="prio p3">P3</td><td>Impostare un <b>monitoraggio</b> delle citazioni IA su 10–15 query target</td><td>Misura reale del consenso tra le liste.</td></tr>
+    </tbody>
+  </table>
+
+  <footer>
+    <p><b>Limiti dell'analisi:</b> il sito è composto da 2 URL, entrambi ispezionati, insieme a robots.txt, sitemap e meta tag — la copertura è quindi completa, ma resta una fotografia al 3 agosto 2026. Nessun "trucco RRF" esiste: pesi e costante <code>k</code> li decide il motore. L'unica leva reale è avere contenuto sufficiente, simultaneamente recuperabile in chiave lessicale e semantica.</p>
+    <p>Fonti metodologiche: <a href="https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking">Microsoft Learn — Hybrid Search Scoring (RRF)</a> · <a href="https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion">Elastic — Reciprocal Rank Fusion</a> · <a href="https://opensearch.org/blog/introducing-reciprocal-rank-fusion-hybrid-search/">OpenSearch — Introducing RRF</a>. Fonte dei dati: <a href="https://www.miaweb.art">www.miaweb.art</a>.</p>
+  </footer>
+</div>
+</body>
+</html>

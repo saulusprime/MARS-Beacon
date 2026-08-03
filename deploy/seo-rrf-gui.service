@@ -1,0 +1,38 @@
+# Unit systemd per l'interfaccia locale dell'audit SEO + RRF.
+#
+# Installazione sulla macchina del cliente:
+#   1. Copia il progetto in /opt/seorrf (script, gui/, requirements.txt)
+#   2. python3 -m venv /opt/seorrf/venv
+#      /opt/seorrf/venv/bin/pip install -r /opt/seorrf/requirements.txt
+#   3. sudo cp deploy/seo-rrf-gui.service /etc/systemd/system/
+#   4. sudo systemctl daemon-reload
+#      sudo systemctl enable --now seo-rrf-gui
+#
+# L'interfaccia resta raggiungibile solo dalla macchina stessa su
+# http://127.0.0.1:8765/ — non esporre su reti non fidate senza un
+# reverse proxy con autenticazione davanti.
+
+[Unit]
+Description=Lympha Technologies - Audit SEO + RRF (interfaccia locale)
+Documentation=file:///opt/seorrf/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/seorrf
+ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/seo_rrf_gui.py \
+    --host 127.0.0.1 --port 8765 --no-browser
+Restart=on-failure
+RestartSec=5
+
+# Esecuzione senza privilegi e con superficie ridotta.
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadOnlyPaths=/opt/seorrf
+
+[Install]
+WantedBy=multi-user.target

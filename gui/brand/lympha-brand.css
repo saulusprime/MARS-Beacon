@@ -1,0 +1,47 @@
+/* =========================================================================
+   Lympha Technologies — layer di BRAND del progetto
+   -------------------------------------------------------------------------
+   Questo file contiene SOLO i token di brand (palette del logo) e gli
+   override delle variabili di Bootstrap Italia. La STRUTTURA (componenti,
+   layout, selettori .lt-*) vive in BsItalia (webroot/css/lympha.css) ed è
+   riutilizzabile: consuma questi token via var(--lt-*).
+
+   Separazione voluta (Fase 1-2 del de-theming): il tema condiviso BsItalia
+   resta neutro e distribuibile; il delta di progetto (colori + asset) sta
+   nel plugin del progetto (LymphaTech). Per riusare la struttura altrove
+   basta ridefinire questo :root con la palette del nuovo progetto.
+
+   Va caricato DOPO lympha.css (la struttura); l'ordine non è vincolante per
+   le custom property, ma tenerlo dopo consente al brand di sovrascrivere.
+   ========================================================================= */
+
+:root {
+  /* --- Palette brand --- */
+  --lt-teal:        #186078; /* primario (dal logo) · bianco su questo = 7.0:1 */
+  --lt-teal-700:    #0f4a5b; /* hover/active · testo su bianco = 9.8:1         */
+  --lt-teal-900:    #0c3540; /* superfici scure · testo bianco = 13.1:1        */
+  --lt-navy:        #17324d; /* navy di brand · footer/sezioni profonde        */
+  --lt-navy-700:    #0f2236; /* navy più scuro per barre/bordi                 */
+  --lt-gray-grave:  #373737; /* grigio del footer                              */
+  --lt-aqua:        #5bb6bf; /* decorativo (mai per testo su bianco)           */
+  --lt-aqua-soft:   #b7e0e3; /* decorativo / testo su fondo scuro = 9.5:1      */
+  --lt-mist:        #eef6f7; /* sfondi chiari                                  */
+  --lt-orange:      #d86010; /* accento brand (dal logo · decorativo)          */
+  --lt-orange-700:  #a8480f; /* accento testo su chiaro = 5.8:1                */
+  --lt-ink:         #14272b; /* testo principale su chiaro = 13.6:1            */
+  --lt-ink-soft:    #3c5054; /* testo secondario su chiaro = 7.0:1             */
+  --lt-border:      rgba(8,49,58,.12); /* bordi tenui                          */
+
+  /* --- Override variabili Bootstrap Italia / Bootstrap 5 --- */
+  --bs-primary: var(--lt-teal);
+  --bs-primary-rgb: 24, 96, 120;
+  --bs-link-color: var(--lt-teal-700);
+  --bs-link-hover-color: var(--lt-teal-900);
+  --bs-body-color: var(--lt-ink);
+  --bs-body-font-family: "Titillium Web", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --bs-border-radius: .75rem;
+  --bs-border-radius-lg: 1.25rem;
+
+  /* Altezza header sticky, usata per lo scroll-margin delle ancore */
+  --lt-header-h: 84px;
+}

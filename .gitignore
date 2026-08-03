@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Ambienti virtuali
+venv/
+.venv/
+
+# Referti e dati generati a runtime (l'esempio consegnato
+# audit_miaweb_rrf.html resta versionato: non corrisponde ai pattern)
+report*.html
+referto*.json
+referto*.txt
+referto*.html
+storico*.jsonl
+citazioni*.jsonl
+
+# IDE e sistema
+.vscode/
+.idea/
+.DS_Store
