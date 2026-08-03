@@ -73,6 +73,12 @@
             "Libreria sentence-transformers non installata: il " +
             "recupero vettoriale userà il proxy char-TFIDF " +
             "(dichiarato nel referto), anche indicando un modello.";
+        } else {
+          el("h-embeddings").textContent =
+            "sentence-transformers rilevato: se lasci vuoto viene " +
+            "usato il modello predefinito " +
+            env.default_embeddings_model + ". Scrivi «none» " +
+            "per forzare il proxy char-TFIDF.";
         }
         el("footer-info").textContent +=
           " — seo_rrf_audit.py " + env.tool_version +

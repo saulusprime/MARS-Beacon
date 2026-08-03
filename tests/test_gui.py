@@ -68,6 +68,7 @@ def test_env(gui_base):
     assert env["tool_version"] == sra_version()
     assert env["default_max_body_mb"] == 10
     assert "embeddings_available" in env
+    assert env["default_embeddings_model"]
 
 
 def sra_version():

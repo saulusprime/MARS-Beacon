@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.5.0, ~2520 righe,
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.6.0, ~2560 righe,
 licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -46,6 +46,13 @@ tacca di parità sulle barre dello share of voice. Nella GUI i
 punteggi-area sono cliccabili (aprono i rilievi dell'area) e i
 risultati vengono ripristinati al ricaricamento della pagina.
 
+Novità 1.6.0 (2026-08-03): auto-rilevamento di sentence-transformers.
+Se la libreria è installata gli embedding reali si attivano da soli
+con il modello multilingue predefinito
+`paraphrase-multilingual-MiniLM-L12-v2`; `--embeddings MODELLO`
+sceglie un modello diverso, `--embeddings none` forza il proxy
+char-tfidf. Senza libreria il comportamento resta invariato.
+
 ## Uso
 
 ```
@@ -59,7 +66,8 @@ python3 seo_rrf_audit.py https://esempio.it --embeddings paraphrase-multilingual
 ```
 
 Opzioni: `--max-pages` (default 25), `--queries FILE` (una per riga; se omesso
-le query sono generate dai bigrammi tematici del sito), `--embeddings MODELLO`,
+le query sono generate dai bigrammi tematici del sito), `--embeddings MODELLO`
+(auto-rilevato se la libreria è installata; `none` forza il proxy),
 `--rrf-k` (default 60), `--delay`, `--max-body MB` (default 10; tetto al corpo
 di ogni risposta, da dimensionare sulla RAM della macchina),
 `--retries N` (default 2; ritenta errori di rete e HTTP 429/5xx con backoff

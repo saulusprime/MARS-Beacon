@@ -42,6 +42,11 @@ Dipendenze opzionali:     numpy, sentence-transformers
     pip install requests beautifulsoup4 lxml
     pip install sentence-transformers   # per embedding reali
 
+Se sentence-transformers e' installato gli embedding reali si
+attivano da soli con un modello multilingue predefinito; --embeddings
+sceglie un modello diverso, --embeddings none forza il proxy
+char-tfidf.
+
 Uso:
     python3 seo_rrf_audit.py https://www.example.com
     python3 seo_rrf_audit.py https://example.com --max-pages 40 \\
@@ -58,6 +63,7 @@ import argparse
 import gzip
 import hashlib
 import html
+import importlib.util
 import io
 import json
 import math
@@ -84,7 +90,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -96,6 +102,11 @@ USER_AGENT = (
 # Token con cui lo strumento compare nel robots.txt (gruppo
 # "User-agent: SeoRrfAudit"); usato da --respect-robots.
 USER_AGENT_TOKEN = "SeoRrfAudit"
+
+# Modello multilingue usato quando sentence-transformers e'
+# installato e l'utente non ne indica uno con --embeddings.
+# "--embeddings none" forza comunque il proxy char-tfidf.
+DEFAULT_EMBEDDINGS_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 
 # Content-Type analizzabili: per tutto il resto (PDF, immagini,
 # archivi...) il corpo non viene scaricato affatto — lo stato e gli
@@ -901,6 +912,30 @@ class BM25Index:
                 scores.append((i, total))
         scores.sort(key=lambda x: (-x[1], x[0]))
         return scores
+
+
+def embeddings_available() -> bool:
+    """True se sentence-transformers e numpy sono importabili."""
+    return (
+        importlib.util.find_spec("sentence_transformers") is not None
+        and importlib.util.find_spec("numpy") is not None
+    )
+
+
+def resolve_model_name(requested: str) -> str:
+    """Modello di embedding effettivo a partire da --embeddings.
+
+    Esplicito se indicato; "none"/"off"/"char-tfidf" forzano il
+    proxy; vuoto con sentence-transformers installato attiva il
+    modello multilingue predefinito (auto-rilevamento); altrimenti
+    resta il proxy char-tfidf.
+    """
+    req = requested.strip()
+    if req.lower() in ("none", "off", "char-tfidf"):
+        return ""
+    if req:
+        return req
+    return DEFAULT_EMBEDDINGS_MODEL if embeddings_available() else ""
 
 
 class VectorIndex:
@@ -2452,6 +2487,14 @@ def run_audit(base: str, max_pages: int, queries: List[str],
                   Dict[str, Optional[float]], List[QueryResult], str,
                   Optional[Dict[str, object]]]:
     """Esegue l'intero audit e restituisce i risultati grezzi."""
+    requested_model = model_name
+    model_name = resolve_model_name(model_name)
+    if verbose and model_name and not requested_model.strip():
+        print("sentence-transformers rilevato: recupero vettoriale "
+              "con il modello predefinito %s (usa --embeddings none "
+              "per il proxy char-tfidf)" % model_name,
+              file=sys.stderr)
+
     fetcher = Fetcher(delay=delay, verbose=verbose,
                       max_bytes=int(max_body_mb * 1048576),
                       retries=retries, user_agent=user_agent)
@@ -2569,7 +2612,10 @@ def build_parser() -> argparse.ArgumentParser:
                              "le query sono generate dai temi del sito")
     parser.add_argument("--embeddings", metavar="MODELLO", default="",
                         help="modello sentence-transformers per il "
-                             "recupero vettoriale reale")
+                             "recupero vettoriale reale. Se omesso e "
+                             "la libreria e' installata viene usato "
+                             "%s; 'none' forza il proxy char-tfidf"
+                             % DEFAULT_EMBEDDINGS_MODEL)
     parser.add_argument("--rrf-k", type=int, default=60,
                         help="costante k della formula RRF "
                              "(default 60)")

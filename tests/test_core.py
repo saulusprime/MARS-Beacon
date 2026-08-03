@@ -46,3 +46,28 @@ def test_is_question():
     assert sra.is_question("Cos'e' il drenaggio linfatico?")
     assert sra.is_question("come funziona una seduta")
     assert not sra.is_question("I nostri servizi principali")
+
+
+# ---------------- auto-rilevamento sentence-transformers ----------------
+
+def test_embeddings_auto_rilevati(monkeypatch):
+    monkeypatch.setattr(sra, "embeddings_available", lambda: True)
+    assert sra.resolve_model_name("") == sra.DEFAULT_EMBEDDINGS_MODEL
+    assert sra.resolve_model_name("  ") == sra.DEFAULT_EMBEDDINGS_MODEL
+
+
+def test_embeddings_modello_esplicito_vince(monkeypatch):
+    monkeypatch.setattr(sra, "embeddings_available", lambda: True)
+    assert sra.resolve_model_name("mio/modello") == "mio/modello"
+
+
+def test_embeddings_none_forza_il_proxy(monkeypatch):
+    monkeypatch.setattr(sra, "embeddings_available", lambda: True)
+    for spento in ("none", "NONE", "off", "char-tfidf"):
+        assert sra.resolve_model_name(spento) == ""
+
+
+def test_embeddings_senza_libreria_resta_proxy(monkeypatch):
+    monkeypatch.setattr(sra, "embeddings_available", lambda: False)
+    assert sra.resolve_model_name("") == ""
+    assert sra.resolve_model_name("mio/modello") == "mio/modello"

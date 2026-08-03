@@ -40,10 +40,13 @@ pip install -r requirements.txt                 # requests, bs4, lxml
 pip install sentence-transformers numpy         # opzionali: embedding reali
 ```
 
-Senza `sentence-transformers` il recupero "semantico" ripiega su un coseno
-TF-IDF di 4-grammi di caratteri: un **proxy morfologico, non una vera
-rappresentazione semantica**. Lo script dichiara sempre la modalità usata
-(`char-tfidf` oppure `embeddings:<modello>`) in tutti i formati di referto.
+Con `sentence-transformers` installato gli embedding reali si attivano da
+soli (modello multilingue predefinito `paraphrase-multilingual-MiniLM-L12-v2`;
+`--embeddings none` forza il proxy). Senza libreria il recupero "semantico"
+ripiega su un coseno TF-IDF di 4-grammi di caratteri: un **proxy morfologico,
+non una vera rappresentazione semantica**. Lo script dichiara sempre la
+modalità usata (`char-tfidf` oppure `embeddings:<modello>`) in tutti i
+formati di referto.
 
 ## Uso
 
@@ -61,7 +64,7 @@ python3 seo_rrf_audit.py https://esempio.it \
 |---|---|---|
 | `--max-pages N` | 25 | numero massimo di pagine analizzate |
 | `--queries FILE` | — | una query per riga; se omesso le query sono auto-generate dai bigrammi tematici di heading e title |
-| `--embeddings MODELLO` | — | modello sentence-transformers per il recupero vettoriale reale |
+| `--embeddings MODELLO` | auto | modello sentence-transformers per il recupero vettoriale reale. Se omesso e la libreria è installata viene usato il modello multilingue predefinito; `none` forza il proxy char-TFIDF |
 | `--rrf-k N` | 60 | costante k della formula RRF (propagata a tutti i renderer) |
 | `--delay SEC` | 0.5 | pausa fra le richieste HTTP |
 | `--competitor URL` | — | sito concorrente da confrontare (ripetibile, massimo 3). Ogni concorrente viene scansionato con gli stessi limiti; i corpora vengono fusi negli stessi indici BM25+vettoriale e interrogati con le stesse query (i temi del **tuo** sito): il referto riporta la **share of voice** — quanti dei primi 5 posti fusi appartengono a ciascun sito, con soglie rispetto alla parità — e le query vinte interamente dai concorrenti |

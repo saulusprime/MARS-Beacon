@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-03.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.5.0
+## Strumento CLI — `seo_rrf_audit.py` v1.6.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -18,8 +18,10 @@ sono nel [README.md](README.md).
   JSON-LD, entità, FAQPage, BreadcrumbList, WebSite).
 - **Simulazione RRF**: chunking per heading (~220 parole), doppio
   indice BM25 (Okapi, k1=1.5, b=0.75) e vettoriale
-  (sentence-transformers oppure fallback char-TFIDF di 4-grammi,
-  sempre dichiarato nel referto), fusione `Σ 1/(k+rank)` con k
+  (sentence-transformers con **auto-rilevamento** dalla v1.6.0 —
+  modello multilingue predefinito se la libreria è installata,
+  `--embeddings none` per forzare il proxy — oppure fallback
+  char-TFIDF di 4-grammi, sempre dichiarato nel referto), fusione `Σ 1/(k+rank)` con k
   configurabile (`--rrf-k`, propagato a tutti i renderer) e misura del
   consenso fra le liste con soglie 20%/45%.
 - **Scoperta URL** da sitemap (anche sitemap-index e `.xml.gz`,
@@ -69,7 +71,7 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v1.5.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v1.6.0 + `gui/`
 
 - **Widget grafici di sintesi** (v1.5.0, GUI e referto HTML, stile
   brand Lympha): anello del punteggio complessivo con verdetto
@@ -189,6 +191,4 @@ sono nel [README.md](README.md).
   default** (`--respect-robots`): la scelta è deliberata per l'audit
   del proprio sito, ma va ricordata quando si analizzano siti altrui.
 - L'audit avviato dalla GUI non è annullabile (esecuzione in-process).
-- Il recupero vettoriale reale richiede l'attivazione esplicita con
-  `--embeddings`, anche quando sentence-transformers è installato.
 - Nessuna CI.

@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import importlib.util
 import json
 import sys
 import threading
@@ -41,7 +40,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -301,14 +300,15 @@ class Handler(BaseHTTPRequestHandler):
             ram = sra.available_ram_mb()
             suggested = (max(1, round(ram * 0.1))
                          if ram is not None else None)
-            spec = importlib.util.find_spec("sentence_transformers")
             self._send_json(200, {
                 "tool_version": sra.__version__,
                 "gui_version": __version__,
                 "default_max_body_mb": sra.DEFAULT_MAX_BODY_MB,
                 "available_ram_mb": ram,
                 "suggested_max_body_mb": suggested,
-                "embeddings_available": spec is not None,
+                "embeddings_available": sra.embeddings_available(),
+                "default_embeddings_model":
+                    sra.DEFAULT_EMBEDDINGS_MODEL,
             })
         elif path == "/api/status":
             self._send_json(200, JOB.snapshot())

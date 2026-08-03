@@ -1,6 +1,6 @@
 # TO-DO — sviluppi e idee di miglioramento
 
-Elenco di ciò che **resta da fare** (codice alla v1.5.0). Quanto già
+Elenco di ciò che **resta da fare** (codice alla v1.6.0). Quanto già
 realizzato è documentato in [AS-IS.md](AS-IS.md): le voci completate
 vengono spostate lì, non spuntate qui. Le voci marcate
 **[bug/rischio]** sono comportamenti osservati nel codice; il resto
@@ -20,10 +20,6 @@ sono proposte.
 
 ## P1 — Qualità dell'analisi
 
-- [ ] **Auto-rilevare sentence-transformers.** Oggi gli embedding reali si
-      attivano solo passando `--embeddings MODELLO`; se la libreria è
-      installata, usare un modello multilingue di default e lasciare
-      `char-tfidf` solo come vero fallback.
 - [ ] Validazione JSON-LD contro lo schema (proprietà obbligatorie di
       `LocalBusiness`, `FAQPage`, ecc.), non solo inventario dei tipi.
 - [ ] Controllo del file **`llms.txt`** (standard emergente per gli agenti IA)
