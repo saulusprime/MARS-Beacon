@@ -1,6 +1,6 @@
 # TO-DO — sviluppi e idee di miglioramento
 
-Elenco di ciò che **resta da fare** (codice alla v1.6.0). Quanto già
+Elenco di ciò che **resta da fare** (codice alla v1.7.0). Quanto già
 realizzato è documentato in [AS-IS.md](AS-IS.md): le voci completate
 vengono spostate lì, non spuntate qui. Le voci marcate
 **[bug/rischio]** sono comportamenti osservati nel codice; il resto
@@ -20,19 +20,12 @@ sono proposte.
 
 ## P1 — Qualità dell'analisi
 
-- [ ] Validazione JSON-LD contro lo schema (proprietà obbligatorie di
-      `LocalBusiness`, `FAQPage`, ecc.), non solo inventario dei tipi.
-- [ ] Controllo del file **`llms.txt`** (standard emergente per gli agenti IA)
-      accanto a robots.txt.
-- [ ] Segnali E-E-A-T: autore, date di pubblicazione/aggiornamento, pagina
-      "chi siamo", contatti verificabili.
-- [ ] Grafo dei link interni: pagine orfane, profondità di click, anchor text
-      (oggi i link si usano solo per la scoperta URL).
 - [ ] Stopword e pattern linguistici oltre it/en (le regex di definizioni,
       anafore e domande coprono solo italiano e inglese).
-- [ ] Rivedere la lista `AI_CRAWLERS`: Bingbot è un crawler di ricerca
-      classico, non IA; valutare l'aggiunta di nuovi agenti (es.
-      `Meta-ExternalAgent`, `Amazonbot`) con fonte documentata.
+- [ ] Opt-out IA di Microsoft: non esiste un token robots.txt dedicato
+      (Bingbot è ricerca classica); valutare un controllo dei meta tag
+      `noarchive`/`nocache` che governano Bing Chat/Copilot e il
+      training Microsoft.
 
 ## P2 — Simulazione RRF più realistica
 

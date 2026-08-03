@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.6.0, ~2560 righe,
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.7.0, ~3060 righe,
 licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -52,6 +52,16 @@ con il modello multilingue predefinito
 `paraphrase-multilingual-MiniLM-L12-v2`; `--embeddings MODELLO`
 sceglie un modello diverso, `--embeddings none` forza il proxy
 char-tfidf. Senza libreria il comportamento resta invariato.
+
+Novità 1.7.0 (2026-08-03): qualità dell'analisi. Lista `AI_CRAWLERS`
+rivista su documentazione ufficiale dei vendor (14 token; via Bingbot
+— crawler di ricerca classico — e Claude-Web, deprecato; dentro
+Claude-SearchBot, Claude-User, Perplexity-User, Meta-ExternalAgent,
+Amazonbot, MistralAI-User); controllo di `/llms.txt`; validazione
+delle proprietà minime dei tipi JSON-LD (incluse le coppie
+domanda/risposta di FAQPage); segnali E-E-A-T (autore, date,
+"chi siamo", contatti verificabili); grafo dei link interni con
+pagine orfane, profondità oltre 3 click e anchor generiche.
 
 ## Uso
 

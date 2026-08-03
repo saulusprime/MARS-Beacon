@@ -172,6 +172,9 @@ class SiteHandler(BaseHTTPRequestHandler):
             "/riservata": (RISERVATA, html),
             "/fantasma/": (FANTASMA, html),
             "/robots.txt": (ROBOTS, "text/plain; charset=utf-8"),
+            "/llms.txt": ("# Centro Linfa\n\n- [Il servizio]"
+                          "(BASE/servizio-drenaggio/)\n",
+                          "text/markdown; charset=utf-8"),
             "/sitemap.xml": (SITEMAP, "application/xml"),
         }
         if self.path in routes:

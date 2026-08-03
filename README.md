@@ -198,22 +198,30 @@ Ogni area produce rilievi (`critical` / `warning` / `ok` / `info`) con
 punteggio 0–100; il complessivo è la media pesata (tecnica 1.0, lessicale 1.5,
 semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5).
 
-1. **Tecnica** — HTTPS, `robots.txt` e permessi per i crawler IA (GPTBot,
-   OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-Web, Google-Extended,
-   PerplexityBot, CCBot, Applebot-Extended, Bingbot), sitemap (anche
-   `.xml.gz`, con priorità agli URL a `lastmod` più recente), URL in errore,
+1. **Tecnica** — HTTPS, `robots.txt` e permessi per i 14 crawler IA
+   documentati dai vendor (GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot,
+   Claude-SearchBot, Claude-User, PerplexityBot, Perplexity-User,
+   Google-Extended, Meta-ExternalAgent, Amazonbot, Applebot-Extended,
+   CCBot, MistralAI-User), `llms.txt`, sitemap (anche `.xml.gz`, con
+   priorità agli URL a `lastmod` più recente), URL in errore,
    catene di redirect interne (http/https, www/non-www, catene multiple),
-   soft-404 (200 con contenuto "pagina non trovata"), pagine segnaposto
-   del CMS, `noindex`, canonical, contenuto solo-JavaScript, hreflang,
-   contenuti duplicati (deduplica per impronta del testo).
+   soft-404 (200 con contenuto "pagina non trovata"), grafo dei link
+   interni (pagine orfane, profondità oltre 3 click, anchor generiche),
+   pagine segnaposto del CMS, `noindex`, canonical, contenuto
+   solo-JavaScript, hreflang, contenuti duplicati (deduplica per impronta
+   del testo).
 2. **Lessicale (BM25)** — title (30–65 caratteri), meta description
    (110–165), struttura H1, conteggio parole (soglie 300/700), slug,
    attributi `alt`.
 3. **Semantica (vettoriale)** — numero di chunk, autoconsistenza dei
    passaggi (aperture anaforiche), heading in forma di domanda, FAQ,
-   definizioni, esempi, ampiezza del vocabolario.
+   definizioni, esempi, ampiezza del vocabolario, segnali **E-E-A-T**
+   (autore dichiarato, date di pubblicazione/aggiornamento, pagina
+   "chi siamo", contatti verificabili).
 4. **Dati strutturati** — inventario dei tipi JSON-LD, entità principale,
-   FAQPage, BreadcrumbList, WebSite.
+   FAQPage, BreadcrumbList, WebSite, **validazione delle proprietà
+   minime** per tipo (es. LocalBusiness senza `address`/`telephone`,
+   Question senza `acceptedAnswer.text`).
 5. **Simulazione RRF** — indicizza i chunk in BM25 e nell'indice vettoriale,
    esegue le query, fonde le liste e misura la sovrapposizione. Soglie di
    consenso: < 20% critico, < 45% avvertenza, altrimenti ok; le query senza

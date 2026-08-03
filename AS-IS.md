@@ -5,17 +5,30 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-03.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.6.0
+## Strumento CLI — `seo_rrf_audit.py` v1.7.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
   semantica 1.5, dati strutturati 1.0, RRF 1.5): tecnica (HTTPS,
-  robots.txt e permessi dei crawler IA, sitemap, errori, redirect
-  interni, soft-404, pagine segnaposto, noindex, canonical, contenuto
-  solo-JS, hreflang, duplicati), lessicale BM25 (title, description, H1, conteggi, slug,
+  robots.txt e permessi dei crawler IA, llms.txt, sitemap, errori,
+  redirect interni, soft-404, grafo dei link interni, pagine
+  segnaposto, noindex, canonical, contenuto solo-JS, hreflang,
+  duplicati), lessicale BM25 (title, description, H1, conteggi, slug,
   alt), semantica (chunk, autoconsistenza, heading-domanda, FAQ,
-  definizioni, esempi, vocabolario), dati strutturati (inventario
-  JSON-LD, entità, FAQPage, BreadcrumbList, WebSite).
+  definizioni, esempi, vocabolario, segnali E-E-A-T), dati
+  strutturati (inventario JSON-LD, entità, FAQPage, BreadcrumbList,
+  WebSite, validazione delle proprietà minime per tipo).
+- **Qualità dell'analisi** (v1.7.0): lista `AI_CRAWLERS` rivista su
+  documentazione ufficiale dei vendor — 14 token fra training,
+  ricerca/citazioni e fetch su richiesta utente; esclusi Bingbot
+  (crawler di ricerca classico) e Claude-Web (deprecato) — con fonti
+  citate nel codice; controllo di `/llms.txt` (rilievo informativo
+  se assente); validazione delle proprietà minime dei tipi JSON-LD
+  più comuni, incluse le coppie domanda/risposta di FAQPage; segnali
+  E-E-A-T (meta author o author JSON-LD, article:published_time o
+  datePublished, pagina "chi siamo", contatti tel:/mailto:/email);
+  grafo dei link interni con pagine orfane, profondità oltre 3 click
+  dalla home e anchor generiche ("clicca qui").
 - **Simulazione RRF**: chunking per heading (~220 parole), doppio
   indice BM25 (Okapi, k1=1.5, b=0.75) e vettoriale
   (sentence-transformers con **auto-rilevamento** dalla v1.6.0 —

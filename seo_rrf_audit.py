@@ -90,7 +90,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.6.0"
+__version__ = "1.7.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -128,17 +128,42 @@ RETRY_MAX_WAIT_S = 8.0
 
 # Crawler dei principali motori/assistenti IA. Fonte: documentazione
 # pubblica dei rispettivi operatori.
+# Token robots.txt degli agenti IA, tutti con documentazione
+# ufficiale del vendor (verifica: 2026-08). Coprono training,
+# ricerca/citazioni e fetch su richiesta utente:
+#   OpenAI      developers.openai.com/api/docs/bots
+#   Anthropic   support.claude.com (articolo 8896518; Claude-Web
+#               e' deprecato e non compare piu')
+#   Perplexity  docs.perplexity.ai/guides/bots
+#   Google      developers.google.com/search/docs/crawling-indexing/
+#               google-common-crawlers (Google-Extended: opt-out
+#               training e grounding Gemini, non tocca la Search)
+#   Meta        developers.facebook.com/docs/sharing/webmasters/
+#               web-crawlers
+#   Amazon      developer.amazon.com/amazonbot
+#   Apple       support.apple.com/en-us/119829
+#   CommonCrawl commoncrawl.org/ccbot
+#   Mistral     docs.mistral.ai/robots/
+# Bingbot NON e' qui: e' il crawler di ricerca classico di Bing
+# (bloccarlo toglie il sito da Bing/Copilot); l'opt-out IA di
+# Microsoft passa dai meta tag noarchive/nocache, non da un token.
+# Bytespider (ByteDance) e' escluso: nessuna doc ufficiale e non
+# rispetta robots.txt.
 AI_CRAWLERS: Tuple[str, ...] = (
     "GPTBot",
     "OAI-SearchBot",
     "ChatGPT-User",
     "ClaudeBot",
-    "Claude-Web",
-    "Google-Extended",
+    "Claude-SearchBot",
+    "Claude-User",
     "PerplexityBot",
-    "CCBot",
+    "Perplexity-User",
+    "Google-Extended",
+    "Meta-ExternalAgent",
+    "Amazonbot",
     "Applebot-Extended",
-    "Bingbot",
+    "CCBot",
+    "MistralAI-User",
 )
 
 SEV_CRITICAL = "critical"
@@ -226,6 +251,41 @@ PLACEHOLDER_TEXT_RE = re.compile(
     r"|welcome to wordpress|lorem ipsum dolor",
     re.IGNORECASE,
 )
+
+# Anchor text generiche: non dicono nulla sul contenuto di arrivo.
+GENERIC_ANCHOR_RE = re.compile(
+    r"^(?:clicca qui|click here|qui|link|vai|continua|leggi tutto"
+    r"|leggi di pi[uù]['’]?|read more|scopri di pi[uù]['’]?"
+    r"|maggiori informazioni|per saperne di pi[uù]['’]?)\.?$",
+    re.IGNORECASE,
+)
+
+# Slug che segnalano pagine di fiducia (E-E-A-T): chi siamo, contatti.
+ABOUT_SLUGS: Tuple[str, ...] = (
+    "chi-siamo", "chisiamo", "about", "about-us", "azienda",
+    "la-nostra-storia", "il-team", "team", "storia",
+)
+CONTACT_SLUGS: Tuple[str, ...] = (
+    "contatti", "contatto", "contact", "contacts", "contact-us",
+    "dove-siamo",
+)
+EMAIL_RE = re.compile(
+    r"\b[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}\b")
+
+# Proprieta' minime dei tipi JSON-LD piu' comuni: senza queste il
+# tipo non e' eleggibile per i risultati arricchiti.
+JSONLD_REQUIRED: Dict[str, Tuple[str, ...]] = {
+    "Organization": ("name", "url"),
+    "LocalBusiness": ("name", "address", "telephone"),
+    "ProfessionalService": ("name", "address", "telephone"),
+    "FAQPage": ("mainEntity",),
+    "BreadcrumbList": ("itemListElement",),
+    "WebSite": ("name", "url"),
+    "Article": ("headline", "datePublished", "author"),
+    "BlogPosting": ("headline", "datePublished", "author"),
+    "Service": ("name", "provider"),
+    "Person": ("name",),
+}
 
 # Soft-404: pagine che rispondono 200 ma il cui contenuto dice
 # "non trovato". Il segnale forte e' nel title/H1; nel corpo vale
@@ -343,6 +403,12 @@ class Page:
     canonical: str = ""
     meta_robots: str = ""
     generator: str = ""
+    author: str = ""
+    published: str = ""
+    modified: str = ""
+    contact_links: int = 0
+    generic_anchors: int = 0
+    internal_targets: List[str] = field(default_factory=list)
     og: Dict[str, str] = field(default_factory=dict)
     hreflang: List[str] = field(default_factory=list)
     headings: List[Tuple[int, str]] = field(default_factory=list)
@@ -739,6 +805,9 @@ def parse_page(url: str, resp: requests.Response) -> Page:
     page.description = _meta(soup, name="description")
     page.meta_robots = _meta(soup, name="robots")
     page.generator = _meta(soup, name="generator")
+    page.author = _meta(soup, name="author")
+    page.published = _meta(soup, prop="article:published_time")
+    page.modified = _meta(soup, prop="article:modified_time")
 
     for prop in ("og:title", "og:description", "og:type", "og:locale",
                  "og:image", "og:site_name"):
@@ -783,9 +852,18 @@ def parse_page(url: str, resp: requests.Response) -> Page:
 
     host = urlparse(url).netloc
     for anchor in soup.find_all("a", href=True):
-        target = urlparse(urljoin(url, anchor["href"])).netloc
+        href = anchor["href"].strip()
+        if href.lower().startswith(("tel:", "mailto:")):
+            page.contact_links += 1
+            continue
+        absolute = urljoin(url, href)
+        target = urlparse(absolute).netloc
         if target == host:
             page.internal_links += 1
+            page.internal_targets.append(norm_url(absolute))
+            text = " ".join(anchor.get_text(" ").split())
+            if GENERIC_ANCHOR_RE.match(text):
+                page.generic_anchors += 1
         elif target:
             page.external_links += 1
 
@@ -1044,6 +1122,104 @@ def reciprocal_rank_fusion(
 # Controlli per area
 # --------------------------------------------------------------------
 
+def check_llms_txt(base: str, fetcher: Fetcher) -> Finding:
+    """Verifica la presenza di /llms.txt (standard emergente).
+
+    E' un indice in Markdown dei contenuti pensato per gli agenti
+    IA (llmstxt.org): assente non e' un errore, quindi il rilievo
+    negativo e' solo informativo.
+    """
+    url = urljoin(base, "/llms.txt")
+    resp = fetcher.get(url)
+    if resp is not None and resp.status_code == 200 \
+            and resp.text.strip() \
+            and "html" not in resp.headers.get("Content-Type", ""):
+        return Finding(
+            AREA_TECH, SEV_OK, "llms.txt presente",
+            "%d righe." % len(resp.text.splitlines()), url=url)
+    return Finding(
+        AREA_TECH, SEV_INFO, "llms.txt assente",
+        "Standard emergente (llmstxt.org): un indice in Markdown "
+        "dei contenuti chiave pensato per gli agenti IA.",
+        "Valuta di pubblicare /llms.txt con i contenuti chiave.",
+        url=url)
+
+
+def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
+    """Pagine orfane, profondita' di click e anchor generiche."""
+    good = [p for p in pages if p.ok]
+    if len(good) < 2:
+        return []
+
+    by_url: Dict[str, Page] = {}
+    for p in good:
+        by_url.setdefault(norm_url(p.url), p)
+        if p.final_url:
+            by_url.setdefault(norm_url(p.final_url), p)
+
+    edges: Dict[str, Set[str]] = {}
+    incoming: Counter = Counter()
+    for p in good:
+        src = norm_url(p.url)
+        outs: Set[str] = set()
+        for target in p.internal_targets:
+            dest = by_url.get(target)
+            if dest is None:
+                continue
+            key = norm_url(dest.url)
+            if key != src:
+                outs.add(key)
+                incoming[key] += 1
+        edges[src] = outs
+
+    out: List[Finding] = []
+    home = norm_url(base)
+    orphans = sorted(u for u in edges
+                     if u != home and not incoming[u])
+    if orphans:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d pagina/e senza link interni in ingresso (orfane)"
+            % len(orphans),
+            "Raggiungibili solo dalla sitemap: %s. Una pagina che "
+            "nessuno linka riceve meno scansioni e meno peso."
+            % ", ".join(orphans[:5]),
+            "Linkale dalle pagine correlate (testo, menu o footer)."))
+    else:
+        out.append(Finding(
+            AREA_TECH, SEV_OK,
+            "Tutte le pagine hanno link interni in ingresso"))
+
+    if home in edges:
+        depth = {home: 0}
+        queue = [home]
+        while queue:
+            node = queue.pop(0)
+            for dest in sorted(edges.get(node, ())):
+                if dest not in depth:
+                    depth[dest] = depth[node] + 1
+                    queue.append(dest)
+        deep = sorted(u for u, d in depth.items() if d > 3)
+        if deep:
+            out.append(Finding(
+                AREA_TECH, SEV_WARNING,
+                "%d pagina/e oltre 3 click dalla home" % len(deep),
+                ", ".join(deep[:5]) + ".",
+                "Accorcia i percorsi: le pagine profonde vengono "
+                "scansionate e pesate meno."))
+
+    generic = sum(p.generic_anchors for p in good)
+    if generic:
+        out.append(Finding(
+            AREA_TECH, SEV_INFO,
+            "%d anchor generiche nei link interni" % generic,
+            "Testi come \"clicca qui\" o \"leggi di piu'\" non "
+            "dicono nulla sul contenuto di arrivo.",
+            "Usa anchor descrittive con i termini della pagina "
+            "di destinazione."))
+    return out
+
+
 def _audit_redirects(pages: List[Page]) -> List[Finding]:
     """Rilievi sulle catene di redirect degli URL analizzati.
 
@@ -1143,6 +1319,7 @@ def audit_technical(pages: List[Page], base: str,
             "Correggi o rimuovi dalla sitemap gli URL in errore."))
 
     out.extend(_audit_redirects(pages))
+    out.extend(_audit_link_graph(pages, base))
 
     soft404 = []
     for p in good:
@@ -1575,6 +1752,147 @@ def is_question(text: str) -> bool:
     return any(clean.startswith(w) for w in QUESTION_STARTERS)
 
 
+def _jsonld_nodes(blocks: Sequence[object]):
+    """Itera tutti i dict annidati nei blocchi JSON-LD."""
+    stack: List[object] = list(blocks)
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            yield node
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+
+
+def _node_types(node: Dict[str, object]) -> List[str]:
+    raw = node.get("@type")
+    if isinstance(raw, str):
+        return [raw]
+    if isinstance(raw, list):
+        return [str(t) for t in raw]
+    return []
+
+
+def validate_jsonld(pages: List[Page]) -> List[Finding]:
+    """Proprieta' minime dei tipi JSON-LD, non solo inventario."""
+    problems: Dict[str, Set[str]] = {}
+    checked: Counter = Counter()
+    faq_broken = 0
+    for page in pages:
+        for node in _jsonld_nodes(page.jsonld_raw):
+            types = _node_types(node)
+            for typ in types:
+                required = JSONLD_REQUIRED.get(typ)
+                if not required:
+                    continue
+                checked[typ] += 1
+                missing = {p for p in required if not node.get(p)}
+                if missing:
+                    problems.setdefault(typ, set()).update(missing)
+            if "FAQPage" in types:
+                entities = node.get("mainEntity") or []
+                if isinstance(entities, dict):
+                    entities = [entities]
+                for question in entities:
+                    if not isinstance(question, dict):
+                        faq_broken += 1
+                        continue
+                    answer = question.get("acceptedAnswer")
+                    if not question.get("name") \
+                            or not isinstance(answer, dict) \
+                            or not answer.get("text"):
+                        faq_broken += 1
+
+    out: List[Finding] = []
+    if problems:
+        detail = "; ".join(
+            "%s senza %s" % (typ, ", ".join(sorted(miss)))
+            for typ, miss in sorted(problems.items()))
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "JSON-LD incompleto per %d tipo/i" % len(problems),
+            "Proprieta' minime mancanti: %s." % detail,
+            "Completa le proprieta' indicate: senza, il tipo non "
+            "e' eleggibile per i risultati arricchiti."))
+    elif checked:
+        out.append(Finding(
+            AREA_SD, SEV_OK,
+            "Proprieta' minime dei tipi JSON-LD presenti",
+            "Verificati: %s." % ", ".join(sorted(checked))))
+    if faq_broken:
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "%d domanda/e FAQPage incomplete" % faq_broken,
+            "Ogni voce di mainEntity richiede una Question con "
+            "name e un acceptedAnswer con text.",
+            "Completa le coppie domanda/risposta nel markup."))
+    return out
+
+
+def audit_eeat(pages: List[Page]) -> List[Finding]:
+    """Segnali E-E-A-T: autore, date, chi siamo, contatti."""
+    good = [p for p in pages if p.ok]
+    if not good:
+        return []
+
+    has_author = any(p.author for p in good)
+    has_dates = any(p.published or p.modified for p in good)
+    for page in good:
+        if has_author and has_dates:
+            break
+        for node in _jsonld_nodes(page.jsonld_raw):
+            if node.get("author"):
+                has_author = True
+            if node.get("datePublished") or node.get("dateModified"):
+                has_dates = True
+
+    def slug_present(slugs: Tuple[str, ...]) -> bool:
+        wanted = set(slugs)
+        for page in good:
+            if page.slug.lower() in wanted:
+                return True
+            for target in page.internal_targets:
+                seg = urlparse(target).path.strip("/") \
+                    .split("/")[-1].lower()
+                if seg in wanted:
+                    return True
+        return False
+
+    has_about = slug_present(ABOUT_SLUGS)
+    has_contact = (any(p.contact_links for p in good)
+                   or slug_present(CONTACT_SLUGS)
+                   or any(EMAIL_RE.search(p.text) for p in good))
+
+    out: List[Finding] = []
+    signals = (
+        (has_author, "Autore dei contenuti dichiarato",
+         "Nessun autore dichiarato",
+         "Aggiungi il meta author o la proprieta' author nel "
+         "JSON-LD: i motori IA pesano chi firma i contenuti."),
+        (has_dates, "Date di pubblicazione/aggiornamento presenti",
+         "Nessuna data di pubblicazione o aggiornamento",
+         "Esponi article:published_time/modified_time o "
+         "datePublished/dateModified nel JSON-LD."),
+        (has_about, "Pagina \"chi siamo\" presente",
+         "Nessuna pagina \"chi siamo\" rilevata",
+         "Una pagina che presenta persone e competenze e' il "
+         "segnale di esperienza piu' diretto."),
+        (has_contact, "Contatti verificabili presenti",
+         "Nessun contatto verificabile rilevato",
+         "Esponi telefono ed email (link tel:/mailto:) o una "
+         "pagina contatti."),
+    )
+    for present, ok_title, warn_title, fix in signals:
+        if present:
+            out.append(Finding(
+                AREA_SEM, SEV_OK, "E-E-A-T: %s" % ok_title))
+        else:
+            out.append(Finding(
+                AREA_SEM, SEV_WARNING, "E-E-A-T: %s" % warn_title,
+                fix=fix))
+    return out
+
+
 def audit_structured_data(pages: List[Page]) -> List[Finding]:
     """Presenza e copertura del markup Schema.org."""
     out: List[Finding] = []
@@ -1631,6 +1949,8 @@ def audit_structured_data(pages: List[Page]) -> List[Finding]:
             AREA_SD, SEV_WARNING,
             "JSON-LD solo su %d pagine su %d" % (covered, len(good)),
             fix="Estendi il markup a tutte le pagine rilevanti."))
+
+    out.extend(validate_jsonld(good))
     return out
 
 
@@ -2555,9 +2875,11 @@ def run_audit(base: str, max_pages: int, queries: List[str],
 
     if verbose:
         print("[4/5] controlli per area", file=sys.stderr)
+    findings.append(check_llms_txt(base, fetcher))
     findings += audit_technical(pages, base, from_sitemap)
     findings += audit_lexical(pages)
     findings += audit_semantic(pages)
+    findings += audit_eeat(pages)
     findings += audit_structured_data(pages)
 
     if verbose:
