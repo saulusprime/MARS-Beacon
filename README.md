@@ -1,6 +1,6 @@
 # SEORRF — Audit SEO + Reciprocal Rank Fusion
 
-Strumento a riga di comando (Python 3, file singolo, ~2.000 righe, licenza MIT)
+Strumento (Python 3, file singolo, ~2.000 righe, licenza MIT)
 che misura quanto un sito è **recuperabile e citabile dai motori di
 ricerca ibridi e dagli assistenti IA** (ChatGPT, Claude, Perplexity, Google AI
 Overviews). Oltre ai controlli SEO classici, riproduce localmente la pipeline
