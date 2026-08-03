@@ -197,10 +197,12 @@ semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5).
 
 1. **Tecnica** — HTTPS, `robots.txt` e permessi per i crawler IA (GPTBot,
    OAI-SearchBot, ChatGPT-User, ClaudeBot, Claude-Web, Google-Extended,
-   PerplexityBot, CCBot, Applebot-Extended, Bingbot), sitemap, URL in errore,
-   pagine segnaposto del CMS, `noindex`, canonical, contenuto
-   solo-JavaScript, hreflang, contenuti duplicati (deduplica per impronta
-   del testo).
+   PerplexityBot, CCBot, Applebot-Extended, Bingbot), sitemap (anche
+   `.xml.gz`, con priorità agli URL a `lastmod` più recente), URL in errore,
+   catene di redirect interne (http/https, www/non-www, catene multiple),
+   soft-404 (200 con contenuto "pagina non trovata"), pagine segnaposto
+   del CMS, `noindex`, canonical, contenuto solo-JavaScript, hreflang,
+   contenuti duplicati (deduplica per impronta del testo).
 2. **Lessicale (BM25)** — title (30–65 caratteri), meta description
    (110–165), struttura H1, conteggio parole (soglie 300/700), slug,
    attributi `alt`.
@@ -226,7 +228,7 @@ flowchart TD
         F["Fetcher<br/>requests.Session · UA dedicato<br/>throttle --delay · timeout 20s<br/>corpo ≤ --max-body (10 MB)"]
         RB["RobotsAudit<br/>robots.txt · permessi crawler IA<br/>direttive Sitemap"]
         DISC["discover_urls()"]
-        SM["parse_sitemap()<br/>anche sitemap-index, ricorsione ≤3"]
+        SM["parse_sitemap()<br/>anche sitemap-index e .xml.gz, ricorsione ≤3"]
         CR["crawl_links()<br/>BFS interno di ripiego"]
         PP["parse_page()<br/>BeautifulSoup + lxml<br/>title, meta, heading, blocchi, JSON-LD"]
         DD["dedupe_pages()<br/>impronta del testo"]

@@ -55,8 +55,10 @@ Licenza: MIT.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import html
+import io
 import json
 import math
 import os
@@ -82,7 +84,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -94,6 +96,11 @@ USER_AGENT = (
 # Token con cui lo strumento compare nel robots.txt (gruppo
 # "User-agent: SeoRrfAudit"); usato da --respect-robots.
 USER_AGENT_TOKEN = "SeoRrfAudit"
+
+# Content-Type analizzabili: per tutto il resto (PDF, immagini,
+# archivi...) il corpo non viene scaricato affatto — lo stato e gli
+# header bastano ai rilievi. "gzip" copre le sitemap .xml.gz.
+ANALYZABLE_CTYPES = ("html", "xml", "text/", "json", "gzip")
 
 # Tetto al corpo di ogni risposta HTTP. L'intero corpo resta in RAM
 # durante il parsing, e il conteggio avviene dopo la decompressione:
@@ -209,6 +216,18 @@ PLACEHOLDER_TEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Soft-404: pagine che rispondono 200 ma il cui contenuto dice
+# "non trovato". Il segnale forte e' nel title/H1; nel corpo vale
+# solo su pagine molto corte (vedi audit_technical).
+SOFT_404_RE = re.compile(
+    r"pagina non (?:e'|è|e|é)?\s*(?:stata\s+)?trovata"
+    r"|contenuto non trovato|nessun risultato"
+    r"|page (?:was\s+)?not found|nothing (?:was\s+)?found"
+    r"|error(?:e)?\s*404|\b404\b",
+    re.IGNORECASE,
+)
+SOFT_404_MAX_WORDS = 120
+
 TOKEN_RE = re.compile(r"[a-zA-Zà-ÿÀ-Ÿ0-9][a-zA-Zà-ÿÀ-Ÿ0-9'’\-]*")
 
 # Soglie di riferimento. Valori di prassi SEO, non standard normativi.
@@ -304,6 +323,7 @@ class Page:
     url: str
     status: int = 0
     final_url: str = ""
+    redirects: int = 0
     elapsed: float = 0.0
     html_bytes: int = 0
     lang: str = ""
@@ -404,6 +424,15 @@ class Fetcher:
             time.sleep(wait)
         return resp
 
+    @staticmethod
+    def _analyzable(ctype: str, url: str) -> bool:
+        """True se il corpo va scaricato per l'analisi."""
+        low = ctype.lower()
+        if any(t in low for t in ANALYZABLE_CTYPES):
+            return True
+        # Sitemap compresse servite come octet-stream.
+        return urlparse(url).path.lower().endswith(".gz")
+
     def _transient(self, resp: Optional[requests.Response]) -> bool:
         """True se l'esito merita un nuovo tentativo."""
         if resp is None:
@@ -425,6 +454,18 @@ class Fetcher:
             if self.verbose:
                 print("  ! errore: %s" % exc, file=sys.stderr)
             return None
+
+        ctype = resp.headers.get("Content-Type", "")
+        if ctype and not self._analyzable(ctype, resp.url or url):
+            # Il chiamante vede stato e header e classifica l'URL come
+            # non HTML; il corpo (magari un PDF da decine di MB) non
+            # viene scaricato.
+            resp.close()
+            resp._content = b""
+            if self.verbose:
+                print("  - contenuto %s: corpo non scaricato"
+                      % ctype.split(";")[0], file=sys.stderr)
+            return resp
 
         limit_mb = self.max_bytes / 1048576.0
         declared = resp.headers.get("Content-Length", "")
@@ -537,8 +578,14 @@ class RobotsAudit:
 
 def parse_sitemap(url: str, fetcher: Fetcher,
                   depth: int = 0, seen: Optional[Set[str]] = None
-                  ) -> List[str]:
-    """Legge una sitemap (anche indice) e restituisce gli URL."""
+                  ) -> List[Tuple[str, str]]:
+    """Legge una sitemap (anche indice, anche .xml.gz).
+
+    Restituisce coppie ``(loc, lastmod)``, con ``lastmod`` vuoto se
+    assente. Le sitemap compresse vengono decompresse rispettando il
+    tetto ``max_bytes`` del fetcher (il conteggio in download avviene
+    prima dell'espansione).
+    """
     seen = seen if seen is not None else set()
     if depth > 3 or url in seen:
         return []
@@ -546,22 +593,36 @@ def parse_sitemap(url: str, fetcher: Fetcher,
     resp = fetcher.get(url)
     if resp is None or resp.status_code != 200:
         return []
+    body = resp.content
+    if body[:2] == b"\x1f\x8b":
+        try:
+            with gzip.GzipFile(fileobj=io.BytesIO(body)) as handle:
+                body = handle.read(fetcher.max_bytes + 1)
+            if len(body) > fetcher.max_bytes:
+                return []
+        except OSError:
+            return []
     try:
-        root = ET.fromstring(resp.content)
+        root = ET.fromstring(body)
     except ET.ParseError:
         return []
 
     ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
-    out: List[str] = []
+    out: List[Tuple[str, str]] = []
     if root.tag.endswith("sitemapindex"):
         for node in root.findall("%ssitemap/%sloc" % (ns, ns)):
             if node.text:
                 out.extend(parse_sitemap(
                     node.text.strip(), fetcher, depth + 1, seen))
     else:
-        for node in root.findall("%surl/%sloc" % (ns, ns)):
-            if node.text:
-                out.append(node.text.strip())
+        for node in root.findall("%surl" % ns):
+            loc = node.find("%sloc" % ns)
+            if loc is None or not loc.text:
+                continue
+            lastmod = node.find("%slastmod" % ns)
+            out.append((loc.text.strip(),
+                        (lastmod.text or "").strip()
+                        if lastmod is not None else ""))
     return out
 
 
@@ -569,8 +630,13 @@ def discover_urls(base: str, robots: RobotsAudit, fetcher: Fetcher,
                   max_pages: int,
                   respect_robots: bool = False
                   ) -> Tuple[List[str], bool]:
-    """Trova gli URL del sito da sitemap; se assente, crawla i link."""
-    candidates: List[str] = []
+    """Trova gli URL del sito da sitemap; se assente, crawla i link.
+
+    Con ``max_pages`` inferiore agli URL in sitemap vengono preferite
+    le pagine con ``lastmod`` piu' recente (ordinamento stabile: senza
+    lastmod l'ordine della sitemap resta invariato).
+    """
+    candidates: List[Tuple[str, str]] = []
     for sm in robots.sitemaps or [urljoin(base, "/sitemap.xml"),
                                   urljoin(base, "/sitemap_index.xml")]:
         candidates.extend(parse_sitemap(sm, fetcher))
@@ -578,8 +644,12 @@ def discover_urls(base: str, robots: RobotsAudit, fetcher: Fetcher,
             break
 
     host = urlparse(base).netloc
-    urls = [u for u in dict.fromkeys(candidates)
-            if urlparse(u).netloc == host]
+    lastmods: Dict[str, str] = {}
+    for loc, lastmod in candidates:
+        if urlparse(loc).netloc == host and loc not in lastmods:
+            lastmods[loc] = lastmod
+    # Il formato W3C (ISO 8601) ordina correttamente come stringa.
+    urls = sorted(lastmods, key=lambda u: lastmods[u], reverse=True)
     if urls:
         return urls[:max_pages], True
 
@@ -641,7 +711,8 @@ def _meta(soup: BeautifulSoup, name: str = "",
 def parse_page(url: str, resp: requests.Response) -> Page:
     """Estrae da una risposta HTTP tutti i segnali utili all'audit."""
     page = Page(url=url, status=resp.status_code,
-                final_url=resp.url, elapsed=resp.elapsed.total_seconds(),
+                final_url=resp.url, redirects=len(resp.history),
+                elapsed=resp.elapsed.total_seconds(),
                 html_bytes=len(resp.content))
     soup = BeautifulSoup(resp.text, "lxml")
 
@@ -938,6 +1009,81 @@ def reciprocal_rank_fusion(
 # Controlli per area
 # --------------------------------------------------------------------
 
+def _audit_redirects(pages: List[Page]) -> List[Finding]:
+    """Rilievi sulle catene di redirect degli URL analizzati.
+
+    Classifica ogni URL che atterra altrove rispetto a dove e' stato
+    chiesto: solo schema (http che passa a https), solo www/non-www,
+    oppure redirect generico (URL spostato). Le catene con piu' di un
+    passaggio vengono evidenziate a parte.
+    """
+    out: List[Finding] = []
+    http_to_https: List[Page] = []
+    www_mismatch: List[Page] = []
+    moved: List[Page] = []
+    for p in pages:
+        if not p.final_url:
+            continue
+        src, dst = urlparse(norm_url(p.url)), \
+            urlparse(norm_url(p.final_url))
+        if (src.scheme, src.netloc, src.path, src.query) == \
+                (dst.scheme, dst.netloc, dst.path, dst.query):
+            continue
+        same_rest = (src.path, src.query) == (dst.path, dst.query)
+        bare = dst.netloc[4:] if dst.netloc.startswith("www.") \
+            else dst.netloc
+        if same_rest and src.netloc == dst.netloc \
+                and src.scheme == "http" and dst.scheme == "https":
+            http_to_https.append(p)
+        elif same_rest and {src.netloc, dst.netloc} == \
+                {bare, "www." + bare}:
+            www_mismatch.append(p)
+        else:
+            moved.append(p)
+
+    if http_to_https:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d URL interni ancora in http" % len(http_to_https),
+            "Reindirizzati alla versione https: %s. Ogni salto "
+            "spreca crawl budget e diluisce i segnali."
+            % ", ".join(p.url for p in http_to_https[:5]),
+            "Aggiorna sitemap e link interni agli URL https "
+            "definitivi."))
+    if www_mismatch:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d URL con host misto www/non-www" % len(www_mismatch),
+            "Reindirizzati all'host canonico: %s."
+            % ", ".join("%s -> %s" % (p.url, p.final_url)
+                        for p in www_mismatch[:5]),
+            "Usa un solo host (con o senza www) in sitemap e link "
+            "interni."))
+    if moved:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d URL interni rispondono con redirect" % len(moved),
+            "URL spostati: %s."
+            % ", ".join("%s -> %s" % (p.url, p.final_url)
+                        for p in moved[:5]),
+            "Aggiorna sitemap e link interni alla destinazione "
+            "finale dei redirect."))
+    chains = [p for p in pages if p.redirects > 1]
+    if chains:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d URL con catena di redirect multipla" % len(chains),
+            ", ".join("%s (%d passaggi)" % (p.url, p.redirects)
+                      for p in chains[:5]) + ".",
+            "Fai puntare ogni redirect direttamente alla "
+            "destinazione finale (un solo passaggio).", weight=2.0))
+    if not (http_to_https or www_mismatch or moved):
+        out.append(Finding(
+            AREA_TECH, SEV_OK, "Nessun redirect interno",
+            "Tutti gli URL analizzati rispondono direttamente."))
+    return out
+
+
 def audit_technical(pages: List[Page], base: str,
                     from_sitemap: bool) -> List[Finding]:
     """Controlli di indicizzabilita' e igiene tecnica."""
@@ -960,6 +1106,27 @@ def audit_technical(pages: List[Page], base: str,
             ", ".join("%s (%s)" % (p.url, p.status or p.error)
                       for p in broken[:5]),
             "Correggi o rimuovi dalla sitemap gli URL in errore."))
+
+    out.extend(_audit_redirects(pages))
+
+    soft404 = []
+    for p in good:
+        head = " ".join([p.title] + [t for _lvl, t in p.headings[:2]])
+        if SOFT_404_RE.search(head) or (
+                p.word_count <= SOFT_404_MAX_WORDS
+                and SOFT_404_RE.search(p.text[:1500])):
+            soft404.append(p)
+    if soft404:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d possibile/i soft-404 (200 con contenuto \"non "
+            "trovato\")" % len(soft404),
+            "Rispondono 200 ma il contenuto dice che la pagina non "
+            "esiste: %s. Entrano nell'indice come pagine vuote e "
+            "diluiscono i segnali del sito."
+            % ", ".join(p.url for p in soft404[:5]),
+            "Fai rispondere 404 (o 410) agli URL inesistenti e "
+            "togli quelli vuoti dalla sitemap.", weight=2.0))
 
     n_pages = len(good)
     if n_pages == 0:
@@ -2041,6 +2208,8 @@ def render_json(base: str, pages: List[Page],
             {
                 "url": p.url,
                 "status": p.status,
+                "final_url": p.final_url,
+                "redirects": p.redirects,
                 "title": p.title,
                 "description": p.description,
                 "word_count": p.word_count,

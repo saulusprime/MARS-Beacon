@@ -5,14 +5,14 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-03.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.4.0
+## Strumento CLI — `seo_rrf_audit.py` v1.5.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
   semantica 1.5, dati strutturati 1.0, RRF 1.5): tecnica (HTTPS,
-  robots.txt e permessi dei crawler IA, sitemap, errori, pagine
-  segnaposto, noindex, canonical, contenuto solo-JS, hreflang,
-  duplicati), lessicale BM25 (title, description, H1, conteggi, slug,
+  robots.txt e permessi dei crawler IA, sitemap, errori, redirect
+  interni, soft-404, pagine segnaposto, noindex, canonical, contenuto
+  solo-JS, hreflang, duplicati), lessicale BM25 (title, description, H1, conteggi, slug,
   alt), semantica (chunk, autoconsistenza, heading-domanda, FAQ,
   definizioni, esempi, vocabolario), dati strutturati (inventario
   JSON-LD, entità, FAQPage, BreadcrumbList, WebSite).
@@ -22,9 +22,18 @@ sono nel [README.md](README.md).
   sempre dichiarato nel referto), fusione `Σ 1/(k+rank)` con k
   configurabile (`--rrf-k`, propagato a tutti i renderer) e misura del
   consenso fra le liste con soglie 20%/45%.
-- **Scoperta URL** da sitemap (anche sitemap-index, ricorsione ≤ 3)
-  con ripiego sul crawling BFS interno; deduplica dei contenuti
-  identici per impronta del testo (conservato l'URL più corto).
+- **Scoperta URL** da sitemap (anche sitemap-index e `.xml.gz`,
+  ricorsione ≤ 3, priorità agli URL con `lastmod` più recente quando
+  `--max-pages` non copre tutto) con ripiego sul crawling BFS
+  interno; deduplica dei contenuti identici per impronta del testo
+  (conservato l'URL più corto).
+- **Robustezza del crawling** (v1.5.0): rilievi sulle catene di
+  redirect interne (http→https, www/non-www, URL spostati, catene a
+  più passaggi, con `final_url` e conteggio nel referto JSON);
+  rilevamento euristico dei **soft-404** (200 con contenuto "pagina
+  non trovata" nel title/H1, o nel corpo se molto breve); i
+  Content-Type non analizzabili (PDF, immagini, archivi) non vengono
+  scaricati: stato e header bastano a classificarli nel referto.
 - **Query di prova** da file (`--queries`) o auto-generate dai
   bigrammi tematici di heading e title, senza query degeneri.
 - **Tre formati di referto** (`text`, `json`, `html` autonomo con tema

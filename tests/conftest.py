@@ -5,8 +5,11 @@ Il sito serve robots.txt (GPTBot bloccato), sitemap, una home
 duplicata su due URL, una pagina servizio ricca, una pagina
 segnaposto WordPress, una pagina noindex e una risposta oversize
 da 12 MB: ogni difetto corrisponde a un rilievo atteso nei test.
+Fuori sitemap, per i test mirati: due redirect in catena, una
+soft-404, un PDF e una sitemap compressa con lastmod.
 """
 
+import gzip
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -17,6 +20,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 BIG_BYTES = 12 * 1048576
+PDF_BYTES = 2 * 1048576
 
 ROBOTS = """User-agent: GPTBot
 Disallow: /
@@ -122,6 +126,28 @@ comparire nei risultati dei motori di ricerca pubblici.</p>
 </body></html>
 """
 
+FANTASMA = """<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8">
+<title>Pagina non trovata — Centro Linfa</title></head><body>
+<h1>Pagina non trovata</h1>
+<p>Il contenuto che cerchi non esiste più o è stato spostato.</p>
+</body></html>
+"""
+
+SITEMAP_GZ = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>BASE/</loc><lastmod>2026-01-10</lastmod></url>
+<url><loc>BASE/sample-page/</loc></url>
+<url><loc>BASE/servizio-drenaggio/</loc>
+<lastmod>2026-07-01T08:30:00+02:00</lastmod></url>
+</urlset>
+"""
+
+REDIRECTS = {
+    "/vecchia/": "/servizio-drenaggio/",
+    "/salto/": "/vecchia/",
+}
+
 
 class SiteHandler(BaseHTTPRequestHandler):
     """Serve il sito di prova con i difetti piantati."""
@@ -144,6 +170,7 @@ class SiteHandler(BaseHTTPRequestHandler):
             "/noindex/": (NOINDEX, html),
             "/riservata/": (RISERVATA, html),
             "/riservata": (RISERVATA, html),
+            "/fantasma/": (FANTASMA, html),
             "/robots.txt": (ROBOTS, "text/plain; charset=utf-8"),
             "/sitemap.xml": (SITEMAP, "application/xml"),
         }
@@ -151,6 +178,28 @@ class SiteHandler(BaseHTTPRequestHandler):
             body, ctype = routes[self.path]
             self._send(body.replace("BASE", base).encode("utf-8"),
                        ctype)
+        elif self.path in REDIRECTS:
+            self.send_response(301)
+            self.send_header("Location", base + REDIRECTS[self.path])
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        elif self.path == "/sitemap.xml.gz":
+            body = gzip.compress(
+                SITEMAP_GZ.replace("BASE", base).encode("utf-8"))
+            self._send(body, "application/gzip")
+        elif self.path == "/doc.pdf":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Length", str(PDF_BYTES))
+            self.end_headers()
+            try:
+                sent = 0
+                block = b"%" * 65536
+                while sent < PDF_BYTES:
+                    self.wfile.write(block)
+                    sent += len(block)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
         elif self.path == "/big/":
             self.send_response(200)
             self.send_header("Content-Type", html)

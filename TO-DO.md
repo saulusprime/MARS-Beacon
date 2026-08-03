@@ -1,6 +1,6 @@
 # TO-DO — sviluppi e idee di miglioramento
 
-Elenco di ciò che **resta da fare** (codice alla v1.4.0). Quanto già
+Elenco di ciò che **resta da fare** (codice alla v1.5.0). Quanto già
 realizzato è documentato in [AS-IS.md](AS-IS.md): le voci completate
 vengono spostate lì, non spuntate qui. Le voci marcate
 **[bug/rischio]** sono comportamenti osservati nel codice; il resto
@@ -8,12 +8,6 @@ sono proposte.
 
 ## P1 — Robustezza del crawling
 
-- [ ] Gestione esplicita delle catene di redirect (segnalare 301/302 interni,
-      URL misti http/https, www/non-www).
-- [ ] Rilevare i **soft-404** (200 con contenuto "pagina non trovata").
-- [ ] Saltare in anticipo i `Content-Type` non HTML/XML senza scaricarne
-      il corpo (residuo del limite `--max-body`: oggi un PDF in sitemap
-      viene scaricato fino al tetto e scartato solo dopo).
 - [ ] Valutare se rendere `--respect-robots` il comportamento predefinito
       quando l'host auditato non coincide con un dominio "proprio"
       dichiarato (oggi è opt-in, pensato per l'audit del proprio sito).
@@ -23,8 +17,6 @@ sono proposte.
 - [ ] Opzione di **rendering JavaScript** (Playwright) per auditare davvero i
       siti client-side: oggi il contenuto solo-JS viene rilevato ma non
       analizzato.
-- [ ] Supporto a sitemap compresse (`.xml.gz`) e a `lastmod` per
-      prioritizzare le pagine.
 
 ## P1 — Qualità dell'analisi
 
