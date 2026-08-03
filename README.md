@@ -120,11 +120,17 @@ Cosa offre:
   download dei referti è riservato alla **registrazione completa**
   (azienda e telefono nel profilo). Utenti e sessioni su SQLite
   locale, password con hash PBKDF2 e salt.
-- **Avanzamento in tempo reale**: fase corrente annunciata via regione
+- **Avanzamento in tempo reale**: push via Server-Sent Events (con
+  ripiego automatico sul polling), fase corrente annunciata via regione
   di stato, log di scansione completo in area scorrevole e bottone
   **"Annulla audit"** (stop cooperativo: interrompe richieste e attese
   alla prima occasione utile, senza risultati parziali; non consuma
   lo slot orario).
+- **Storico degli audit** per utente: tabella delle esecuzioni con
+  delta del punteggio rispetto al run precedente dello stesso sito e
+  grafico dell'andamento del punteggio complessivo con soglie 40/70.
+- **Preimpostazioni**: la configurazione del form si salva con un nome
+  (per cliente/sito) in localStorage e si ricarica in un click.
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, rilievi in una fisarmonica per area con gravità espressa da
   testo + simbolo (mai solo colore), tabella del consenso RRF per

@@ -125,6 +125,15 @@ SameSite=Strict. Nuovi endpoint: `/api/register`, `/api/login`,
 e `/api/report/*` ora richiedono la sessione (i referti anche il
 profilo completo).
 
+Novità GUI 2.1.0 (2026-08-03): avanzamento push con Server-Sent
+Events (`GET /api/events`, con ripiego automatico sul polling);
+**storico degli audit per utente** su SQLite con nuova sezione nella
+pagina — tabella delle esecuzioni con delta del punteggio rispetto
+al run precedente dello stesso sito e grafico dell'andamento del
+punteggio complessivo con soglie 40/70 (il widget "trend salute"
+del concept board); **preimpostazioni di configurazione** salvabili
+per cliente/sito in localStorage (salva/carica/elimina).
+
 ## Uso
 
 ```

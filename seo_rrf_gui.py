@@ -13,6 +13,8 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
     POST /api/logout        chiusura della sessione
     GET  /api/me            stato della sessione e profilo
     POST /api/profile       completamento profilo (azienda, telefono)
+    GET  /api/history       storico degli audit dell'utente
+    GET  /api/events        avanzamento push (Server-Sent Events)
     POST /api/audit         avvia un check (richiede accesso; uno
                             per utente ogni ora)
     POST /api/cancel        annulla l'audit in corso
@@ -57,7 +59,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -139,7 +141,17 @@ class UserStore:
                 "CREATE TABLE IF NOT EXISTS sessions ("
                 " token TEXT PRIMARY KEY,"
                 " user_id INTEGER NOT NULL,"
-                " expires_at REAL NOT NULL);")
+                " expires_at REAL NOT NULL);"
+                "CREATE TABLE IF NOT EXISTS audits ("
+                " id INTEGER PRIMARY KEY,"
+                " user_id INTEGER NOT NULL,"
+                " site TEXT NOT NULL,"
+                " created_at REAL NOT NULL,"
+                " overall REAL NOT NULL,"
+                " scores TEXT NOT NULL,"
+                " critical INTEGER NOT NULL,"
+                " warning INTEGER NOT NULL,"
+                " info INTEGER NOT NULL);")
 
     def _connect(self) -> sqlite3.Connection:
         con = sqlite3.connect(self.path)
@@ -239,6 +251,43 @@ class UserStore:
             con.execute(
                 "UPDATE users SET last_check_at = 0 WHERE id = ?",
                 (user_id,))
+
+    def add_audit(self, user_id: int,
+                  summary: Dict[str, object]) -> None:
+        """Registra la sintesi di un audit concluso nello storico."""
+        with self.lock, self._connect() as con:
+            con.execute(
+                "INSERT INTO audits (user_id, site, created_at, "
+                "overall, scores, critical, warning, info) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, str(summary.get("site", "")), time.time(),
+                 float(summary.get("overall") or 0),
+                 json.dumps(summary.get("scores") or {},
+                            ensure_ascii=False),
+                 int(summary.get("critical") or 0),
+                 int(summary.get("warning") or 0),
+                 int(summary.get("info") or 0)))
+
+    def history(self, user_id: int,
+                limit: int = 50) -> List[Dict[str, object]]:
+        """Storico degli audit dell'utente, dal piu' recente."""
+        with self.lock, self._connect() as con:
+            rows = con.execute(
+                "SELECT * FROM audits WHERE user_id = ? "
+                "ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit)).fetchall()
+        return [
+            {
+                "site": row["site"],
+                "created_at": row["created_at"],
+                "overall": row["overall"],
+                "scores": json.loads(row["scores"]),
+                "critical": row["critical"],
+                "warning": row["warning"],
+                "info": row["info"],
+            }
+            for row in rows
+        ]
 
 
 STORE: Optional[UserStore] = None
@@ -378,6 +427,8 @@ class Job:
             "info": severities.count(sra.SEV_INFO),
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
+        if self.user_id:
+            get_store().add_audit(self.user_id, summary)
         with self.lock:
             self.reports = reports
             self.summary = summary
@@ -509,6 +560,38 @@ class Handler(BaseHTTPRequestHandler):
                             {"error": "corpo non valido: %s" % exc})
             return None
 
+    def _stream_events(self) -> None:
+        """Avanzamento push (Server-Sent Events).
+
+        Invia lo snapshot quando cambia (nuove righe di log o cambio
+        di stato) e chiude il flusso quando l'audit raggiunge uno
+        stato terminale; il client ripiega sul polling se il flusso
+        non e' disponibile.
+        """
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Content-Security-Policy", CSP)
+        self.end_headers()
+
+        last_sent = None
+        try:
+            while True:
+                snap = JOB.snapshot()
+                marker = (snap["state"], len(snap["log"]))
+                if marker != last_sent:
+                    last_sent = marker
+                    payload = json.dumps(snap, ensure_ascii=False)
+                    self.wfile.write(
+                        ("data: %s\n\n" % payload).encode("utf-8"))
+                    self.wfile.flush()
+                if snap["state"] != "running":
+                    break
+                time.sleep(0.3)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # client disconnesso: nessun rumore
+
     def _serve_static(self, path: str) -> None:
         rel = path.lstrip("/") or "index.html"
         target = (GUI_DIR / rel).resolve()
@@ -550,6 +633,18 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
             self._send_json(200, JOB.snapshot())
+        elif path == "/api/history":
+            user = self._session_user()
+            if user is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+                return
+            self._send_json(200, {
+                "runs": get_store().history(int(user["id"]))})
+        elif path == "/api/events":
+            if self._session_user() is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+                return
+            self._stream_events()
         elif path.startswith("/api/report/"):
             user = self._session_user()
             if user is None:

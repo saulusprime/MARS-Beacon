@@ -22,6 +22,13 @@
   };
   const SEV_ORDER = { critical: 0, warning: 1, info: 2, ok: 3 };
 
+  const PRESETS_KEY = "seo_rrf_presets";
+  const PRESET_FIELDS = [
+    "f-url", "f-max-pages", "f-delay", "f-max-body", "f-retries",
+    "f-competitors", "f-respect-robots", "f-queries",
+    "f-embeddings", "f-rrf-k",
+  ];
+
   const NUMERIC_FIELDS = [
     ["f-max-pages", "e-max-pages"],
     ["f-delay", "e-delay"],
@@ -64,6 +71,10 @@
       }
     });
   });
+  el("preset-save").addEventListener("click", savePreset);
+  el("preset-load").addEventListener("click", loadPreset);
+  el("preset-delete").addEventListener("click", deletePreset);
+  refreshPresetSelect();
   loadEnv();
   refreshAuth();
 
@@ -110,12 +121,14 @@
       el("config-section").hidden = false;
       setOpen("sec-auth", false);
       setOpen("sec-config", true);
+      loadHistory();
     } else {
       el("auth-out").hidden = false;
       el("auth-in").hidden = true;
       el("config-section").hidden = true;
       el("progress-section").hidden = true;
       el("results-section").hidden = true;
+      el("history-section").hidden = true;
       setOpen("sec-auth", true);
     }
     updateDownloadGate();
@@ -188,6 +201,241 @@
 
   function onLogout() {
     postJson("api/logout", {}).finally(() => applyAuth(null));
+  }
+
+  /* ---------------- storico degli audit ---------------- */
+
+  function loadHistory() {
+    if (!me) {
+      return;
+    }
+    fetch("api/history")
+      .then((r) => r.json())
+      .then((data) => renderHistory(data.runs || []))
+      .catch(() => { /* lo storico non blocca il resto */ });
+  }
+
+  function deltaNode(delta) {
+    const span = document.createElement("span");
+    if (delta === null) {
+      span.className = "text-muted";
+      span.textContent = "—";
+    } else if (delta > 0) {
+      span.className = "delta-up";
+      span.textContent = "▲ +" + delta;
+    } else if (delta < 0) {
+      span.className = "delta-down";
+      span.textContent = "▼ " + delta;
+    } else {
+      span.className = "text-muted";
+      span.textContent = "=";
+    }
+    return span;
+  }
+
+  function renderHistory(runs) {
+    const section = el("history-section");
+    if (!runs.length) {
+      section.hidden = true;
+      return;
+    }
+    const tbody = el("history-table").querySelector("tbody");
+    tbody.textContent = "";
+    runs.forEach((run, index) => {
+      const prev = runs.slice(index + 1)
+        .find((r) => r.site === run.site);
+      const delta = prev
+        ? Math.round(run.overall) - Math.round(prev.overall) : null;
+
+      const tr = document.createElement("tr");
+      const when = document.createElement("td");
+      when.textContent = new Date(run.created_at * 1000)
+        .toLocaleString("it-IT", {
+          day: "2-digit", month: "2-digit", year: "2-digit",
+          hour: "2-digit", minute: "2-digit",
+        });
+      tr.appendChild(when);
+
+      const site = document.createElement("th");
+      site.scope = "row";
+      site.className = "fw-normal";
+      site.textContent = run.site;
+      tr.appendChild(site);
+
+      const score = document.createElement("td");
+      const dot = document.createElement("span");
+      dot.className = "sev-dot me-1";
+      dot.style.backgroundColor = scoreColor(run.overall);
+      score.appendChild(dot);
+      score.appendChild(document.createTextNode(
+        Math.round(run.overall) + "/100"));
+      tr.appendChild(score);
+
+      const deltaCell = document.createElement("td");
+      deltaCell.appendChild(deltaNode(delta));
+      tr.appendChild(deltaCell);
+
+      const critical = document.createElement("td");
+      critical.textContent = run.critical;
+      tr.appendChild(critical);
+      const warning = document.createElement("td");
+      warning.textContent = run.warning;
+      tr.appendChild(warning);
+
+      tbody.appendChild(tr);
+    });
+
+    renderTrend(runs.filter((r) => r.site === runs[0].site)
+      .slice(0, 12).reverse());
+    section.hidden = false;
+  }
+
+  /* Trend del punteggio complessivo (stile CrUX Vis: linea con
+     soglie 40/70 tratteggiate come hairline). */
+  function renderTrend(points) {
+    const box = el("history-trend");
+    box.textContent = "";
+    if (points.length < 2) {
+      return;
+    }
+    const width = 560;
+    const x0 = 40;
+    const x1 = 540;
+    const yOf = (value) => 150 - value * 1.3;
+    const xOf = (index) =>
+      x0 + (x1 - x0) * index / (points.length - 1);
+
+    const svg = svgNode("svg", {
+      viewBox: "0 0 " + width + " 175",
+      class: "history-trend-svg",
+      role: "img",
+      "aria-label": "Andamento del punteggio complessivo di " +
+        points[points.length - 1].site + " negli ultimi " +
+        points.length + " audit",
+    });
+    [[0, "#c3c2b7"], [40, "#e5e5e5"], [70, "#e5e5e5"]]
+      .forEach(([value, color]) => {
+        svg.appendChild(svgNode("line", {
+          x1: x0, x2: x1, y1: yOf(value), y2: yOf(value),
+          stroke: color, "stroke-width": 1,
+        }));
+      });
+    [[40, "40"], [70, "70"], [0, "0"]].forEach(([value, label]) => {
+      const text = svgNode("text", {
+        x: x0 - 6, y: yOf(value) + 4, "font-size": 10,
+        "text-anchor": "end", fill: "#6b7f83",
+      });
+      text.textContent = label;
+      svg.appendChild(text);
+    });
+
+    const coords = points.map((p, i) =>
+      xOf(i).toFixed(1) + "," + yOf(p.overall).toFixed(1));
+    svg.appendChild(svgNode("polyline", {
+      points: coords.join(" "),
+      fill: "none", stroke: "#186078", "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round",
+    }));
+    const last = points[points.length - 1];
+    svg.appendChild(svgNode("circle", {
+      cx: x1, cy: yOf(last.overall), r: 6, fill: "#fff",
+    }));
+    svg.appendChild(svgNode("circle", {
+      cx: x1, cy: yOf(last.overall), r: 4, fill: "#186078",
+    }));
+    const endLabel = svgNode("text", {
+      x: x1 - 10, y: yOf(last.overall) - 10, "font-size": 11,
+      "font-weight": 600, "text-anchor": "end", fill: "#14272b",
+    });
+    endLabel.textContent = Math.round(last.overall);
+    svg.appendChild(endLabel);
+    box.appendChild(svg);
+  }
+
+  /* ---------------- preimpostazioni ---------------- */
+
+  function readPresets() {
+    try {
+      return JSON.parse(
+        window.localStorage.getItem(PRESETS_KEY)) || {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function writePresets(presets) {
+    window.localStorage.setItem(PRESETS_KEY,
+      JSON.stringify(presets));
+  }
+
+  function refreshPresetSelect() {
+    const select = el("preset-select");
+    const current = select.value;
+    select.textContent = "";
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "— nessuna —";
+    select.appendChild(none);
+    Object.keys(readPresets()).sort().forEach((name) => {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      select.appendChild(option);
+    });
+    select.value = current;
+  }
+
+  function savePreset() {
+    const name = el("preset-name").value.trim();
+    if (!name) {
+      showFormError("Dai un nome alla preimpostazione da salvare.");
+      return;
+    }
+    const presets = readPresets();
+    const data = {};
+    PRESET_FIELDS.forEach((id) => {
+      const field = el(id);
+      data[id] = field.type === "checkbox"
+        ? field.checked : field.value;
+    });
+    presets[name] = data;
+    writePresets(presets);
+    el("preset-name").value = "";
+    refreshPresetSelect();
+    el("preset-select").value = name;
+    el("announcer").textContent =
+      "Preimpostazione \"" + name + "\" salvata.";
+  }
+
+  function loadPreset() {
+    const name = el("preset-select").value;
+    const data = readPresets()[name];
+    if (!data) {
+      return;
+    }
+    PRESET_FIELDS.forEach((id) => {
+      const field = el(id);
+      if (field.type === "checkbox") {
+        field.checked = !!data[id];
+      } else if (data[id] !== undefined) {
+        field.value = data[id];
+      }
+    });
+    el("announcer").textContent =
+      "Preimpostazione \"" + name + "\" caricata.";
+  }
+
+  function deletePreset() {
+    const name = el("preset-select").value;
+    if (!name) {
+      return;
+    }
+    const presets = readPresets();
+    delete presets[name];
+    writePresets(presets);
+    refreshPresetSelect();
+    el("announcer").textContent =
+      "Preimpostazione \"" + name + "\" eliminata.";
   }
 
   function cancelAudit() {
@@ -373,7 +621,7 @@
         setOpen("sec-config", false);
         setOpen("sec-progress", true);
         el("progress-toggle").focus();
-        window.setTimeout(poll, 800);
+        window.setTimeout(watchProgress, 300);
       })
       .catch(() => showFormError(
         "Impossibile contattare il server locale: verifica che " +
@@ -393,22 +641,62 @@
     button.textContent = busy ? "Audit in corso…" : "Avvia audit";
   }
 
+  /* Avanzamento push (SSE) con ripiego sul polling. */
+
+  let events = null;
+
+  function stopEvents() {
+    if (events) {
+      events.close();
+      events = null;
+    }
+  }
+
+  function watchProgress() {
+    stopEvents();
+    if (window.EventSource) {
+      try {
+        events = new EventSource("api/events");
+        events.onmessage = (msg) => {
+          handleSnapshot(JSON.parse(msg.data));
+        };
+        events.onerror = () => {
+          stopEvents();
+          if (running) {
+            window.setTimeout(poll, 500);
+          }
+        };
+        return;
+      } catch (err) { /* ripiego sul polling */ }
+    }
+    poll();
+  }
+
+  function handleSnapshot(snap) {
+    if (!snap.state) {
+      stopEvents();
+      fail(snap.error || "Sessione scaduta: accedi di nuovo.");
+      return;
+    }
+    renderLog(snap.log || []);
+    if (snap.state === "done") {
+      stopEvents();
+      finish(snap);
+    } else if (snap.state === "cancelled") {
+      stopEvents();
+      cancelled();
+    } else if (snap.state === "error") {
+      stopEvents();
+      fail(snap.error || "Errore sconosciuto durante l'audit.");
+    }
+  }
+
   function poll() {
     fetch("api/status")
       .then((r) => r.json())
       .then((snap) => {
-        if (!snap.state) {
-          fail(snap.error || "Sessione scaduta: accedi di nuovo.");
-          return;
-        }
-        renderLog(snap.log || []);
-        if (snap.state === "done") {
-          finish(snap);
-        } else if (snap.state === "cancelled") {
-          cancelled();
-        } else if (snap.state === "error") {
-          fail(snap.error || "Errore sconosciuto durante l'audit.");
-        } else {
+        handleSnapshot(snap);
+        if (snap.state === "running") {
           window.setTimeout(poll, 1000);
         }
       })
@@ -463,6 +751,7 @@
     el("announcer").textContent = "Audit completato: risultati pronti.";
     setOpen("sec-progress", false);
     showResults(snap);
+    loadHistory();
     el("results-toggle").focus();
   }
 

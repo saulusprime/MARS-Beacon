@@ -222,6 +222,15 @@
   margin: .2rem 0;
 }
 
+/* ------------------------- Storico ------------------------- */
+
+.history-trend-svg {
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+  display: block;
+}
+
 /* ------------------------- Accesso ------------------------- */
 /* Come per le legend: l'etichetta attiva di Bootstrap Italia trasla
    sopra il bordo del form-group e coprirebbe il titolo del form. */

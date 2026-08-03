@@ -313,3 +313,50 @@ def test_annullamento_audit(gui_base, site):
     assert status == 202
     snap = _attendi_stato(gui_base, cookie, ("done", "error"))
     assert snap["state"] == "done"
+
+
+# ---------------- storico e avanzamento push ----------------
+
+def test_storico_per_utente(gui_base, site):
+    status, _, _ = _api(gui_base, "/api/history")
+    assert status == 401
+
+    cookie = _register(gui_base, completo=True)
+    status, body, _ = _api(gui_base, "/api/history", cookie=cookie)
+    assert status == 200 and json.loads(body)["runs"] == []
+
+    status, _, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 2, "delay": 0.0,
+        "queries": "drenaggio linfatico"}, cookie=cookie)
+    assert status == 202
+    snap = _attendi_stato(gui_base, cookie, ("done", "error"))
+    assert snap["state"] == "done"
+
+    _, body, _ = _api(gui_base, "/api/history", cookie=cookie)
+    runs = json.loads(body)["runs"]
+    assert len(runs) == 1
+    assert runs[0]["site"].startswith("http://127.0.0.1")
+    assert 0 <= runs[0]["overall"] <= 100
+    assert runs[0]["scores"]
+    assert runs[0]["critical"] >= 1
+
+    # Lo storico e' per utente: un altro account non vede nulla.
+    cookie2 = _register(gui_base, email="altro@esempio.it")
+    _, body, _ = _api(gui_base, "/api/history", cookie=cookie2)
+    assert json.loads(body)["runs"] == []
+
+
+def test_eventi_sse(gui_base):
+    status, _, _ = _api(gui_base, "/api/events")
+    assert status == 401
+
+    cookie = _register(gui_base)
+    req = urllib.request.Request(gui_base + "/api/events")
+    req.add_header("Cookie", cookie)
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        ctype = resp.headers.get("Content-Type", "")
+        assert ctype.startswith("text/event-stream")
+        body = resp.read()  # stato idle: un evento e chiusura
+    assert body.startswith(b"data: ")
+    snap = json.loads(body[len(b"data: "):].strip())
+    assert snap["state"] == "idle"

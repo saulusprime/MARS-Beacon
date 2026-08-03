@@ -202,6 +202,32 @@
       <div id="form-error" class="alert alert-danger" role="alert"
            tabindex="-1" hidden></div>
 
+      <div class="row align-items-center mb-4" id="preset-row">
+        <div class="col-12 col-md-4">
+          <label for="preset-select" class="form-label small mb-1">
+            Preimpostazioni salvate</label>
+          <select id="preset-select" class="form-select form-select-sm">
+            <option value="">— nessuna —</option>
+          </select>
+        </div>
+        <div class="col-auto pt-3">
+          <button type="button" class="btn btn-outline-primary btn-sm"
+                  id="preset-load">Carica</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm"
+                  id="preset-delete">Elimina</button>
+        </div>
+        <div class="col-12 col-md-3 ms-md-auto pt-3 pt-md-0">
+          <label for="preset-name" class="form-label small mb-1">
+            Salva la configurazione attuale come</label>
+          <input type="text" class="form-control form-control-sm"
+                 id="preset-name" placeholder="es. cliente-rossi">
+        </div>
+        <div class="col-auto pt-3">
+          <button type="button" class="btn btn-outline-primary btn-sm"
+                  id="preset-save">Salva</button>
+        </div>
+      </div>
+
       <form id="audit-form" novalidate>
         <fieldset class="mb-4">
           <legend class="h5">Sito e scansione</legend>
@@ -513,6 +539,49 @@
             <tbody></tbody>
           </table>
         </div>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ================= Storico ================= -->
+    <div class="accordion-item" id="history-section" hidden>
+      <h2 class="accordion-header" id="history-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="history-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-history" aria-expanded="false"
+                aria-controls="sec-history">
+          Storico dei tuoi audit
+        </button>
+      </h2>
+      <div id="sec-history" class="accordion-collapse collapse"
+           aria-labelledby="history-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted mb-2">
+        Le esecuzioni concluse del tuo account, dalla più recente. Il
+        delta confronta lo stesso sito con l'esecuzione precedente;
+        il grafico mostra l'andamento del punteggio complessivo per
+        l'ultimo sito analizzato (soglie 40 e 70).
+      </p>
+      <div id="history-trend" class="mb-3"></div>
+      <div class="table-responsive" tabindex="0" role="group"
+           aria-label="Tabella dello storico audit, area scorrevole">
+        <table class="table table-striped align-middle"
+               id="history-table">
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Sito</th>
+              <th scope="col">Punteggio</th>
+              <th scope="col">Delta</th>
+              <th scope="col">Critici</th>
+              <th scope="col">Avvertenze</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
 
       </div>

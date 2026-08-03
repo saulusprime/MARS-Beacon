@@ -101,7 +101,20 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.0.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.1.0 + `gui/`
+
+- **Storico degli audit** (v2.1.0), per utente su SQLite: sezione
+  dedicata con tabella delle esecuzioni (data, sito, punteggio con
+  colore-soglia, delta rispetto al run precedente dello stesso
+  sito, critici/avvertenze) e grafico SVG dell'andamento del
+  punteggio complessivo con soglie 40/70 — primo widget "richiede
+  storico" del concept board realizzato.
+- **Avanzamento push** (v2.1.0): Server-Sent Events su
+  `GET /api/events` (snapshot inviato a ogni variazione, flusso
+  chiuso allo stato terminale) con ripiego automatico sul polling.
+- **Preimpostazioni di configurazione** (v2.1.0): l'intero form si
+  salva con un nome in localStorage (salva/carica/elimina), per
+  riusare le configurazioni per cliente o sito.
 
 - **Account utente** (v2.0.0): registrazione rapida (nome, email,
   password, accettazione condizioni di servizio con dichiarazione di

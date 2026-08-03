@@ -97,10 +97,10 @@ Widget che richiedono lo **storico degli audit** (prerequisito: la voce
 FILE` che appende una riga JSONL compatta come già fa il monitor
 citazioni):
 
-- [ ] Delta (freccia verde/rossa vs audit precedente) su punteggi, aree
-      e conteggi di severità.
-- [ ] Trend del punteggio complessivo per esecuzione con bande di soglia
-      50/90 — pattern: CrUX Vis, tab Progress di Semrush.
+- [ ] Delta su punteggi per area e conteggi di severità dentro i
+      risultati (il delta sul punteggio complessivo e il trend con
+      soglie sono realizzati nella sezione Storico della GUI dalla
+      v2.1.0; restano i delta per area e nei referti CLI).
 - [ ] Badge "nuovo"/"risolto" sui rilievi, confronto fra due audit —
       pattern: Compare Crawls di Semrush, colonne New/Fixed di Ahrefs.
 
@@ -113,14 +113,9 @@ in P1), distribuzione della profondità di crawl.
 
 ## P2 — Interfaccia grafica (seo_rrf_gui.py)
 
-- [ ] Avanzamento push (Server-Sent Events) al posto del polling a 1s.
-- [ ] Storico degli audit nella GUI: elenco delle esecuzioni con confronto
-      dei punteggi (si aggancia all'idea "storico e delta" dei referti).
 - [ ] Audit di accessibilità automatizzato in CI (axe-core / Pa11y) e
       verifica manuale con screen reader (NVDA/VoiceOver) documentata:
       oggi la struttura è lintata staticamente ma non testata con AT reali.
-- [ ] Salvataggio/caricamento di preimpostazioni di configurazione
-      (per cliente/sito) in localStorage o file.
 - [ ] Aggiornare la vendorizzazione di Bootstrap Italia con uno script
       dedicato (`update-vendor.sh`) che scarichi e potri i formati legacy.
 - [ ] Incorporare il logo nel referto HTML autonomo (oggi la firma è
