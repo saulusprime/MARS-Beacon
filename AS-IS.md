@@ -86,9 +86,11 @@ sono nel [README.md](README.md).
 
 ## Interfaccia grafica locale — `seo_rrf_gui.py` v1.7.0 + `gui/`
 
-- **Layout a sezioni collassabili** (v1.7.0): configurazione,
+- **Layout a sezioni collassabili** (v1.7.x): configurazione,
   avanzamento e "Risultati dell'audit e referto" (unificati: pulsanti
-  di download e anteprima del referto dentro i risultati) sono voci
+  di download del referto dentro i risultati; dalla v1.7.1 senza
+  anteprima incorporata — il referto HTML si apre in una nuova
+  scheda) sono voci
   di un accordion Bootstrap Italia col tema Lympha. Il ciclo audit
   guida le sezioni: all'avvio si chiude la configurazione e si apre
   l'avanzamento, alla fine l'avanzamento si richiude (log sempre
@@ -119,8 +121,8 @@ sono nel [README.md](README.md).
   sprite icone, licenza): funziona offline, nessun CDN. Modulo con
   tutti i parametri della CLI e suggerimenti contestuali, avanzamento
   in tempo reale con log, risultati nella pagina (punteggi, rilievi in
-  fisarmonica, tabella del consenso RRF), anteprima del referto HTML
-  in iframe sandbox e scarico nei tre formati.
+  fisarmonica, tabella del consenso RRF) e scarico del referto nei
+  tre formati, con apertura del referto HTML in una nuova scheda.
 - **Accessibilità (obiettivo WCAG 2.2 AA)**: lingua, landmark e
   gerarchia heading corretti, skip link, label/hint su ogni campo,
   errori sul campo + riepilogo con focus gestito, stati via

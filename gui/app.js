@@ -209,7 +209,6 @@
         setSubmitState(true);
         el("results-section").hidden = true;
         setOpen("sec-results", false);
-        el("report-frame").hidden = true;
         el("audit-error").hidden = true;
         el("log").textContent = "";
         el("announcer").textContent = "Audit avviato.";
@@ -299,10 +298,6 @@
     renderFindings(snap.findings || []);
     renderRrf(snap.rrf || []);
     renderCompetitive(snap.competitive);
-
-    const frame = el("report-frame");
-    frame.src = "api/report/html?t=" + Date.now();
-    frame.hidden = false;
 
     el("results-section").hidden = false;
     setOpen("sec-results", true);

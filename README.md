@@ -119,8 +119,9 @@ Cosa offre:
   testuali, rilievi in una fisarmonica per area con gravità espressa da
   testo + simbolo (mai solo colore), tabella del consenso RRF per
   query, **confronto competitivo** (barre della share of voice per sito
-  e tabella per query, quando si indicano concorrenti), anteprima del
-  referto HTML incorporata e scarico dei referti HTML / JSON / testo.
+  e tabella per query, quando si indicano concorrenti) e scarico dei
+  referti HTML / JSON / testo (il referto HTML si apre in una nuova
+  scheda).
 
 Accessibilità (obiettivo WCAG 2.2 AA): pagina in italiano con landmark
 e gerarchia di heading corretti, skip link, etichette e descrizioni su

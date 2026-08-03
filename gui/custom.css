@@ -24,10 +24,6 @@
   word-break: break-word;
 }
 
-.report-frame {
-  height: 75vh;
-}
-
 /* Badge di gravità: colore + testo + simbolo (mai solo colore). */
 .badge-sev {
   font-size: .78rem;
