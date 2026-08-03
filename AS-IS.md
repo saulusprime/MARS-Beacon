@@ -217,6 +217,18 @@ sono nel [README.md](README.md).
 
 ## Qualità e verifica
 
+- **CI su GitHub Actions** (`.github/workflows/ci.yml`): a ogni push
+  e pull request, `flake8` + `pytest` su Python 3.10 e 3.12 e
+  **audit di accessibilità Pa11y** (WCAG 2 AA) su pagine reali
+  servite dalla GUI nel runner — condizioni di servizio, vista
+  anonima e vista autenticata (raggiunta compilando davvero il form
+  di registrazione con le azioni di Pa11y, config `.pa11yci.js`).
+  Esito locale alla creazione: 3/3 pagine, 0 errori.
+- **Protocollo di verifica manuale con screen reader**
+  (`docs/ACCESSIBILITA.md`): flussi da testare con VoiceOver/NVDA,
+  comportamento atteso per ciascuno e registro degli esiti da
+  compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
+
 - **Suite pytest: 69 test in ~5 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

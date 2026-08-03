@@ -140,7 +140,10 @@ Cosa offre:
   referti HTML / JSON / testo (il referto HTML si apre in una nuova
   scheda).
 
-Accessibilità (obiettivo WCAG 2.2 AA): pagina in italiano con landmark
+Accessibilità (obiettivo WCAG 2.2 AA): audit automatico Pa11y in CI su
+pagine reali (vedi [docs/ACCESSIBILITA.md](docs/ACCESSIBILITA.md), che
+documenta anche il protocollo di verifica manuale con screen reader);
+pagina in italiano con landmark
 e gerarchia di heading corretti, skip link, etichette e descrizioni su
 ogni campo, errori identificati sul campo e in un riepilogo con focus
 gestito, aggiornamenti di stato via `role="status"`, aree scorrevoli

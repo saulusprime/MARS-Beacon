@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: flake8 + pytest (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Dipendenze
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint
+        run: flake8 seo_rrf_audit.py seo_rrf_gui.py seo_rrf_citations.py tests/
+      - name: Test
+        run: pytest -q
+
+  a11y:
+    name: Accessibilita (Pa11y, WCAG 2 AA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Dipendenze Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Avvio della GUI in background
+        run: |
+          python seo_rrf_gui.py --no-browser --port 8765 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8765/api/env > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8765/api/env > /dev/null
+      - name: Pa11y (pagine pubbliche e vista autenticata)
+        env:
+          PA11Y_CHROME: /usr/bin/google-chrome
+        run: npx --yes pa11y-ci@3 --config .pa11yci.js

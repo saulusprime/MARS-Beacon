@@ -113,9 +113,9 @@ in P1), distribuzione della profondità di crawl.
 
 ## P2 — Interfaccia grafica (seo_rrf_gui.py)
 
-- [ ] Audit di accessibilità automatizzato in CI (axe-core / Pa11y) e
-      verifica manuale con screen reader (NVDA/VoiceOver) documentata:
-      oggi la struttura è lintata staticamente ma non testata con AT reali.
+- [ ] Eseguire (e registrare in docs/ACCESSIBILITA.md) la prima
+      sessione di verifica manuale con screen reader: il protocollo
+      VoiceOver/NVDA è documentato, serve una persona con l'AT attivo.
 - [ ] Aggiornare la vendorizzazione di Bootstrap Italia con uno script
       dedicato (`update-vendor.sh`) che scarichi e potri i formati legacy.
 - [ ] Incorporare il logo nel referto HTML autonomo (oggi la firma è
@@ -131,8 +131,9 @@ in P1), distribuzione della profondità di crawl.
       su PyPI; valutare la scomposizione del file singolo in moduli
       (`crawler`, `indexes`, `audits`, `render`) mantenendo l'installazione
       monocomando.
-- [ ] CI (GitHub Actions): flake8 + pytest su più versioni di Python;
-      aggiungere alla suite i golden file completi dei tre renderer.
+- [ ] Aggiungere alla suite i golden file completi dei tre renderer
+      (la CI GitHub Actions con flake8 + pytest su Python 3.10/3.12 e
+      audit Pa11y esiste dalla sessione del 2026-08-03).
 - [ ] Immagine Docker per esecuzioni riproducibili (utile con Playwright).
 - [ ] Modalità server/batch: audit schedulati di una lista di siti con
       notifica sulle regressioni (il codice di uscita 0/1 è già pronto per
