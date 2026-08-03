@@ -163,3 +163,27 @@ def test_anchor_generiche_riconosciute():
         assert sra.GENERIC_ANCHOR_RE.match(testo), testo
     for testo in ("Scopri il servizio", "Guida al drenaggio"):
         assert not sra.GENERIC_ANCHOR_RE.match(testo), testo
+
+
+# ---------------- installazione embedding rotta ----------------
+
+def test_installazione_rotta_ripiega_su_tfidf(monkeypatch, capsys):
+    """Un import che esplode (torch/numpy incompatibili) non deve
+    propagare: si ripiega sul proxy dichiarandolo."""
+    import sys as _sys
+    import types
+
+    rotto = types.ModuleType("sentence_transformers")
+
+    def _boom(name):
+        raise RuntimeError("ambiente rotto")
+
+    rotto.__getattr__ = _boom
+    monkeypatch.setitem(_sys.modules, "sentence_transformers", rotto)
+
+    index = sra.VectorIndex(["primo documento", "secondo documento"],
+                            model_name="qualunque")
+    err = capsys.readouterr().err
+    assert index.mode == "char-tfidf"
+    assert "non utilizzabile" in err
+    assert index.search("primo")

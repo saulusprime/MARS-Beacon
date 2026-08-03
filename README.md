@@ -40,6 +40,14 @@ pip install -r requirements.txt                 # requests, bs4, lxml
 pip install sentence-transformers numpy         # opzionali: embedding reali
 ```
 
+> **Nota per macOS Intel (x86_64).** PyTorch per macOS x86 si ferma alla
+> 2.2.2, quindi le versioni recenti di transformers/sentence-transformers
+> (che richiedono torch ≥ 2.4) non possono funzionare. La combinazione
+> compatibile è:
+> `pip install "torch==2.2.2" "numpy<2" "transformers==4.46.3" "sentence-transformers==3.2.1"`.
+> Con un'installazione incompatibile lo strumento ripiega comunque sul
+> proxy char-TFIDF, dichiarando il motivo nel log.
+
 Con `sentence-transformers` installato gli embedding reali si attivano da
 soli (modello multilingue predefinito `paraphrase-multilingual-MiniLM-L12-v2`;
 `--embeddings none` forza il proxy). Senza libreria il recupero "semantico"

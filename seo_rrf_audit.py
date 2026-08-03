@@ -90,7 +90,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.7.0"
+__version__ = "1.7.1"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -1043,6 +1043,14 @@ class VectorIndex:
         except ImportError:
             print("  ! sentence-transformers non disponibile: uso il "
                   "proxy TF-IDF su n-grammi.", file=sys.stderr)
+            return
+        except Exception as exc:
+            # Installazioni rotte (es. torch/numpy incompatibili)
+            # sollevano errori diversi da ImportError: il ripiego
+            # deve restare pulito anche in quel caso.
+            print("  ! sentence-transformers non utilizzabile "
+                  "(%s: %s): uso il proxy TF-IDF su n-grammi."
+                  % (type(exc).__name__, exc), file=sys.stderr)
             return
         try:
             self.model = SentenceTransformer(model_name)

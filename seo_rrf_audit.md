@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.7.0, ~3060 righe,
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.7.1, ~3070 righe,
 licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -62,6 +62,14 @@ delle proprietà minime dei tipi JSON-LD (incluse le coppie
 domanda/risposta di FAQPage); segnali E-E-A-T (autore, date,
 "chi siamo", contatti verificabili); grafo dei link interni con
 pagine orfane, profondità oltre 3 click e anchor generiche.
+
+Novità 1.7.1 (2026-08-03): ripiego robusto sugli ambienti embedding
+rotti. Un'installazione incompatibile di sentence-transformers (es.
+torch/numpy in conflitto, caso tipico su macOS Intel dove PyTorch si
+ferma alla 2.2.2) sollevava errori diversi da ImportError durante
+l'import: ora qualunque eccezione produce il ripiego pulito sul proxy
+char-TFIDF, con il motivo dichiarato nel log. Nel README la
+combinazione di versioni compatibile con macOS x86_64.
 
 ## Uso
 
