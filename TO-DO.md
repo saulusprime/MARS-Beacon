@@ -87,27 +87,16 @@ Convenzioni trasversali da adottare in blocco:
   alfabetiche;
 - trend con **annotazioni-evento** ("qui abbiamo pubblicato le FAQ").
 
-Widget realizzabili **oggi** (dati già nel referto JSON):
+Widget realizzabili **oggi** (dati già nel referto JSON; i primi sei
+della lista originale — anello del punteggio, meter per area con
+drill-down, tripletta di severità, barre del consenso con soglie,
+share of voice con tacca di parità, donut stato pagine — sono stati
+realizzati nella v1.5.0, vedi AS-IS):
 
-- [ ] Anello del punteggio complessivo con soglie fisse e verdetto
-      testuale (`scores.overall`) — pattern: score gauge Lighthouse/PSI,
-      Site Health Semrush.
-- [ ] Meter per area con colore-soglia e click di drill-down che filtra
-      i rilievi dell'area (`scores.*`) — pattern: thematic report tiles
-      di Semrush.
-- [ ] Tripletta Critici/Avvisi/Info come stat tile (`findings[].severity`)
-      — pattern: contatori Errors/Warnings/Notices di Semrush/Ahrefs.
-- [ ] Barre del **consenso RRF per query** con tacche alle soglie 20%/45%
-      già presenti nel codice (`rrf_simulation[].consensus`) — pattern:
-      "valore + marcatori di soglia" di PageSpeed Insights. Con lo share
-      of voice, è il widget che nessun tool commerciale può offrire.
-- [ ] **Share of voice con tacca di parità**: sito a colori, concorrenti
-      in grigio (pattern "emphasis"), più elenco query perse
-      (`competitive.share`, query vinte dai concorrenti).
-- [ ] Donut dello stato pagine: senza rilievi / con rilievi / errore /
-      non HTML (`pages[].status`) — pattern: Crawled Pages di Semrush.
 - [ ] Top rilievi ordinati per impatto con pallino di severità
-      (`findings`) — pattern: Top Issues di Ahrefs/Semrush.
+      (`findings`), come vista trasversale alle aree — pattern:
+      Top Issues di Ahrefs/Semrush (oggi i rilievi sono ordinati per
+      gravità solo dentro ogni area).
 - [ ] Grafico del tasso di citazione IA nel tempo con pin-evento e linea
       per provider: lo storico JSONL di `seo_rrf_citations.py` esiste già
       (si aggancia alla voce "monitoraggio citazioni nella GUI" in P2 —

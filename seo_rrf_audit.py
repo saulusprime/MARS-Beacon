@@ -1999,6 +1999,125 @@ def render_text(base: str, pages: List[Page],
     return "\n".join(lines)
 
 
+def score_verdict(value: float) -> Tuple[str, str, str]:
+    """(etichetta, variabile colore, simbolo) per un punteggio 0-100.
+
+    Soglie 40/70, le stesse delle barre di punteggio. Il simbolo
+    accompagna sempre il colore (mai solo colore).
+    """
+    if value >= 70:
+        return "Buono", "var(--good)", "&#10003;"
+    if value >= 40:
+        return "Da migliorare", "var(--warn)", "!"
+    return "Critico", "var(--bad)", "&#10005;"
+
+
+def page_status_counts(pages: List[Page],
+                       findings: List[Finding]) -> Tuple[int, int, int]:
+    """(senza rilievi, con rilievi, in errore) per il donut pagine.
+
+    "Con rilievi" = pagine raggiungibili citate come riferimento da
+    almeno un rilievo critico o avvertenza.
+    """
+    flagged_urls = {
+        f.url for f in findings
+        if f.url and f.severity in (SEV_CRITICAL, SEV_WARNING)
+    }
+    ok_pages = [p for p in pages if p.ok]
+    flagged = len([p for p in ok_pages
+                   if p.url in flagged_urls
+                   or (p.final_url and p.final_url in flagged_urls)])
+    return len(ok_pages) - flagged, flagged, len(pages) - len(ok_pages)
+
+
+def _donut_svg(segments: List[Tuple[int, str]], total: int,
+               label: str) -> str:
+    """Donut SVG a segmenti (conteggio, colore) con foro centrale."""
+    circ = 276.46  # 2 * pi * r, con r = 44
+    parts = ["<svg viewBox=\"0 0 120 120\" width=\"116\" height=\"116\""
+             " role=\"img\" aria-label=\"%s\">"
+             "<g transform=\"rotate(-90 60 60)\">" % html.escape(label)]
+    offset = 0.0
+    for count, color in segments:
+        if not count:
+            continue
+        span = circ * count / total
+        # 2px di "aria" fra i segmenti, se il segmento li contiene.
+        dash = max(span - 2.0, 1.0) if span > 3.0 else span
+        parts.append(
+            "<circle cx=\"60\" cy=\"60\" r=\"44\" fill=\"none\" "
+            "stroke=\"%s\" stroke-width=\"14\" stroke-dasharray="
+            "\"%.2f %.2f\" stroke-dashoffset=\"%.2f\"></circle>"
+            % (color, dash, circ - dash, -offset))
+        offset += span
+    parts.append("</g></svg>")
+    return "".join(parts)
+
+
+def _render_hero(pages: List[Page], findings: List[Finding],
+                 scores: Dict[str, Optional[float]]) -> str:
+    """Testata visiva del referto: anello, verdetto, tile, donut."""
+    esc = html.escape
+    total = overall_score(scores)
+    label, hue, mark = score_verdict(total)
+    ring_c = 326.73  # 2 * pi * r, con r = 52
+
+    sev_counts = Counter(f.severity for f in findings)
+    clean, flagged, broken = page_status_counts(pages, findings)
+    n_pages = len(pages)
+
+    out: List[str] = ["<div class=\"hero\">"]
+    out.append(
+        "<div class=\"ringbox\" role=\"img\" aria-label=\"Punteggio "
+        "complessivo %.0f su 100: %s\"><svg viewBox=\"0 0 120 120\" "
+        "width=\"124\" height=\"124\" aria-hidden=\"true\">"
+        "<circle class=\"rtrack\" cx=\"60\" cy=\"60\" r=\"52\"></circle>"
+        "<circle class=\"rfill\" cx=\"60\" cy=\"60\" r=\"52\" "
+        "style=\"stroke:%s;stroke-dasharray:%.2f %.2f\" "
+        "transform=\"rotate(-90 60 60)\"></circle></svg>"
+        "<div class=\"rnum\" aria-hidden=\"true\"><b>%.0f</b>"
+        "<small>su 100</small></div></div>"
+        % (total, esc(label), hue, ring_c * total / 100.0,
+           ring_c, total))
+    out.append(
+        "<div class=\"heroside\"><p class=\"verdict\"><span class="
+        "\"ico\" style=\"background:%s\">%s</span>%s</p>"
+        "<p class=\"soglie\">buono &ge; 70 &middot; da migliorare "
+        "40&ndash;69 &middot; critico &lt; 40</p><div class=\"tiles\">"
+        % (hue, mark, esc(label)))
+    for sev, label_it, color in (
+            (SEV_CRITICAL, "Critici", "var(--bad)"),
+            (SEV_WARNING, "Avvertenze", "var(--warn)"),
+            (SEV_INFO, "Informazioni", "var(--muted)")):
+        out.append(
+            "<div class=\"tile\"><span class=\"lbl\"><span class="
+            "\"dot\" style=\"background:%s\"></span>%s</span>"
+            "<b>%d</b></div>"
+            % (color, esc(label_it), sev_counts.get(sev, 0)))
+    out.append("</div></div>")
+
+    if n_pages:
+        donut = _donut_svg(
+            [(clean, "var(--good)"), (flagged, "var(--warn)"),
+             (broken, "var(--bad)")], n_pages,
+            "%d pagine: %d senza rilievi, %d con rilievi, %d in "
+            "errore" % (n_pages, clean, flagged, broken))
+        out.append(
+            "<div class=\"donutbox\"><div class=\"donutwrap\">%s"
+            "<div class=\"dnum\" aria-hidden=\"true\"><b>%d</b>"
+            "<small>pagine</small></div></div>"
+            "<ul class=\"dleg\" aria-hidden=\"true\">"
+            "<li><span class=\"dot\" style=\"background:var(--good)\">"
+            "</span>%d senza rilievi</li>"
+            "<li><span class=\"dot\" style=\"background:var(--warn)\">"
+            "</span>%d con rilievi</li>"
+            "<li><span class=\"dot\" style=\"background:var(--bad)\">"
+            "</span>%d in errore</li></ul></div>"
+            % (donut, n_pages, clean, flagged, broken))
+    out.append("</div>")
+    return "".join(out)
+
+
 def render_html(base: str, pages: List[Page],
                 findings: List[Finding],
                 scores: Dict[str, Optional[float]],
@@ -2030,6 +2149,8 @@ def render_html(base: str, pages: List[Page],
         "</code></p>" % (
             len([p for p in pages if p.ok]),
             sum(len(p.chunks) for p in pages if p.ok), esc(mode)))
+
+    parts.append(_render_hero(pages, findings, scores))
 
     parts.append("<div class=\"scores\">")
     for area, score in scores.items():
@@ -2076,24 +2197,40 @@ def render_html(base: str, pages: List[Page],
 
     if results:
         parts.append("<section><h2>Dettaglio simulazione RRF</h2>"
+                     "<p class=\"meta\">Le tacche sul consenso sono "
+                     "le soglie del giudizio: sotto il 20% e' "
+                     "critico, sotto il 45% da migliorare.</p>"
                      "<table><thead><tr><th>Query</th><th>Consenso"
                      "</th><th>Passaggio in testa dopo la fusione</th>"
                      "<th>Punteggio</th></tr></thead><tbody>")
         for res in results:
             top = res.fused_top[0] if res.fused_top else ("-", 0.0)
+            ratio = res.consensus / 5.0
+            hue = "var(--good)" if ratio >= 0.45 else (
+                "var(--warn)" if ratio >= 0.2 else "var(--bad)")
             parts.append(
-                "<tr><td>%s</td><td>%d</td><td>%s</td><td>%.5f</td></tr>"
-                % (esc(res.query), res.consensus, esc(str(top[0])),
-                   top[1]))
+                "<tr><td>%s</td><td class=\"cons\">"
+                "<span class=\"mnum\">%d su 5</span>"
+                "<div class=\"meter\" aria-hidden=\"true\">"
+                "<div class=\"mfill\" style=\"width:%.0f%%;"
+                "background:%s\"></div>"
+                "<span class=\"tick\" style=\"left:20%%\"></span>"
+                "<span class=\"tick\" style=\"left:45%%\"></span>"
+                "</div></td><td>%s</td><td>%.5f</td></tr>"
+                % (esc(res.query), res.consensus, ratio * 100,
+                   hue, esc(str(top[0])), top[1]))
         parts.append("</tbody></table></section>")
 
     if competitive:
         share = competitive["share"]
+        parity = 100.0 / max(1, len(competitive["sites"]))
         parts.append(
             "<section><h2>Confronto competitivo</h2>"
             "<p class=\"meta\">Share of voice sui primi %d posti "
-            "delle liste fuse, sulle query dei temi del tuo sito."
-            "</p>" % competitive["top_n"])
+            "delle liste fuse, sulle query dei temi del tuo sito. "
+            "La tacca indica la parita' (%.0f%%): sopra la tacca si "
+            "e' sopra la propria quota naturale.</p>"
+            % (competitive["top_n"], parity))
         parts.append("<table><thead><tr><th>Sito</th>"
                      "<th>Share</th><th></th></tr></thead><tbody>")
         for host in competitive["sites"]:
@@ -2103,10 +2240,13 @@ def render_html(base: str, pages: List[Page],
             hue = "var(--accent)" if mine else "var(--muted)"
             parts.append(
                 "<tr><td>%s</td><td>%.1f%%</td>"
-                "<td style=\"min-width:180px\"><div class=\"bar\">"
+                "<td style=\"min-width:180px\">"
+                "<div class=\"bar meter\">"
                 "<div class=\"fill\" style=\"width:%.0f%%;"
-                "background:%s\"></div></div></td></tr>"
-                % (name, share[host], share[host], hue))
+                "background:%s\"></div>"
+                "<span class=\"tick\" style=\"left:%.1f%%\"></span>"
+                "</div></td></tr>"
+                % (name, share[host], share[host], hue, parity))
         parts.append("</tbody></table>")
         parts.append("<table><thead><tr><th>Query</th>"
                      "<th>Tuoi passaggi</th><th>Migliore posizione"
@@ -2151,6 +2291,44 @@ font-family:"Titillium Web",-apple-system,BlinkMacSystemFont,
 h1{font-size:1.5rem;margin:0 0 4px}
 .sub{color:var(--accent);font-size:.95rem;margin:0 0 4px}
 .meta{color:var(--muted);font-size:.8rem;margin:0 0 22px}
+.hero{display:flex;gap:26px;flex-wrap:wrap;align-items:center;
+background:var(--card);border:1px solid var(--line);
+border-radius:14px;padding:18px 22px;margin-bottom:16px}
+.ringbox,.donutwrap{position:relative;flex:0 0 auto}
+.rtrack{fill:none;stroke:var(--line);stroke-width:10}
+.rfill{fill:none;stroke-width:10;stroke-linecap:round}
+.rnum,.dnum{position:absolute;inset:0;display:flex;
+flex-direction:column;align-items:center;justify-content:center;
+line-height:1.05}
+.rnum b{font-size:2rem}
+.rnum small,.dnum small{font-size:.68rem;color:var(--muted)}
+.dnum b{font-size:1.3rem}
+.heroside{flex:1 1 200px;min-width:180px}
+.verdict{display:flex;align-items:center;gap:8px;font-weight:700;
+font-size:1.05rem;margin:0 0 2px}
+.soglie{color:var(--muted);font-size:.75rem;margin:0 0 12px}
+.tiles{display:flex;gap:10px;flex-wrap:wrap}
+.tile{border:1px solid var(--line);border-radius:10px;
+padding:7px 12px;min-width:96px}
+.tile .lbl{display:flex;align-items:center;gap:6px;font-size:.72rem;
+color:var(--muted)}
+.tile b{display:block;font-size:1.35rem;margin-top:1px}
+.dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;
+display:inline-block}
+.donutbox{display:flex;align-items:center;gap:14px}
+.dleg{list-style:none;margin:0;padding:0;font-size:.78rem;
+color:var(--muted)}
+.dleg li{display:flex;align-items:center;gap:6px;margin:3px 0}
+.meter{position:relative}
+.meter .tick{position:absolute;top:-3px;bottom:-3px;width:2px;
+background:var(--muted);opacity:.7}
+.bar.meter{overflow:visible}
+.bar.meter .fill{border-radius:999px}
+td.cons{min-width:130px}
+td.cons .mnum{display:block;font-variant-numeric:tabular-nums;
+margin-bottom:4px}
+td.cons .meter{height:7px;border-radius:999px;background:var(--line)}
+td.cons .mfill{height:100%;border-radius:999px}
 .scores{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px}
 .sc{flex:1;min-width:150px;background:var(--card);
 border:1px solid var(--line);border-radius:12px;padding:12px 14px}

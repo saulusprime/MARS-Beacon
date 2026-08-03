@@ -41,7 +41,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -168,6 +168,8 @@ class Job:
                                     results, mode, k, competitive),
         }
         severities = [f.severity for f in findings]
+        clean, flagged, broken = sra.page_status_counts(pages,
+                                                        findings)
         summary = {
             "site": base,
             "overall": sra.overall_score(scores),
@@ -176,9 +178,13 @@ class Job:
             "rrf_k": k,
             "pages_ok": len([p for p in pages if p.ok]),
             "pages_total": len(pages),
+            "pages_clean": clean,
+            "pages_flagged": flagged,
+            "pages_error": broken,
             "chunks": sum(len(p.chunks) for p in pages if p.ok),
             "critical": severities.count(sra.SEV_CRITICAL),
             "warning": severities.count(sra.SEV_WARNING),
+            "info": severities.count(sra.SEV_INFO),
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
         with self.lock:

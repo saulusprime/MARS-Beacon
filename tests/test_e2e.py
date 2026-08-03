@@ -49,6 +49,19 @@ def test_renderer_coerenti_e_k_propagato(site):
     assert report_html.startswith("<!DOCTYPE html>")
     assert "char-tfidf" in report_html
 
+    # Widget di sintesi: anello del punteggio, tile di severita',
+    # donut delle pagine, meter del consenso con tacche di soglia.
+    assert "class=\"hero\"" in report_html
+    assert "rfill" in report_html
+    assert "Punteggio complessivo" in report_html
+    assert "class=\"tile\"" in report_html
+    assert "donutbox" in report_html
+    assert "class=\"tick\"" in report_html
+
+    clean, flagged, broken = sra.page_status_counts(pages, findings)
+    assert clean + flagged + broken == len(pages)
+    assert broken >= 1, "attesa la pagina oversize fra gli errori"
+
     report_text = sra.render_text(
         site, pages, findings, scores, results, mode, 48)
     assert "AUDIT SEO + RRF" in report_text

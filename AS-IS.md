@@ -69,7 +69,18 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v1.4.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v1.5.0 + `gui/`
+
+- **Widget grafici di sintesi** (v1.5.0, GUI e referto HTML, stile
+  brand Lympha): anello del punteggio complessivo con verdetto
+  testuale e soglie dichiarate (40/70, mai solo colore), tile
+  Critici/Avvertenze/Informazioni, donut dello stato pagine (senza
+  rilievi / con rilievi / in errore), meter del consenso RRF con
+  tacche alle soglie 20%/45%, tacca di parità sulle barre dello
+  share of voice (tuo sito a colori, concorrenti in grigio). Nella
+  GUI i punteggi per area sono pulsanti che aprono i rilievi
+  dell'area e i risultati vengono ripristinati se la pagina viene
+  ricaricata dopo un audit concluso.
 
 - **Server in sola libreria standard** (nessuna dipendenza nuova):
   importa lo script, esegue `run_audit()` in un thread e da un'unica

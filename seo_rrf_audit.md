@@ -37,6 +37,15 @@ immagini, archivi) non vengono più scaricati — bastano stato e
 header; sitemap compresse `.xml.gz` e prioritizzazione degli URL per
 `lastmod` più recente quando `--max-pages` non copre tutto.
 
+Novità 1.5.0, referto e GUI: widget grafici di sintesi in stile
+Lympha (pattern mutuati da Lighthouse/Semrush/PSI): anello del
+punteggio complessivo con verdetto testuale e soglie dichiarate
+(40/70), tile Critici/Avvertenze/Informazioni, donut dello stato
+pagine, meter del consenso RRF con tacche alle soglie 20%/45%,
+tacca di parità sulle barre dello share of voice. Nella GUI i
+punteggi-area sono cliccabili (aprono i rilievi dell'area) e i
+risultati vengono ripristinati al ricaricamento della pagina.
+
 ## Uso
 
 ```

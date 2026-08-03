@@ -81,6 +81,189 @@
   margin-top: .5rem;
 }
 
+/* ------------------- Widget di sintesi (hero) ------------------- */
+/* Colori di stato come i badge di gravità: mai da soli, sempre con
+   simbolo o etichetta accanto (vedi scoreVerdict in app.js). */
+
+.audit-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.75rem;
+  padding: 1.25rem 1.5rem;
+  background: #fff;
+}
+
+.hero-ring,
+.donut-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.hero-ring .ring-track {
+  fill: none;
+  stroke: var(--bs-gray-200, #e5e5e5);
+  stroke-width: 10;
+}
+
+.hero-ring .ring-fill {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.ring-num,
+.donut-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.05;
+}
+
+.ring-num b { font-size: 2.1rem; }
+.donut-num b { font-size: 1.3rem; }
+
+.ring-num small,
+.donut-num small {
+  font-size: .7rem;
+  color: var(--lt-ink-soft, #3c5054);
+}
+
+.hero-side { flex: 1 1 14rem; min-width: 12rem; }
+
+.hero-verdict {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--lt-teal-900, #0c3540);
+  margin-bottom: .1rem;
+}
+
+.verdict-ico {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: .8rem;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.hero-soglie {
+  color: var(--lt-ink-soft, #3c5054);
+  font-size: .8rem;
+  margin-bottom: .9rem;
+}
+
+.sev-tiles { display: flex; flex-wrap: wrap; gap: .6rem; }
+
+.sev-tile {
+  border: 1px solid var(--lt-border, rgba(8, 49, 58, .12));
+  border-radius: .6rem;
+  padding: .45rem .8rem;
+  min-width: 6.5rem;
+}
+
+.sev-tile-label {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .78rem;
+  color: var(--lt-ink-soft, #3c5054);
+}
+
+.sev-tile b { display: block; font-size: 1.35rem; }
+
+.sev-dot {
+  width: .6rem;
+  height: .6rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+.hero-donut { display: flex; align-items: center; gap: .9rem; }
+
+.donut-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: .82rem;
+  color: var(--lt-ink-soft, #3c5054);
+}
+
+.donut-legend li {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin: .2rem 0;
+}
+
+/* --------- Meter con tacche di soglia (consenso, parità) --------- */
+
+.meter-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--lt-ink-soft, #3c5054);
+  opacity: .65;
+}
+
+.cons-cell { min-width: 9rem; }
+
+.cons-num {
+  display: block;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: .25rem;
+}
+
+.cons-meter {
+  position: relative;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--bs-gray-200, #e5e5e5);
+}
+
+.cons-fill { height: 100%; border-radius: 999px; }
+
+.share-meter {
+  overflow: visible;
+  position: relative;
+}
+
+.share-meter .progress-bar { border-radius: 999px; }
+
+/* ------------------ Drill-down dai punteggi ------------------ */
+
+button.score-label.score-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--lt-teal-700, #0f4a5b);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+button.score-label.score-link:hover {
+  color: var(--lt-teal-900, #0c3540);
+}
+
+button.score-label.score-link:focus-visible {
+  outline: 2px solid var(--lt-teal, #186078);
+  outline-offset: 2px;
+}
+
 /* Nasconde l'animazione per chi la riduce (WCAG 2.3.3 / preferenze). */
 @media (prefers-reduced-motion: reduce) {
   .progress-indeterminate .progress-bar {

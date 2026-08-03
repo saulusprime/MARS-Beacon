@@ -139,6 +139,12 @@ def test_ciclo_completo_con_409_e_referti(gui_base, site):
     assert snap["summary"]["pages_ok"] >= 1
     assert snap["findings"] and snap["rrf"]
 
+    # Campi per i widget di sintesi (anello, tile, donut pagine).
+    riass = snap["summary"]
+    assert riass["pages_clean"] + riass["pages_flagged"] \
+        + riass["pages_error"] == riass["pages_total"]
+    assert riass["info"] >= 0
+
     status, body, _ = _api(gui_base, "/api/report/html")
     assert status == 200 and body.startswith(b"<!DOCTYPE html>")
     status, body, _ = _api(gui_base, "/api/report/json")
