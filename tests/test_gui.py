@@ -157,3 +157,42 @@ def test_ciclo_completo_con_409_e_referti(gui_base, site):
                                  "/api/report/text?download=1")
     assert status == 200 and b"AUDIT" in body
     assert "attachment" in headers.get("Content-Disposition", "")
+
+
+def test_annullamento_audit(gui_base, site):
+    # Senza audit in corso l'annullamento e' un 409.
+    status, _, _ = _api(gui_base, "/api/cancel", {})
+    assert status == 409
+
+    # Audit lento (delay alto), annullato quasi subito.
+    status, body, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 8, "delay": 1.0,
+        "queries": "drenaggio linfatico"})
+    assert status == 202, body
+    time.sleep(0.5)
+    status, _, _ = _api(gui_base, "/api/cancel", {})
+    assert status == 202
+
+    scadenza = time.time() + 30
+    snap = {}
+    while time.time() < scadenza:
+        _, body, _ = _api(gui_base, "/api/status")
+        snap = json.loads(body)
+        if snap["state"] != "running":
+            break
+        time.sleep(0.3)
+    assert snap["state"] == "cancelled"
+    assert not snap["summary"], "un audit annullato non ha risultati"
+
+    # Dopo l'annullamento il job accetta un nuovo audit.
+    status, _, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 2, "delay": 0.0,
+        "queries": "drenaggio linfatico"})
+    assert status == 202
+    scadenza = time.time() + 60
+    while time.time() < scadenza:
+        _, body, _ = _api(gui_base, "/api/status")
+        if json.loads(body)["state"] in ("done", "error"):
+            break
+        time.sleep(0.3)
+    assert json.loads(body)["state"] == "done"

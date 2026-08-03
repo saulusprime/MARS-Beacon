@@ -113,10 +113,6 @@ in P1), distribuzione della profondità di crawl.
 
 ## P2 — Interfaccia grafica (seo_rrf_gui.py)
 
-- [ ] **Annullamento dell'audit in corso.** L'audit gira in-process in un
-      thread e non è interrompibile; per un vero "Annulla" serve eseguire
-      lo script come sottoprocesso (con `--format json`) o introdurre un
-      flag cooperativo di stop nel `Fetcher`.
 - [ ] Avanzamento push (Server-Sent Events) al posto del polling a 1s.
 - [ ] Storico degli audit nella GUI: elenco delle esecuzioni con confronto
       dei punteggi (si aggancia all'idea "storico e delta" dei referti).

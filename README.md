@@ -114,7 +114,9 @@ Cosa offre:
   embedding con avviso se sentence-transformers non è installato,
   costante k) e validazione con messaggi in italiano.
 - **Avanzamento in tempo reale**: fase corrente annunciata via regione
-  di stato, log di scansione completo in area scorrevole.
+  di stato, log di scansione completo in area scorrevole e bottone
+  **"Annulla audit"** (stop cooperativo: interrompe richieste e attese
+  alla prima occasione utile, senza risultati parziali).
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, rilievi in una fisarmonica per area con gravità espressa da
   testo + simbolo (mai solo colore), tabella del consenso RRF per

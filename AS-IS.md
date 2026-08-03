@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-03.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.9.0
+## Strumento CLI — `seo_rrf_audit.py` v1.10.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -101,7 +101,14 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v1.8.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v1.9.0 + `gui/`
+
+- **Audit annullabile** (v1.9.0): bottone "Annulla audit"
+  nell'avanzamento e `POST /api/cancel`; lo stop è cooperativo
+  (`stop_event` propagato a `run_audit`/`Fetcher`, che interrompe
+  richieste, attese di throttle/backoff e download a blocchi con
+  `AuditCancelled`). Stato `cancelled` distinto da errore; il job
+  accetta subito un nuovo audit.
 
 - **Layout a sezioni collassabili** (v1.7.x): configurazione,
   avanzamento e "Risultati dell'audit e referto" (unificati: pulsanti
@@ -231,5 +238,4 @@ sono nel [README.md](README.md).
 - Il rispetto dei `Disallow` del robots.txt è **opzionale e spento di
   default** (`--respect-robots`): la scelta è deliberata per l'audit
   del proprio sito, ma va ricordata quando si analizzano siti altrui.
-- L'audit avviato dalla GUI non è annullabile (esecuzione in-process).
 - Nessuna CI.

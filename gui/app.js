@@ -50,8 +50,27 @@
   let lastPhase = "";
 
   el("audit-form").addEventListener("submit", onSubmit);
+  el("cancel-btn").addEventListener("click", cancelAudit);
   loadEnv();
   restoreResults();
+
+  function cancelAudit() {
+    const btn = el("cancel-btn");
+    btn.disabled = true;
+    btn.textContent = "Annullamento…";
+    el("announcer").textContent = "Annullamento richiesto…";
+    fetch("api/cancel", { method: "POST" }).catch(() => {
+      btn.disabled = false;
+      btn.textContent = "Annulla audit";
+    });
+  }
+
+  function hideCancel() {
+    const btn = el("cancel-btn");
+    btn.hidden = true;
+    btn.disabled = false;
+    btn.textContent = "Annulla audit";
+  }
 
   /* Se un audit e' gia' concluso (es. pagina ricaricata), i
      risultati vengono ripristinati senza rilanciare nulla. */
@@ -213,6 +232,7 @@
         el("log").textContent = "";
         el("announcer").textContent = "Audit avviato.";
         el("progress-anim").hidden = false;
+        el("cancel-btn").hidden = false;
         el("progress-section").hidden = false;
         setOpen("sec-config", false);
         setOpen("sec-progress", true);
@@ -244,6 +264,8 @@
         renderLog(snap.log || []);
         if (snap.state === "done") {
           finish(snap);
+        } else if (snap.state === "cancelled") {
+          cancelled();
         } else if (snap.state === "error") {
           fail(snap.error || "Errore sconosciuto durante l'audit.");
         } else {
@@ -270,9 +292,21 @@
     }
   }
 
+  function cancelled() {
+    running = false;
+    setSubmitState(false);
+    hideCancel();
+    el("progress-anim").hidden = true;
+    el("announcer").textContent =
+      "Audit annullato: nessun risultato prodotto. Puoi avviarne " +
+      "un altro dalla configurazione.";
+    setOpen("sec-config", true);
+  }
+
   function fail(message) {
     running = false;
     setSubmitState(false);
+    hideCancel();
     el("progress-anim").hidden = true;
     el("announcer").textContent = "Audit interrotto da un errore.";
     const box = el("audit-error");
@@ -284,6 +318,7 @@
   function finish(snap) {
     running = false;
     setSubmitState(false);
+    hideCancel();
     el("progress-anim").hidden = true;
     el("announcer").textContent = "Audit completato: risultati pronti.";
     setOpen("sec-progress", false);

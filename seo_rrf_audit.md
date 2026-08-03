@@ -1,8 +1,8 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.9.0, ~3500 righe,
-licenza MIT.
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.10.0, ~3550
+righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
 (default 10 MB, opzione `--max-body`): scarico a blocchi interrotto al
@@ -101,6 +101,15 @@ confronto competitivo, consenso per query, evidenze E-E-A-T (dove è
 stato trovato autore/data/chi-siamo/contatti), URL nei rilievi su
 canonical/description/H1, esempi di chunk anaforici e di heading
 interrogativi.
+
+Novità 1.10.0 (2026-08-03): audit annullabile. `run_audit()` e
+`Fetcher` accettano uno `stop_event` (`threading.Event`): quando
+scatta viene sollevata `AuditCancelled` alla prima occasione utile
+(richieste HTTP, attese di throttle/backoff interrotte, download a
+blocchi, confini di fase). Nella GUI (v1.9.0): endpoint
+`POST /api/cancel`, stato `cancelled` e bottone "Annulla audit"
+nella sezione Avanzamento; dopo l'annullamento il job accetta
+subito un nuovo audit.
 
 ## Uso
 

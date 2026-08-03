@@ -9,6 +9,7 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
     GET  /                  interfaccia grafica
     GET  /api/env           versione, RAM disponibile, valori suggeriti
     POST /api/audit         avvia un audit (uno alla volta)
+    POST /api/cancel        annulla l'audit in corso
     GET  /api/status        stato, log di avanzamento, sintesi finale
     GET  /api/report/html   referto HTML dell'ultimo audit
     GET  /api/report/json   referto JSON
@@ -40,7 +41,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -90,7 +91,9 @@ class Job:
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
-        self.state = "idle"  # idle | running | done | error
+        # idle | running | done | error | cancelled
+        self.state = "idle"
+        self.stop_event = threading.Event()
         self.log: List[str] = []
         self.error = ""
         self.config: Dict[str, object] = {}
@@ -121,6 +124,7 @@ class Job:
             if self.state == "running":
                 return False
             self.state = "running"
+            self.stop_event.clear()
             self.log = []
             self.error = ""
             self.config = config
@@ -130,6 +134,14 @@ class Job:
             self.rrf = []
             self.competitive = None
             self.reports = {}
+            return True
+
+    def cancel(self) -> bool:
+        """Chiede lo stop dell'audit in corso; False se non ce n'e'."""
+        with self.lock:
+            if self.state != "running":
+                return False
+            self.stop_event.set()
             return True
 
     def run(self) -> None:
@@ -150,8 +162,14 @@ class Job:
                     max_body_mb=float(cfg["max_body"]),
                     respect_robots=bool(cfg["respect_robots"]),
                     retries=int(cfg["retries"]),
-                    competitors=list(cfg["competitors"]))
+                    competitors=list(cfg["competitors"]),
+                    stop_event=self.stop_event)
             buf.flush()
+        except sra.AuditCancelled:
+            buf.flush()
+            with self.lock:
+                self.state = "cancelled"
+            return
         except Exception as exc:  # noqa: BLE001 - riportato alla GUI
             buf.flush()
             with self.lock:
@@ -337,7 +355,15 @@ class Handler(BaseHTTPRequestHandler):
             self._serve_static(path)
 
     def do_POST(self) -> None:  # noqa: N802 - firma di BaseHTTPServer
-        if self.path.split("?", 1)[0] != "/api/audit":
+        path = self.path.split("?", 1)[0]
+        if path == "/api/cancel":
+            if JOB.cancel():
+                self._send_json(202, {"ok": True})
+            else:
+                self._send_json(409, {"error": "Nessun audit in "
+                                               "corso da annullare."})
+            return
+        if path != "/api/audit":
             self._send_json(404, {"error": "endpoint sconosciuto"})
             return
         try:

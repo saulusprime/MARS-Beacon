@@ -121,3 +121,33 @@ def test_host_irraggiungibile(site):
     fetcher = _fetcher(timeout=2, retries=0)
     assert fetcher.get("http://127.0.0.1:9/") is None
     assert fetcher.last_error == "richiesta fallita"
+
+
+def test_stop_event_gia_scattato_interrompe_subito(site):
+    stop = threading.Event()
+    stop.set()
+    fetcher = _fetcher(stop_event=stop)
+    with pytest.raises(sra.AuditCancelled):
+        fetcher.get(site + "/")
+
+
+def test_stop_event_interrompe_l_attesa_di_backoff(flaky):
+    import time as _time
+    base, _server = flaky
+    stop = threading.Event()
+    fetcher = _fetcher(retries=5, backoff=5.0, stop_event=stop)
+    threading.Timer(0.2, stop.set).start()
+    inizio = _time.time()
+    with pytest.raises(sra.AuditCancelled):
+        fetcher.get(base + "/down")
+    assert _time.time() - inizio < 3, \
+        "il backoff deve interrompersi senza attendere i 5 secondi"
+
+
+def test_run_audit_annullabile(site):
+    stop = threading.Event()
+    stop.set()
+    with pytest.raises(sra.AuditCancelled):
+        sra.run_audit(base=site, max_pages=3, queries=[],
+                      model_name="", delay=0.0, k=60, verbose=False,
+                      stop_event=stop)

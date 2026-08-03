@@ -70,6 +70,7 @@ import math
 import os
 import re
 import sys
+import threading
 import time
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -90,7 +91,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.9.0"
+__version__ = "1.10.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -408,6 +409,10 @@ def available_ram_mb() -> Optional[float]:
 # Modelli di dato
 # --------------------------------------------------------------------
 
+class AuditCancelled(Exception):
+    """Audit interrotto dall'utente tramite il flag di stop."""
+
+
 @dataclass
 class Finding:
     """Singolo rilievo dell'audit.
@@ -535,7 +540,8 @@ class Fetcher:
                  max_bytes: int = DEFAULT_MAX_BODY_MB * 1048576,
                  retries: int = DEFAULT_RETRIES,
                  backoff: float = RETRY_BACKOFF_S,
-                 user_agent: str = USER_AGENT) -> None:
+                 user_agent: str = USER_AGENT,
+                 stop_event: Optional[threading.Event] = None) -> None:
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": user_agent or USER_AGENT,
@@ -549,11 +555,24 @@ class Fetcher:
         self.backoff = max(0.0, backoff)
         self.last_error = ""
         self._last = 0.0
+        self.stop_event = stop_event
+
+    def _check_stop(self) -> None:
+        if self.stop_event is not None and self.stop_event.is_set():
+            raise AuditCancelled()
+
+    def _wait(self, seconds: float) -> None:
+        """Attesa interrompibile dal flag di stop."""
+        if self.stop_event is not None:
+            self.stop_event.wait(seconds)
+            self._check_stop()
+        else:
+            time.sleep(seconds)
 
     def _throttle(self) -> None:
         wait = self.delay - (time.time() - self._last)
         if wait > 0:
-            time.sleep(wait)
+            self._wait(wait)
         self._last = time.time()
 
     def get(self, url: str) -> Optional[requests.Response]:
@@ -568,6 +587,7 @@ class Fetcher:
         attempts = self.retries + 1
         resp: Optional[requests.Response] = None
         for attempt in range(1, attempts + 1):
+            self._check_stop()
             resp = self._fetch_once(url)
             if not self._transient(resp) or attempt == attempts:
                 return resp
@@ -586,7 +606,7 @@ class Fetcher:
                 print("  ! %s: nuovo tentativo %d/%d fra %.1fs"
                       % (reason, attempt + 1, attempts, wait),
                       file=sys.stderr)
-            time.sleep(wait)
+            self._wait(wait)
         return resp
 
     @staticmethod
@@ -647,6 +667,10 @@ class Fetcher:
         read = 0
         try:
             for chunk in resp.iter_content(chunk_size=65536):
+                if self.stop_event is not None \
+                        and self.stop_event.is_set():
+                    resp.close()
+                    raise AuditCancelled()
                 read += len(chunk)
                 if read > self.max_bytes:
                     resp.close()
@@ -3232,11 +3256,21 @@ def run_audit(base: str, max_pages: int, queries: List[str],
               respect_robots: bool = False,
               retries: int = DEFAULT_RETRIES,
               competitors: Optional[List[str]] = None,
-              user_agent: str = USER_AGENT) -> Tuple[
+              user_agent: str = USER_AGENT,
+              stop_event: Optional[threading.Event] = None) -> Tuple[
                   List[Page], List[Finding],
                   Dict[str, Optional[float]], List[QueryResult], str,
                   Optional[Dict[str, object]]]:
-    """Esegue l'intero audit e restituisce i risultati grezzi."""
+    """Esegue l'intero audit e restituisce i risultati grezzi.
+
+    Con ``stop_event`` valorizzato l'audit e' annullabile: quando
+    l'evento scatta viene sollevata ``AuditCancelled`` alla prima
+    occasione utile (richieste HTTP e confini di fase).
+    """
+    def check_stop() -> None:
+        if stop_event is not None and stop_event.is_set():
+            raise AuditCancelled()
+
     requested_model = model_name
     model_name = resolve_model_name(model_name)
     if verbose and model_name and not requested_model.strip():
@@ -3247,7 +3281,8 @@ def run_audit(base: str, max_pages: int, queries: List[str],
 
     fetcher = Fetcher(delay=delay, verbose=verbose,
                       max_bytes=int(max_body_mb * 1048576),
-                      retries=retries, user_agent=user_agent)
+                      retries=retries, user_agent=user_agent,
+                      stop_event=stop_event)
 
     if verbose:
         print("[1/5] robots.txt", file=sys.stderr)
@@ -3278,6 +3313,7 @@ def run_audit(base: str, max_pages: int, queries: List[str],
         print("[3/5] scansione di %d pagine" % len(urls), file=sys.stderr)
     pages: List[Page] = []
     for url in urls:
+        check_stop()
         resp = fetcher.get(url)
         if resp is None:
             pages.append(Page(
@@ -3306,6 +3342,7 @@ def run_audit(base: str, max_pages: int, queries: List[str],
                     "e sulla pagina canonica:\n<link rel=\"canonical\""
                     " href=\"https://esempio.it/\">"))
 
+    check_stop()
     if verbose:
         print("[4/5] controlli per area", file=sys.stderr)
     findings.append(check_llms_txt(base, fetcher))
@@ -3317,6 +3354,7 @@ def run_audit(base: str, max_pages: int, queries: List[str],
 
     if verbose:
         print("[5/5] simulazione RRF", file=sys.stderr)
+    check_stop()
     if not queries:
         queries = auto_queries([p for p in pages if p.ok])
     results, rrf_findings, mode = simulate_rrf(
