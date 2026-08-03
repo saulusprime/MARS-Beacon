@@ -75,6 +75,72 @@ sono proposte.
 - [ ] Referto HTML: CSS di stampa/esport PDF, ancore per rilievo,
       internazionalizzazione (oggi solo italiano).
 
+## P2 — Widget grafici (GUI e referto HTML)
+
+Idee raccolte dall'analisi dei principali tool del settore (Semrush,
+Ahrefs, Moz, Lighthouse/PageSpeed, GTmetrix, CrUX Vis, Sistrix,
+SE Ranking, Screaming Frog; per l'AI visibility: Profound, Peec,
+Otterly, Ahrefs Brand Radar). Tutti realizzabili in HTML+CSS+SVG puro,
+senza librerie, coerenti col vincolo offline della GUI e riusabili nel
+referto HTML autonomo.
+
+Convenzioni trasversali da adottare in blocco:
+
+- scala 0–100 con **soglie fisse e visibili** (50/90 alla Lighthouse):
+  colore per il verdetto immediato, numero sempre accanto;
+- **mai solo colore**: forma geometrica (cerchio/quadrato/triangolo) o
+  etichetta accanto al semaforo; gli informativi in blu, non in verde;
+- **delta** rispetto all'esecuzione precedente accanto a ogni numero;
+- liste di problemi ordinate per **severità × diffusione**, mai
+  alfabetiche;
+- trend con **annotazioni-evento** ("qui abbiamo pubblicato le FAQ").
+
+Widget realizzabili **oggi** (dati già nel referto JSON):
+
+- [ ] Anello del punteggio complessivo con soglie fisse e verdetto
+      testuale (`scores.overall`) — pattern: score gauge Lighthouse/PSI,
+      Site Health Semrush.
+- [ ] Meter per area con colore-soglia e click di drill-down che filtra
+      i rilievi dell'area (`scores.*`) — pattern: thematic report tiles
+      di Semrush.
+- [ ] Tripletta Critici/Avvisi/Info come stat tile (`findings[].severity`)
+      — pattern: contatori Errors/Warnings/Notices di Semrush/Ahrefs.
+- [ ] Barre del **consenso RRF per query** con tacche alle soglie 20%/45%
+      già presenti nel codice (`rrf_simulation[].consensus`) — pattern:
+      "valore + marcatori di soglia" di PageSpeed Insights. Con lo share
+      of voice, è il widget che nessun tool commerciale può offrire.
+- [ ] **Share of voice con tacca di parità**: sito a colori, concorrenti
+      in grigio (pattern "emphasis"), più elenco query perse
+      (`competitive.share`, query vinte dai concorrenti).
+- [ ] Donut dello stato pagine: senza rilievi / con rilievi / errore /
+      non HTML (`pages[].status`) — pattern: Crawled Pages di Semrush.
+- [ ] Top rilievi ordinati per impatto con pallino di severità
+      (`findings`) — pattern: Top Issues di Ahrefs/Semrush.
+- [ ] Grafico del tasso di citazione IA nel tempo con pin-evento e linea
+      per provider: lo storico JSONL di `seo_rrf_citations.py` esiste già
+      (si aggancia alla voce "monitoraggio citazioni nella GUI" in P2 —
+      Simulazione RRF) — pattern: Visibility Index di Sistrix, Brand
+      Radar di Ahrefs.
+
+Widget che richiedono lo **storico degli audit** (prerequisito: la voce
+"Storico e delta" in P2 — Output e reportistica; basta un `--history
+FILE` che appende una riga JSONL compatta come già fa il monitor
+citazioni):
+
+- [ ] Delta (freccia verde/rossa vs audit precedente) su punteggi, aree
+      e conteggi di severità.
+- [ ] Trend del punteggio complessivo per esecuzione con bande di soglia
+      50/90 — pattern: CrUX Vis, tab Progress di Semrush.
+- [ ] Badge "nuovo"/"risolto" sui rilievi, confronto fra due audit —
+      pattern: Compare Crawls di Semrush, colonne New/Fixed di Ahrefs.
+
+Mockup interattivo dei nove widget con dati d'esempio (artefatto della
+sessione di analisi, 2026-08-03): board "SEO-RRF · Concept widget
+dashboard" su claude.ai. Idee ulteriori emerse e rimandate: mappa a
+bolle del posizionamento competitivo (Semrush), grafo force-directed
+dell'architettura (Screaming Frog, dipende dal grafo dei link interni
+in P1), distribuzione della profondità di crawl.
+
 ## P2 — Interfaccia grafica (seo_rrf_gui.py)
 
 - [ ] **Annullamento dell'audit in corso.** L'audit gira in-process in un
