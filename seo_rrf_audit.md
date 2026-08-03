@@ -71,6 +71,13 @@ l'import: ora qualunque eccezione produce il ripiego pulito sul proxy
 char-TFIDF, con il motivo dichiarato nel log. Nel README la
 combinazione di versioni compatibile con macOS x86_64.
 
+Novità GUI 1.7.0 (2026-08-03): interfaccia riorganizzata in tre
+sezioni collassabili (accordion Bootstrap Italia, tema Lympha):
+configurazione, avanzamento e "Risultati dell'audit e referto"
+unificati — download e anteprima del referto vivono dentro i
+risultati. Le sezioni si aprono e chiudono da sole seguendo il ciclo
+dell'audit.
+
 ## Uso
 
 ```

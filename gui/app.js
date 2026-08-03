@@ -32,6 +32,20 @@
 
   const el = (id) => document.getElementById(id);
 
+  /* Apre o chiude una sezione collassabile passando dal suo bottone,
+     cosi' Bootstrap mantiene coerenti classi e aria-expanded. */
+  function setOpen(collapseId, open) {
+    const body = el(collapseId);
+    const toggle = document.querySelector(
+      '[data-bs-target="#' + collapseId + '"]');
+    if (!body || !toggle) {
+      return;
+    }
+    if (body.classList.contains("show") !== open) {
+      toggle.click();
+    }
+  }
+
   let running = false;
   let lastPhase = "";
 
@@ -48,6 +62,9 @@
         if (!running && snap.state === "done" &&
             snap.summary && snap.summary.site) {
           renderLog(snap.log || []);
+          el("progress-anim").hidden = true;
+          el("progress-section").hidden = false;
+          setOpen("sec-config", false);
           showResults(snap);
         }
       })
@@ -191,13 +208,16 @@
         lastPhase = "";
         setSubmitState(true);
         el("results-section").hidden = true;
+        setOpen("sec-results", false);
         el("report-frame").hidden = true;
         el("audit-error").hidden = true;
         el("log").textContent = "";
         el("announcer").textContent = "Audit avviato.";
         el("progress-anim").hidden = false;
         el("progress-section").hidden = false;
-        el("progress-heading").focus();
+        setOpen("sec-config", false);
+        setOpen("sec-progress", true);
+        el("progress-toggle").focus();
         window.setTimeout(poll, 800);
       })
       .catch(() => showFormError(
@@ -267,8 +287,9 @@
     setSubmitState(false);
     el("progress-anim").hidden = true;
     el("announcer").textContent = "Audit completato: risultati pronti.";
+    setOpen("sec-progress", false);
     showResults(snap);
-    el("results-heading").focus();
+    el("results-toggle").focus();
   }
 
   function showResults(snap) {
@@ -284,6 +305,7 @@
     frame.hidden = false;
 
     el("results-section").hidden = false;
+    setOpen("sec-results", true);
   }
 
   /* ---------------- rendering dei risultati ---------------- */

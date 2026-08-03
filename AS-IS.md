@@ -84,7 +84,16 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v1.6.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v1.7.0 + `gui/`
+
+- **Layout a sezioni collassabili** (v1.7.0): configurazione,
+  avanzamento e "Risultati dell'audit e referto" (unificati: pulsanti
+  di download e anteprima del referto dentro i risultati) sono voci
+  di un accordion Bootstrap Italia col tema Lympha. Il ciclo audit
+  guida le sezioni: all'avvio si chiude la configurazione e si apre
+  l'avanzamento, alla fine l'avanzamento si richiude (log sempre
+  consultabile) e si aprono i risultati; il ripristino dopo un
+  ricaricamento riapre direttamente i risultati.
 
 - **Widget grafici di sintesi** (v1.5.0, GUI e referto HTML, stile
   brand Lympha): anello del punteggio complessivo con verdetto

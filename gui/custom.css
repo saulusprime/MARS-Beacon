@@ -81,6 +81,25 @@
   margin-top: .5rem;
 }
 
+/* ---------------- Sezioni principali collassabili ---------------- */
+/* Le tre macro-sezioni (configurazione, avanzamento, risultati e
+   referto) sono voci di un accordion Bootstrap Italia: ereditano il
+   tema teal di theme.css; qui solo gerarchia tipografica e respiro. */
+
+.lt-sections {
+  margin-bottom: 3rem;
+}
+
+.lt-sections > .accordion-item > .accordion-header .accordion-button {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.lt-sections > .accordion-item > .accordion-collapse > .accordion-body {
+  padding-top: 1.25rem;
+  padding-bottom: 1.5rem;
+}
+
 /* ------------------- Widget di sintesi (hero) ------------------- */
 /* Colori di stato come i badge di gravità: mai da soli, sempre con
    simbolo o etichetta accanto (vedi scoreVerdict in app.js). */
