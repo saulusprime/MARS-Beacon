@@ -140,6 +140,9 @@ def test_ciclo_completo_con_409_e_referti(gui_base, site):
     assert snap["summary"]["pages_ok"] >= 1
     assert snap["findings"] and snap["rrf"]
 
+    assert snap["remediation"], "atteso il piano di remediation"
+    assert snap["remediation"][0]["severity"] == "critical"
+
     # Campi per i widget di sintesi (anello, tile, donut pagine).
     riass = snap["summary"]
     assert riass["pages_clean"] + riass["pages_flagged"] \

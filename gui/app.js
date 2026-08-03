@@ -296,6 +296,7 @@
     renderHero(snap.summary);
     renderScores(snap.summary);
     renderFindings(snap.findings || []);
+    renderRemediation(snap.remediation || []);
     renderRrf(snap.rrf || []);
     renderCompetitive(snap.competitive);
 
@@ -675,6 +676,54 @@
 
       acc.appendChild(item);
     });
+  }
+
+  function renderRemediation(plan) {
+    const block = el("remediation-block");
+    const list = el("remediation-list");
+    list.textContent = "";
+    if (!plan.length) {
+      block.hidden = true;
+      return;
+    }
+    el("remediation-intro").textContent =
+      plan.length + " interventi ordinati per gravità e peso: si " +
+      "parte da ciò che rende di più sul punteggio.";
+
+    plan.forEach((item) => {
+      const box = document.createElement("div");
+      box.className = "finding";
+
+      const head = document.createElement("p");
+      head.className = "mb-1";
+      head.appendChild(severityBadge(item.severity));
+      const title = document.createElement("strong");
+      title.className = "ms-2";
+      title.textContent = item.priority + ". " + item.title;
+      head.appendChild(title);
+      box.appendChild(head);
+
+      if (item.fix) {
+        const fix = document.createElement("p");
+        fix.className = "mb-1 small";
+        fix.textContent = item.fix;
+        box.appendChild(fix);
+      }
+      if (item.example) {
+        const example = document.createElement("pre");
+        example.className = "remediation-ex";
+        example.textContent = item.example;
+        box.appendChild(example);
+      }
+      if (item.url) {
+        const where = document.createElement("p");
+        where.className = "mb-0 small text-muted";
+        where.textContent = "Riferimento: " + item.url;
+        box.appendChild(where);
+      }
+      list.appendChild(box);
+    });
+    block.hidden = false;
   }
 
   function renderCompetitive(comp) {

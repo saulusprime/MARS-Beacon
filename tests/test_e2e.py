@@ -62,9 +62,23 @@ def test_renderer_coerenti_e_k_propagato(site):
     assert clean + flagged + broken == len(pages)
     assert broken >= 1, "attesa la pagina oversize fra gli errori"
 
+    # Piano di remediation: nei tre formati, ordinato dai critici.
+    assert report_json["remediation"]
+    assert report_json["remediation"][0]["severity"] == \
+        sra.SEV_CRITICAL
+    assert "Piano di remediation" in report_html
+    assert "class=\"ex\"" in report_html
+
+    # Dettagli arricchiti: le query verificate sono elencate.
+    coperte = [f for f in findings
+               if "trovano almeno un passaggio" in f.title]
+    if coperte:
+        assert "Query verificate:" in coperte[0].detail
+
     report_text = sra.render_text(
         site, pages, findings, scores, results, mode, 48)
     assert "AUDIT SEO + RRF" in report_text
+    assert "PIANO DI REMEDIATION" in report_text
 
 
 def test_robots_allowed_per_il_nostro_agente(site):

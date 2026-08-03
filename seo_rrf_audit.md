@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.8.0, ~3260 righe,
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.9.0, ~3500 righe,
 licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -89,6 +89,18 @@ valori: prezzi delle offerte numerici col punto e valuta ISO 4217
 giudizi, ratingValue dentro la scala dichiarata con conteggio
 recensioni, date in ISO 8601, URL di media assoluti in
 image/logo/thumbnailUrl/contentUrl/embedUrl.
+
+Novità 1.9.0 (2026-08-03): piano di remediation e rilievi più
+dettagliati. Ogni rilievo può portare un esempio concreto di fix
+(campo `example`: snippet JSON-LD, righe di robots.txt, testo
+prima/dopo) e i tre referti più la GUI espongono un **piano di
+remediation**: i rilievi critici e le avvertenze ordinati per
+gravità × peso, ciascuno con correzione ed esempio. Dettagli
+arricchiti: query verificate elencate nei rilievi RRF e nel
+confronto competitivo, consenso per query, evidenze E-E-A-T (dove è
+stato trovato autore/data/chi-siamo/contatti), URL nei rilievi su
+canonical/description/H1, esempi di chunk anaforici e di heading
+interrogativi.
 
 ## Uso
 

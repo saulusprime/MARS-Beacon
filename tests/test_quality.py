@@ -268,3 +268,40 @@ def test_evento_completo_e_coerente_da_ok():
     assert len(findings) == 1
     assert findings[0].severity == sra.SEV_OK
     assert "coerente" in findings[0].title
+
+
+# ---------------- piano di remediation ----------------
+
+def test_build_remediation_ordina_per_gravita_e_peso():
+    findings = [
+        sra.Finding(sra.AREA_LEX, sra.SEV_WARNING, "w1", weight=1.0),
+        sra.Finding(sra.AREA_TECH, sra.SEV_CRITICAL, "c1",
+                    weight=1.0),
+        sra.Finding(sra.AREA_SEM, sra.SEV_OK, "tutto bene"),
+        sra.Finding(sra.AREA_SD, sra.SEV_CRITICAL, "c2", weight=3.0,
+                    example="snippet"),
+        sra.Finding(sra.AREA_RRF, sra.SEV_INFO, "nota"),
+        sra.Finding(sra.AREA_LEX, sra.SEV_WARNING, "w2", weight=2.0),
+    ]
+    plan = sra.build_remediation(findings)
+    assert [x["title"] for x in plan] == ["c2", "c1", "w2", "w1"]
+    assert [x["priority"] for x in plan] == [1, 2, 3, 4]
+    assert plan[0]["example"] == "snippet"
+
+
+def test_rilievi_critici_portano_esempi():
+    """I rilievi piu' comuni devono avere un esempio di fix."""
+    page = sra.Page(url="https://x.it/pagina", status=200,
+                    text="poco testo")
+    findings = sra.audit_lexical([page])
+    critici = [f for f in findings
+               if f.severity == sra.SEV_CRITICAL and f.example]
+    assert critici, "attesi esempi sui rilievi lessicali critici"
+
+
+def test_eeat_warning_con_esempio():
+    page = sra.Page(url="https://x.it/servizi/", status=200,
+                    text="Elenco servizi.")
+    findings = sra.audit_eeat([page])
+    assert all(f.example for f in findings
+               if f.severity == sra.SEV_WARNING)

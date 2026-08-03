@@ -90,7 +90,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -318,6 +318,31 @@ JSONLD_URL_KEYS: Tuple[str, ...] = (
 JSONLD_PRICE_RE = re.compile(r"^\d+(\.\d+)?$")
 JSONLD_CURRENCY_RE = re.compile(r"^[A-Za-z]{3}$")
 
+# Snippet riusati negli esempi di remediation.
+EX_LOCALBUSINESS = (
+    "<script type=\"application/ld+json\">\n"
+    "{\"@context\": \"https://schema.org\","
+    " \"@type\": \"LocalBusiness\",\n"
+    " \"name\": \"Centro Esempio\","
+    " \"url\": \"https://esempio.it/\",\n"
+    " \"telephone\": \"+39 0521 123456\",\n"
+    " \"address\": {\"@type\": \"PostalAddress\",\n"
+    "  \"streetAddress\": \"Via Roma 1\","
+    " \"addressLocality\": \"Parma\",\n"
+    "  \"postalCode\": \"43121\", \"addressCountry\": \"IT\"}}\n"
+    "</script>")
+
+EX_FAQPAGE = (
+    "<script type=\"application/ld+json\">\n"
+    "{\"@context\": \"https://schema.org\","
+    " \"@type\": \"FAQPage\", \"mainEntity\": [\n"
+    " {\"@type\": \"Question\","
+    " \"name\": \"Quanto costa una seduta?\",\n"
+    "  \"acceptedAnswer\": {\"@type\": \"Answer\",\n"
+    "   \"text\": \"Da 40 a 80 euro, in base a durata e zona "
+    "trattata.\"}}]}\n"
+    "</script>")
+
 # Soft-404: pagine che rispondono 200 ma il cui contenuto dice
 # "non trovato". Il segnale forte e' nel title/H1; nel corpo vale
 # solo su pagine molto corte (vedi audit_technical).
@@ -385,7 +410,12 @@ def available_ram_mb() -> Optional[float]:
 
 @dataclass
 class Finding:
-    """Singolo rilievo dell'audit."""
+    """Singolo rilievo dell'audit.
+
+    ``example`` e' un esempio concreto di correzione (snippet di
+    markup, righe di robots.txt, testo prima/dopo): alimenta il
+    piano di remediation dei referti.
+    """
 
     area: str
     severity: str
@@ -394,9 +424,36 @@ class Finding:
     fix: str = ""
     url: str = ""
     weight: float = 1.0
+    example: str = ""
 
     def as_dict(self) -> Dict[str, object]:
         return asdict(self)
+
+
+def build_remediation(
+        findings: Sequence["Finding"]) -> List[Dict[str, object]]:
+    """Piano d'azione: critici e avvertenze per gravita' e peso.
+
+    L'ordinamento (gravita', poi peso decrescente) riflette il
+    contributo del rilievo al punteggio: si parte da cio' che rende
+    di piu'.
+    """
+    order = {SEV_CRITICAL: 0, SEV_WARNING: 1}
+    todo = sorted(
+        (f for f in findings if f.severity in order),
+        key=lambda f: (order[f.severity], -f.weight))
+    return [
+        {
+            "priority": pos,
+            "severity": f.severity,
+            "area": f.area,
+            "title": f.title,
+            "fix": f.fix,
+            "example": f.example,
+            "url": f.url,
+        }
+        for pos, f in enumerate(todo, 1)
+    ]
 
 
 @dataclass
@@ -642,7 +699,9 @@ class RobotsAudit:
                 AREA_TECH, SEV_WARNING, "robots.txt non raggiungibile",
                 "Richiesta a %s fallita o non 200." % url,
                 "Pubblica un robots.txt che dichiari la sitemap.",
-                url=url))
+                url=url,
+                example="# /robots.txt\nUser-agent: *\nDisallow:\n\n"
+                        "Sitemap: https://esempio.it/sitemap.xml"))
             return findings
 
         self.found = True
@@ -665,7 +724,11 @@ class RobotsAudit:
                 "bloccati non entri in nessuna lista di recupero e "
                 "l'RRF non ha nulla da fondere.",
                 "Rimuovi i Disallow per gli agenti che vuoi ti citino.",
-                url=url, weight=2.0))
+                url=url, weight=2.0,
+                example="# robots.txt - sblocca gli agenti IA\n"
+                        "User-agent: GPTBot\nDisallow:\n\n"
+                        "User-agent: ClaudeBot\nDisallow:\n\n"
+                        "User-agent: PerplexityBot\nDisallow:"))
         else:
             findings.append(Finding(
                 AREA_TECH, SEV_OK, "Crawler IA ammessi",
@@ -680,7 +743,9 @@ class RobotsAudit:
                 AREA_TECH, SEV_WARNING,
                 "Nessuna sitemap dichiarata nel robots.txt",
                 fix="Aggiungi la riga 'Sitemap: https://.../sitemap.xml'.",
-                url=url))
+                url=url,
+                example="# in fondo al robots.txt\n"
+                        "Sitemap: https://esempio.it/sitemap.xml"))
         return findings
 
 
@@ -1223,7 +1288,10 @@ def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
             "Raggiungibili solo dalla sitemap: %s. Una pagina che "
             "nessuno linka riceve meno scansioni e meno peso."
             % ", ".join(orphans[:5]),
-            "Linkale dalle pagine correlate (testo, menu o footer)."))
+            "Linkale dalle pagine correlate (testo, menu o footer).",
+            example="Dalla pagina correlata:\n"
+                    "<a href=\"/servizio-collegato/\">nome "
+                    "descrittivo del servizio</a>"))
     else:
         out.append(Finding(
             AREA_TECH, SEV_OK,
@@ -1299,7 +1367,10 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
             "spreca crawl budget e diluisce i segnali."
             % ", ".join(p.url for p in http_to_https[:5]),
             "Aggiorna sitemap e link interni agli URL https "
-            "definitivi."))
+            "definitivi.",
+            example="<!-- prima --> <a href=\"http://esempio.it/"
+                    "servizio/\">\n<!-- dopo  --> "
+                    "<a href=\"https://esempio.it/servizio/\">"))
     if www_mismatch:
         out.append(Finding(
             AREA_TECH, SEV_WARNING,
@@ -1317,7 +1388,10 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
             % ", ".join("%s -> %s" % (p.url, p.final_url)
                         for p in moved[:5]),
             "Aggiorna sitemap e link interni alla destinazione "
-            "finale dei redirect."))
+            "finale dei redirect.",
+            example="Nella sitemap e nei link interni usa gia' "
+                    "l'URL di arrivo:\n<url><loc>https://esempio.it/"
+                    "nuova-pagina/</loc></url>"))
     chains = [p for p in pages if p.redirects > 1]
     if chains:
         out.append(Finding(
@@ -1326,7 +1400,11 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
             ", ".join("%s (%d passaggi)" % (p.url, p.redirects)
                       for p in chains[:5]) + ".",
             "Fai puntare ogni redirect direttamente alla "
-            "destinazione finale (un solo passaggio).", weight=2.0))
+            "destinazione finale (un solo passaggio).", weight=2.0,
+            example="# un solo salto, non a catena\n"
+                    "Redirect 301 /vecchia/ "
+                    "https://esempio.it/nuova/\n"
+                    "# NON: /vecchia/ -> /intermedia/ -> /nuova/"))
     if not (http_to_https or www_mismatch or moved):
         out.append(Finding(
             AREA_TECH, SEV_OK, "Nessun redirect interno",
@@ -1344,7 +1422,12 @@ def audit_technical(pages: List[Page], base: str,
         out.append(Finding(
             AREA_TECH, SEV_CRITICAL, "Sito non in HTTPS",
             fix="Attiva un certificato TLS e reindirizza tutto a HTTPS.",
-            url=base, weight=2.0))
+            url=base, weight=2.0,
+            example="# nginx\nreturn 301 https://$host$request_uri;\n"
+                    "# Apache (.htaccess)\nRewriteEngine On\n"
+                    "RewriteCond %{HTTPS} off\n"
+                    "RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} "
+                    "[L,R=301]"))
     else:
         out.append(Finding(AREA_TECH, SEV_OK, "HTTPS attivo", url=base))
 
@@ -1377,7 +1460,12 @@ def audit_technical(pages: List[Page], base: str,
             "diluiscono i segnali del sito."
             % ", ".join(p.url for p in soft404[:5]),
             "Fai rispondere 404 (o 410) agli URL inesistenti e "
-            "togli quelli vuoti dalla sitemap.", weight=2.0))
+            "togli quelli vuoti dalla sitemap.", weight=2.0,
+            example="La pagina inesistente deve rispondere con "
+                    "stato 404, non 200:\n"
+                    "# Apache (.htaccess)\n"
+                    "ErrorDocument 404 /404.html\n"
+                    "# niente redirect alla home al posto del 404"))
 
     n_pages = len(good)
     if n_pages == 0:
@@ -1407,13 +1495,21 @@ def audit_technical(pages: List[Page], base: str,
     else:
         out.append(Finding(
             AREA_TECH, SEV_OK,
-            "%d pagine indicizzabili analizzate" % n_pages))
+            "%d pagine indicizzabili analizzate" % n_pages,
+            "%s%s." % (", ".join(p.url for p in good[:5]),
+                       " e altre %d" % (n_pages - 5)
+                       if n_pages > 5 else "")))
 
     if not from_sitemap:
         out.append(Finding(
             AREA_TECH, SEV_WARNING, "Sitemap XML assente o illeggibile",
             "URL individuati tramite crawling dei link interni.",
-            "Pubblica una sitemap XML e dichiarala nel robots.txt."))
+            "Pubblica una sitemap XML e dichiarala nel robots.txt.",
+            example="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                    "<urlset xmlns=\"http://www.sitemaps.org/schemas/"
+                    "sitemap/0.9\">\n<url><loc>https://esempio.it/"
+                    "</loc><lastmod>2026-08-03</lastmod></url>\n"
+                    "</urlset>"))
 
     placeholders = [
         p for p in good
@@ -1437,16 +1533,25 @@ def audit_technical(pages: List[Page], base: str,
             AREA_TECH, SEV_WARNING,
             "%d pagina/e con meta robots noindex" % len(noindex),
             ", ".join(p.url for p in noindex[:5]),
-            "Verifica che l'esclusione sia voluta."))
+            "Verifica che l'esclusione sia voluta.",
+            example="Se la pagina deve essere indicizzata, rimuovi "
+                    "il meta o usa:\n<meta name=\"robots\" "
+                    "content=\"index, follow\">"))
 
     no_canonical = [p for p in good if not p.canonical]
     if no_canonical:
         out.append(Finding(
             AREA_TECH, SEV_WARNING,
             "%d pagina/e senza canonical" % len(no_canonical),
-            fix="Dichiara <link rel=\"canonical\"> su ogni pagina."))
+            ", ".join(p.url for p in no_canonical[:5]),
+            "Dichiara <link rel=\"canonical\"> su ogni pagina.",
+            example="<link rel=\"canonical\" "
+                    "href=\"https://esempio.it/servizio/\">"))
     elif good:
-        out.append(Finding(AREA_TECH, SEV_OK, "Canonical presenti"))
+        out.append(Finding(
+            AREA_TECH, SEV_OK, "Canonical presenti",
+            "Dichiarato su tutte le %d pagine analizzate."
+            % len(good)))
 
     no_lang = [p for p in good if not p.lang]
     if no_lang:
@@ -1492,7 +1597,11 @@ def audit_technical(pages: List[Page], base: str,
             AREA_TECH, SEV_WARNING,
             "Sito multilingua senza hreflang",
             "Lingue rilevate: %s." % ", ".join(sorted(langs)),
-            "Dichiara hreflang reciproci fra le versioni."))
+            "Dichiara hreflang reciproci fra le versioni.",
+            example="<link rel=\"alternate\" hreflang=\"it\" "
+                    "href=\"https://esempio.it/it/\">\n"
+                    "<link rel=\"alternate\" hreflang=\"en\" "
+                    "href=\"https://esempio.it/en/\">"))
     elif not multilingual:
         out.append(Finding(
             AREA_TECH, SEV_INFO, "Sito monolingua: hreflang non "
@@ -1535,7 +1644,10 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
                 "%r (%d car.)" % (p.title, len(p.title))
                 for p in bad_title[:3]),
             "Title unico, 30-65 caratteri, con i termini di ricerca "
-            "reali; evita il nome dominio come titolo.", weight=2.0))
+            "reali; evita il nome dominio come titolo.", weight=2.0,
+            example="<title>Drenaggio linfatico manuale a Parma | "
+                    "Centro Esempio</title>\n"
+                    "(52 caratteri: servizio + territorio + brand)"))
     if dup_title:
         out.append(Finding(
             AREA_LEX, SEV_WARNING,
@@ -1555,8 +1667,14 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
         out.append(Finding(
             AREA_LEX, SEV_CRITICAL,
             "%d pagina/e senza meta description" % len(no_desc),
-            fix="Scrivi 110-165 caratteri con servizio e territorio.",
-            weight=1.5))
+            ", ".join(p.url for p in no_desc[:5]),
+            "Scrivi 110-165 caratteri con servizio e territorio.",
+            weight=1.5,
+            example="<meta name=\"description\" content=\"Drenaggio "
+                    "linfatico manuale a Parma:\nsedute da 45 minuti "
+                    "con fisioterapisti certificati, percorsi "
+                    "post-operatori\ne prima valutazione "
+                    "gratuita.\">"))
     if weak_desc:
         out.append(Finding(
             AREA_LEX, SEV_WARNING,
@@ -1582,8 +1700,11 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
     if no_h1:
         out.append(Finding(
             AREA_LEX, SEV_CRITICAL, "%d pagina/e senza H1" % len(no_h1),
-            fix="Un solo H1 per pagina, con i termini principali.",
-            weight=1.5))
+            ", ".join(p.url for p in no_h1[:5]),
+            "Un solo H1 per pagina, con i termini principali.",
+            weight=1.5,
+            example="<h1>Drenaggio linfatico manuale: cos'e' e "
+                    "come funziona</h1>"))
     if multi_h1:
         out.append(Finding(
             AREA_LEX, SEV_WARNING,
@@ -1603,7 +1724,11 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             % (sum(p.word_count for p in good) / len(good)),
             "Porta le pagine chiave verso le %d+ parole con contenuto "
             "informativo, non promozionale." % GOOD_CONTENT_WORDS,
-            weight=2.0))
+            weight=2.0,
+            example="Struttura tipo per una pagina servizio:\n"
+                    "<h2>Cos'e' ...?</h2> <h2>Come funziona una "
+                    "seduta</h2>\n<h2>Quando serve</h2> <h2>Quanto "
+                    "costa</h2> <h2>Domande frequenti</h2>"))
     else:
         out.append(Finding(
             AREA_LEX, SEV_OK, "Volume di testo adeguato",
@@ -1642,7 +1767,10 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
         out.append(Finding(
             AREA_LEX, SEV_WARNING,
             "Attributi alt incompleti (%d/%d)" % (with_alt, total_img),
-            fix="L'alt e' testo indicizzabile oltre che accessibilita'."))
+            fix="L'alt e' testo indicizzabile oltre che accessibilita'.",
+            example="<img src=\"seduta.jpg\" alt=\"fisioterapista "
+                    "esegue drenaggio linfatico\nmanuale sulla gamba "
+                    "di una paziente\">"))
     elif total_img:
         out.append(Finding(
             AREA_LEX, SEV_OK,
@@ -1699,9 +1827,16 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
             AREA_SEM, SEV_WARNING,
             "%.0f%% dei chunk non e' autoconsistente" % (ratio * 100),
             "Iniziano con un riferimento anaforico (questo, tale, "
-            "cio'...): estratti da soli non rispondono a nulla.",
+            "cio'...): estratti da soli non rispondono a nulla. "
+            "Esempi: %s."
+            % "; ".join("\"%s...\"" % c.text.strip()[:60]
+                        for c in anaphoric[:3]),
             "Riscrivi le aperture nominando esplicitamente il "
-            "soggetto."))
+            "soggetto.",
+            example="Prima: \"Questo trattamento e' indicato dopo "
+                    "gli interventi.\"\nDopo:  \"Il drenaggio "
+                    "linfatico manuale e' indicato dopo gli "
+                    "interventi.\""))
     else:
         out.append(Finding(
             AREA_SEM, SEV_OK,
@@ -1725,19 +1860,31 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
         out.append(Finding(
             AREA_SEM, SEV_OK,
             "%d heading in forma di domanda (%.0f%%)"
-            % (len(questions), q_ratio * 100)))
+            % (len(questions), q_ratio * 100),
+            "Esempi: %s."
+            % "; ".join("\"%s\"" % q[:60] for q in questions[:3])))
 
     has_faq = any(FAQ_HINT_RE.search(h) for h in headings) or any(
         FAQ_HINT_RE.search(p.text[:4000]) for p in good)
     if has_faq:
-        out.append(Finding(AREA_SEM, SEV_OK, "Sezione FAQ rilevata"))
+        faq_where = next(
+            (p.url for p in good
+             if any(FAQ_HINT_RE.search(h) for _, h in p.headings)
+             or FAQ_HINT_RE.search(p.text[:4000])), "")
+        out.append(Finding(
+            AREA_SEM, SEV_OK, "Sezione FAQ rilevata",
+            "Rilevata su %s." % faq_where if faq_where else ""))
     else:
         out.append(Finding(
             AREA_SEM, SEV_CRITICAL, "Nessuna sezione FAQ",
             "Le FAQ allineano un chunk a un intento preciso e "
             "alimentano entrambi gli assi contemporaneamente.",
             "Aggiungi FAQ per pagina, marcate con FAQPage JSON-LD.",
-            weight=1.5))
+            weight=1.5,
+            example="<h2>Domande frequenti</h2>\n"
+                    "<h3>Quanto costa una seduta?</h3>\n"
+                    "<p>Da 40 a 80 euro, in base a durata e zona "
+                    "trattata.</p>\npiu' il markup:\n" + EX_FAQPAGE))
 
     definitions = sum(1 for c in chunks if DEFINITION_RE.search(c.text))
     def_ratio = definitions / len(chunks)
@@ -1956,7 +2103,11 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
             "; ".join(offer_issues[:4]) + ".",
             "In price solo il numero con il punto decimale (niente "
             "simboli di valuta); la valuta in priceCurrency (codice "
-            "ISO 4217, es. EUR)."))
+            "ISO 4217, es. EUR).",
+            example="\"offers\": {\"@type\": \"Offer\",\n"
+                    " \"price\": \"50.00\", \"priceCurrency\": "
+                    "\"EUR\",\n \"availability\": "
+                    "\"https://schema.org/InStock\"}"))
     if bare_products:
         out.append(Finding(
             AREA_SD, SEV_WARNING,
@@ -1965,7 +2116,10 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
             "non e' eleggibile per i risultati arricchiti di "
             "prodotto.",
             "Aggiungi almeno offers (con price e priceCurrency) "
-            "oppure review/aggregateRating."))
+            "oppure review/aggregateRating.",
+            example="\"aggregateRating\": {\"@type\": "
+                    "\"AggregateRating\",\n \"ratingValue\": "
+                    "\"4.8\", \"reviewCount\": \"27\"}"))
     if rating_issues:
         out.append(Finding(
             AREA_SD, SEV_WARNING,
@@ -2002,61 +2156,96 @@ def audit_eeat(pages: List[Page]) -> List[Finding]:
     if not good:
         return []
 
-    has_author = any(p.author for p in good)
-    has_dates = any(p.published or p.modified for p in good)
+    author_note = next(
+        ("meta author \"%s\" su %s" % (p.author, p.url)
+         for p in good if p.author), "")
+    dates_note = next(
+        ("%s su %s" % ("article:published_time" if p.published
+                       else "article:modified_time", p.url)
+         for p in good if p.published or p.modified), "")
     for page in good:
-        if has_author and has_dates:
+        if author_note and dates_note:
             break
         for node in _jsonld_nodes(page.jsonld_raw):
-            if node.get("author"):
-                has_author = True
-            if node.get("datePublished") or node.get("dateModified"):
-                has_dates = True
+            if not author_note and node.get("author"):
+                author_note = "author nel JSON-LD di %s" % page.url
+            if not dates_note and (node.get("datePublished")
+                                   or node.get("dateModified")):
+                dates_note = ("datePublished nel JSON-LD di %s"
+                              % page.url)
 
-    def slug_present(slugs: Tuple[str, ...]) -> bool:
+    def find_slug(slugs: Tuple[str, ...]) -> str:
         wanted = set(slugs)
         for page in good:
             if page.slug.lower() in wanted:
-                return True
+                return page.url
             for target in page.internal_targets:
                 seg = urlparse(target).path.strip("/") \
                     .split("/")[-1].lower()
                 if seg in wanted:
-                    return True
-        return False
+                    return target
+        return ""
 
-    has_about = slug_present(ABOUT_SLUGS)
-    has_contact = (any(p.contact_links for p in good)
-                   or slug_present(CONTACT_SLUGS)
-                   or any(EMAIL_RE.search(p.text) for p in good))
+    about_note = find_slug(ABOUT_SLUGS)
+    if about_note:
+        about_note = "rilevata: %s" % about_note
+
+    contact_pages = [p for p in good if p.contact_links]
+    if contact_pages:
+        contact_note = "link tel:/mailto: su %d pagina/e (es. %s)" \
+            % (len(contact_pages), contact_pages[0].url)
+    else:
+        contact_note = find_slug(CONTACT_SLUGS)
+        if contact_note:
+            contact_note = "pagina contatti: %s" % contact_note
+        else:
+            with_mail = next(
+                (p.url for p in good if EMAIL_RE.search(p.text)), "")
+            contact_note = ("email nel testo di %s" % with_mail
+                            if with_mail else "")
 
     out: List[Finding] = []
     signals = (
-        (has_author, "Autore dei contenuti dichiarato",
+        (author_note, "Autore dei contenuti dichiarato",
          "Nessun autore dichiarato",
          "Aggiungi il meta author o la proprieta' author nel "
-         "JSON-LD: i motori IA pesano chi firma i contenuti."),
-        (has_dates, "Date di pubblicazione/aggiornamento presenti",
+         "JSON-LD: i motori IA pesano chi firma i contenuti.",
+         "<meta name=\"author\" content=\"Dott.ssa Paola Rossi\">\n"
+         "oppure nel JSON-LD:\n"
+         "\"author\": {\"@type\": \"Person\", \"name\": "
+         "\"Paola Rossi\"}"),
+        (dates_note, "Date di pubblicazione/aggiornamento presenti",
          "Nessuna data di pubblicazione o aggiornamento",
          "Esponi article:published_time/modified_time o "
-         "datePublished/dateModified nel JSON-LD."),
-        (has_about, "Pagina \"chi siamo\" presente",
+         "datePublished/dateModified nel JSON-LD.",
+         "<meta property=\"article:published_time\" "
+         "content=\"2026-08-03\">\n"
+         "oppure nel JSON-LD:\n"
+         "\"datePublished\": \"2026-08-03\", "
+         "\"dateModified\": \"2026-08-03\""),
+        (about_note, "Pagina \"chi siamo\" presente",
          "Nessuna pagina \"chi siamo\" rilevata",
          "Una pagina che presenta persone e competenze e' il "
-         "segnale di esperienza piu' diretto."),
-        (has_contact, "Contatti verificabili presenti",
+         "segnale di esperienza piu' diretto.",
+         "Crea /chi-siamo/ con: chi cura i contenuti, titoli e "
+         "formazione,\nda quanto tempo, foto reali. Linkala dal "
+         "footer di ogni pagina."),
+        (contact_note, "Contatti verificabili presenti",
          "Nessun contatto verificabile rilevato",
          "Esponi telefono ed email (link tel:/mailto:) o una "
-         "pagina contatti."),
+         "pagina contatti.",
+         "<a href=\"tel:+390521123456\">0521 123456</a>\n"
+         "<a href=\"mailto:info@esempio.it\">info@esempio.it</a>"),
     )
-    for present, ok_title, warn_title, fix in signals:
-        if present:
+    for evidence, ok_title, warn_title, fix, example in signals:
+        if evidence:
             out.append(Finding(
-                AREA_SEM, SEV_OK, "E-E-A-T: %s" % ok_title))
+                AREA_SEM, SEV_OK, "E-E-A-T: %s" % ok_title,
+                evidence[0].upper() + evidence[1:] + "."))
         else:
             out.append(Finding(
                 AREA_SEM, SEV_WARNING, "E-E-A-T: %s" % warn_title,
-                fix=fix))
+                fix=fix, example=example))
     return out
 
 
@@ -2078,7 +2267,7 @@ def audit_structured_data(pages: List[Page]) -> List[Finding]:
             "contenuti non sono eleggibili per i risultati arricchiti.",
             "Aggiungi almeno Organization (o LocalBusiness), poi "
             "Service, FAQPage, BreadcrumbList, Article.",
-            weight=2.0))
+            weight=2.0, example=EX_LOCALBUSINESS))
         return out
 
     out.append(Finding(
@@ -2093,7 +2282,7 @@ def audit_structured_data(pages: List[Page]) -> List[Finding]:
             AREA_SD, SEV_CRITICAL, "Entita' principale non dichiarata",
             fix="Aggiungi Organization o LocalBusiness con nome, "
                 "indirizzo, contatti e identificativi fiscali.",
-            weight=1.5))
+            weight=1.5, example=EX_LOCALBUSINESS))
     else:
         out.append(Finding(
             AREA_SD, SEV_OK, "Entita' principale dichiarata"))
@@ -2108,7 +2297,8 @@ def audit_structured_data(pages: List[Page]) -> List[Finding]:
         if wanted not in all_types:
             out.append(Finding(
                 AREA_SD, sev, "Markup %s assente" % wanted, why,
-                "Aggiungi il tipo %s dove pertinente." % wanted))
+                "Aggiungi il tipo %s dove pertinente." % wanted,
+                example=EX_FAQPAGE if wanted == "FAQPage" else ""))
 
     covered = sum(1 for p in good if p.jsonld_types)
     if covered < len(good):
@@ -2229,16 +2419,27 @@ def simulate_rrf(pages: List[Page], queries: Sequence[str],
         sev, note = SEV_OK, (
             "Buona sovrapposizione fra recupero lessicale e "
             "vettoriale.")
+    per_query = "; ".join(
+        "\"%s\" %d/%d" % (r.query, r.consensus, top_n)
+        for r in results[:12])
+    if len(results) > 12:
+        per_query += "; ..."
     findings.append(Finding(
         AREA_RRF, sev,
         "Consenso medio fra le liste: %.1f/%d (%.0f%%)"
         % (avg_consensus, top_n, consensus_ratio * 100),
         note + " Nella formula RRF un documento presente in entrambe "
         "le liste somma due addendi 1/(k+rank) e supera chi domina una "
-        "lista sola.",
+        "lista sola. Consenso per query: %s." % per_query,
         "Ottimizza gli stessi passaggi su entrambi gli assi: termini "
         "espliciti (BM25) e spiegazione completa (vettoriale).",
-        weight=2.0))
+        weight=2.0,
+        example="Prima (solo lessicale): \"Drenaggio linfatico. "
+                "Chiama per info.\"\n"
+                "Dopo (entrambi gli assi): \"Il drenaggio linfatico "
+                "manuale e' un massaggio\ndolce che favorisce il "
+                "deflusso della linfa: una seduta dura 45 minuti\ne "
+                "il ciclo tipico va da 5 a 10 incontri.\""))
 
     uncovered = [r.query for r in results if not r.covered]
     if uncovered:
@@ -2247,12 +2448,21 @@ def simulate_rrf(pages: List[Page], queries: Sequence[str],
             "%d query senza alcun risultato" % len(uncovered),
             "Nessun chunk del sito risponde a: %s."
             % "; ".join(uncovered[:5]),
-            "Crea contenuti dedicati a questi intenti.", weight=2.0))
+            "Crea contenuti dedicati a questi intenti.", weight=2.0,
+            example="Per ogni query scoperta, una sezione con "
+                    "heading uguale alla domanda:\n"
+                    "<h2>Quanto costa il drenaggio linfatico?</h2>\n"
+                    "<p>Una seduta costa in media 40-80 euro, in "
+                    "base a durata e zona trattata.</p>"))
     else:
+        elenco = "; ".join("\"%s\"" % r.query for r in results[:12])
+        if len(results) > 12:
+            elenco += "; ..."
         findings.append(Finding(
             AREA_RRF, SEV_OK,
             "Tutte le %d query trovano almeno un passaggio"
-            % len(results)))
+            % len(results),
+            "Query verificate: %s." % elenco))
 
     return results, findings, vector.mode
 
@@ -2397,10 +2607,14 @@ def simulate_share_of_voice(
             "Crea o riscrivi contenuti dedicati a questi intenti.",
             weight=2.0))
     else:
+        elenco = "; ".join("\"%s\"" % r.query for r in results[:12])
+        if len(results) > 12:
+            elenco += "; ..."
         findings.append(Finding(
             AREA_RRF, SEV_OK,
             "Presente nei primi %d per tutte le %d query"
-            % (top_n, len(results))))
+            % (top_n, len(results)),
+            "Query del confronto: %s." % elenco))
 
     payload: Dict[str, object] = {
         "main": main_host,
@@ -2484,6 +2698,26 @@ def render_text(base: str, pages: List[Page],
             if finding.fix:
                 lines.append("    -> Fix: %s" % finding.fix)
         lines.append("")
+
+    plan = build_remediation(findings)
+    if plan:
+        lines.append("-" * 70)
+        lines.append("PIANO DI REMEDIATION  ·  %d interventi, per "
+                     "gravita' e peso" % len(plan))
+        lines.append("-" * 70)
+        for item in plan:
+            tag = ("CRITICO" if item["severity"] == SEV_CRITICAL
+                   else "AVVISO")
+            lines.append("%2d. [%s · %s] %s"
+                         % (item["priority"], tag, item["area"],
+                            item["title"]))
+            if item["fix"]:
+                lines.append("    Fix: %s" % item["fix"])
+            if item["example"]:
+                lines.append("    Esempio:")
+                for row in str(item["example"]).splitlines():
+                    lines.append("        %s" % row)
+            lines.append("")
 
     if results:
         lines.append("-" * 70)
@@ -2717,6 +2951,30 @@ def render_html(base: str, pages: List[Page],
             parts.append("</div></div>")
         parts.append("</section>")
 
+    plan = build_remediation(findings)
+    if plan:
+        parts.append(
+            "<section><h2>Piano di remediation</h2>"
+            "<p class=\"meta\">%d interventi ordinati per gravita' "
+            "e peso: si parte da cio' che rende di piu' sul "
+            "punteggio.</p>" % len(plan))
+        for item in plan:
+            sev = str(item["severity"])
+            parts.append(
+                "<div class=\"find\"><span class=\"ico\" style=\""
+                "background:%s\">%s</span><div class=\"txt\">"
+                "<b>%d. %s</b>"
+                % (colors[sev], marks[sev], item["priority"],
+                   esc(str(item["title"]))))
+            if item["fix"]:
+                parts.append("<span class=\"d\">%s</span>"
+                             % esc(str(item["fix"])))
+            if item["example"]:
+                parts.append("<pre class=\"ex\">%s</pre>"
+                             % esc(str(item["example"])))
+            parts.append("</div></div>")
+        parts.append("</section>")
+
     if results:
         parts.append("<section><h2>Dettaglio simulazione RRF</h2>"
                      "<p class=\"meta\">Le tacche sul consenso sono "
@@ -2881,6 +3139,10 @@ var(--line);vertical-align:top}
 th{font-size:.7rem;text-transform:uppercase;color:var(--muted)}
 code{font-family:Menlo,Consolas,monospace;font-size:.85em;
 background:var(--accent-soft);padding:1px 5px;border-radius:5px}
+pre.ex{font-family:Menlo,Consolas,monospace;font-size:.78rem;
+background:var(--accent-soft);border-radius:8px;padding:10px 12px;
+margin:6px 0 2px;overflow-x:auto;white-space:pre-wrap;
+word-break:break-word}
 footer{color:var(--muted);font-size:.78rem;padding:0 4px}
 footer a{color:var(--accent)}
 footer .brand{color:var(--accent);font-weight:700;font-size:.88rem;
@@ -2920,6 +3182,7 @@ def render_json(base: str, pages: List[Page],
             for p in pages
         ],
         "findings": [f.as_dict() for f in findings],
+        "remediation": build_remediation(findings),
         "rrf_simulation": [asdict(r) for r in results],
         "competitive": competitive,
     }
@@ -3038,7 +3301,10 @@ def run_audit(base: str, max_pages: int, queries: List[str],
             "diluiscono i segnali e sprecano budget di scansione."
             % ", ".join(sorted(duplicates)[:4]),
             "Scegli un URL canonico e reindirizza gli altri con un 301.",
-            weight=1.0))
+            weight=1.0,
+            example="Redirect 301 /index.html https://esempio.it/\n"
+                    "e sulla pagina canonica:\n<link rel=\"canonical\""
+                    " href=\"https://esempio.it/\">"))
 
     if verbose:
         print("[4/5] controlli per area", file=sys.stderr)

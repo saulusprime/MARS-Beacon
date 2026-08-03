@@ -118,7 +118,8 @@ Cosa offre:
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, rilievi in una fisarmonica per area con gravità espressa da
   testo + simbolo (mai solo colore), tabella del consenso RRF per
-  query, **confronto competitivo** (barre della share of voice per sito
+  query, **piano di remediation** con esempi di fix pronti da copiare,
+  **confronto competitivo** (barre della share of voice per sito
   e tabella per query, quando si indicano concorrenti) e scarico dei
   referti HTML / JSON / testo (il referto HTML si apre in una nuova
   scheda).
@@ -205,7 +206,11 @@ scarico).
 
 Ogni area produce rilievi (`critical` / `warning` / `ok` / `info`) con
 punteggio 0–100; il complessivo è la media pesata (tecnica 1.0, lessicale 1.5,
-semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5).
+semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5). I rilievi
+riportano evidenze concrete (URL, query verificate, esempi dei testi
+problematici) e i referti includono un **piano di remediation**: critici e
+avvertenze ordinati per gravità × peso, ciascuno con la correzione e un
+esempio pronto (snippet JSON-LD, righe di robots.txt, testo prima/dopo).
 
 1. **Tecnica** — HTTPS, `robots.txt` e permessi per i 14 crawler IA
    documentati dai vendor (GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot,

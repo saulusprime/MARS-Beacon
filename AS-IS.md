@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-03.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.8.0
+## Strumento CLI — `seo_rrf_audit.py` v1.9.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -29,6 +29,15 @@ sono nel [README.md](README.md).
   datePublished, pagina "chi siamo", contatti tel:/mailto:/email);
   grafo dei link interni con pagine orfane, profondità oltre 3 click
   dalla home e anchor generiche ("clicca qui").
+- **Piano di remediation** (v1.9.0), in tutti i referti e nella GUI:
+  rilievi critici e avvertenze ordinati per gravità × peso, ciascuno
+  con correzione ed **esempio concreto di fix** (campo `example` del
+  rilievo: snippet JSON-LD, righe di robots.txt/.htaccess, testo
+  prima/dopo). Rilievi arricchiti con evidenze: query verificate e
+  consenso per query nell'area RRF, evidenze E-E-A-T (dove sono
+  stati trovati autore, date, chi-siamo, contatti), URL coinvolti
+  nei rilievi su canonical/description/H1/noindex, esempi testuali
+  dei chunk anaforici e degli heading interrogativi.
 - **Qualità del markup Schema.org** (v1.8.0): proprietà minime per
   23 tipi (fra cui Product, VideoObject, ImageObject, Event, Recipe,
   HowTo, JobPosting, Review, AggregateRating, Course, i tipi medici)
@@ -92,7 +101,7 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v1.7.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v1.8.0 + `gui/`
 
 - **Layout a sezioni collassabili** (v1.7.x): configurazione,
   avanzamento e "Risultati dell'audit e referto" (unificati: pulsanti

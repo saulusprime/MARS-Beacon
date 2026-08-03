@@ -40,7 +40,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "1.7.1"
+__version__ = "1.8.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -96,6 +96,7 @@ class Job:
         self.config: Dict[str, object] = {}
         self.summary: Dict[str, object] = {}
         self.findings: List[Dict[str, object]] = []
+        self.remediation: List[Dict[str, object]] = []
         self.rrf: List[Dict[str, object]] = []
         self.competitive: Optional[Dict[str, object]] = None
         self.reports: Dict[str, str] = {}
@@ -109,6 +110,7 @@ class Job:
                 "config": dict(self.config),
                 "summary": dict(self.summary),
                 "findings": list(self.findings),
+                "remediation": list(self.remediation),
                 "rrf": list(self.rrf),
                 "competitive": self.competitive,
             }
@@ -124,6 +126,7 @@ class Job:
             self.config = config
             self.summary = {}
             self.findings = []
+            self.remediation = []
             self.rrf = []
             self.competitive = None
             self.reports = {}
@@ -190,6 +193,7 @@ class Job:
             self.reports = reports
             self.summary = summary
             self.findings = [f.as_dict() for f in findings]
+            self.remediation = sra.build_remediation(findings)
             self.rrf = [sra.asdict(r) for r in results]
             self.competitive = competitive
             self.state = "done"

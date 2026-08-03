@@ -40,12 +40,12 @@ sono proposte.
 
 ## P2 — Output e reportistica
 
-- [ ] **Colmare il divario fra referto generato e referto consegnato**: il
-      referto di esempio ([audit_miaweb_rrf.html](audit_miaweb_rrf.html)) è
-      stato curato a mano e contiene verdetto sintetico, tabella
-      "matematica del problema" e piano d'azione per priorità che
-      `render_html()` non produce. Generare automaticamente almeno il piano
-      d'azione ordinato per (gravità × peso × sforzo stimato).
+- [ ] **Colmare il divario fra referto generato e referto consegnato**:
+      dalla v1.9.0 il piano d'azione per priorità (gravità × peso, con
+      esempi di fix) è generato automaticamente; del referto curato a mano
+      ([audit_miaweb_rrf.html](audit_miaweb_rrf.html)) mancano ancora la
+      tabella "matematica del problema" e una stima dello sforzo per
+      intervento da incrociare con la priorità.
 - [ ] Renderer **Markdown** (comodo per issue/PR) ed export **CSV** dei
       rilievi.
 - [ ] **Storico e delta**: salvare il JSON di ogni esecuzione e riportare le
