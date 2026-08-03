@@ -364,5 +364,4 @@ Dettaglio completo in [seo_rrf_audit.md](seo_rrf_audit.md).
 
 ## Licenza
 
-MIT (dichiarata nello script; vedi [TO-DO.md](TO-DO.md) per il file LICENSE
-mancante).
+MIT — vedi [LICENSE](LICENSE).

@@ -8,7 +8,7 @@ sono proposte.
 
 ## P0 — Correttezza e igiene di progetto
 
-- [ ] **Aggiungere `LICENSE`** (MIT è dichiarata nel docstring ma il file manca).
+- [x] **Aggiungere `LICENSE`** (MIT è dichiarata nel docstring ma il file manca).
 - [ ] **User agent con URL reale.** `USER_AGENT` punta a
       `https://example.invalid/bot`: sostituire con una pagina che spieghi chi
       è il bot, o rendere l'UA configurabile (`--user-agent`).
