@@ -106,13 +106,12 @@ commerciale, non di sviluppo — il white-label è già in P2 — GUI).
 
 - [ ] Renderer **Markdown** (comodo per issue/PR) ed export **CSV** dei
       rilievi.
-- [ ] **Storico e delta nella CLI**: la versione GUI è realizzata
-      nella v2.10.0 (referto JSON in SQLite per utente/dominio,
-      export, delta con rilievi nuovi/risolti — vedi AS-IS); per gli
-      usi headless resta un `--history FILE` JSONL nella CLI, con il
-      delta riportato nei tre referti (riusare `compute_delta` della
-      GUI, oggi in seo_rrf_gui.py: valutare lo spostamento nel
-      core).
+- [ ] Nel deploy systemd, affiancare al timer delle citazioni un
+      timer per l'audit periodico con `--history` (la CLI ha
+      storico e delta dalla v1.19.0 — vedi AS-IS): unit di esempio
+      in `deploy/` con notifica sulle regressioni via
+      `--fail-under`-equivalente (oggi il gate è il codice di
+      uscita sui critici).
 - [ ] Versionare lo schema del JSON (`"schema_version"`) per compatibilità
       futura.
 - [ ] Referto HTML: CSS di stampa/esport PDF, ancore per rilievo,
@@ -163,10 +162,6 @@ Widget che richiedono lo **storico degli audit** (in GUI c'è dalla
 v2.10.0 con referto JSON in database; per la CLI vedi "Storico e
 delta nella CLI" in P2 — Output e reportistica):
 
-- [ ] Delta per area anche **nei referti CLI** (nella GUI i delta
-      per area e complessivo sono nel blocco "Rispetto
-      all'esecuzione precedente" dalla v2.10.0; il trend con soglie
-      nello Storico dalla v2.1.0).
 - [ ] Badge "nuovo"/"risolto" **sui singoli rilievi nella
       fisarmonica** e confronto fra **due audit scelti** dallo
       storico (oggi il confronto è solo con l'esecuzione

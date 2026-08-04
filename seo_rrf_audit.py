@@ -98,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.18.0"
+__version__ = "1.19.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -3241,6 +3241,118 @@ def citability_top_actions(
     return build_remediation(findings, pages, scores, market)[:top]
 
 
+def _finding_key(finding: Dict[str, object]) -> Tuple[str, str]:
+    """Chiave stabile di un rilievo fra due audit.
+
+    I titoli incorporano conteggi che cambiano a ogni esecuzione
+    ("3 title non ottimizzati" -> "2 title non ottimizzati"): i
+    numeri vengono normalizzati a N perche' e' lo stesso problema
+    che evolve, non un rilievo nuovo.
+    """
+    return (str(finding.get("area", "")),
+            re.sub(r"\d+", "N", str(finding.get("title", ""))))
+
+
+def compute_delta(previous: Dict[str, object],
+                  current: Dict[str, object],
+                  previous_at: float) -> Dict[str, object]:
+    """Variazioni fra due esecuzioni sullo stesso sito.
+
+    Accetta sia referti JSON completi sia le righe compatte dello
+    storico (`history_payload`): servono solo scores, findings,
+    site e generated_at. Punteggi: differenza per area (e
+    complessivo) dove entrambe le esecuzioni hanno un valore.
+    Rilievi: confronto dei soli critici e avvertenze per (area,
+    titolo normalizzato): "nuovi" = solo nell'attuale, "risolti" =
+    solo nel precedente. Euristica dichiarata: un rilievo
+    riformulato conta come nuovo + risolto.
+    """
+    def actionable(payload: Dict[str, object]) -> Dict[
+            Tuple[str, str], Dict[str, object]]:
+        out: Dict[Tuple[str, str], Dict[str, object]] = {}
+        for f in payload.get("findings") or []:
+            if f.get("severity") in (SEV_CRITICAL, SEV_WARNING):
+                out.setdefault(_finding_key(f), f)
+        return out
+
+    prev_scores = previous.get("scores") or {}
+    cur_scores = current.get("scores") or {}
+    scores = {}
+    for area, value in cur_scores.items():
+        before = prev_scores.get(area)
+        if value is not None and before is not None:
+            scores[area] = round(float(value) - float(before), 1)
+
+    prev_f = actionable(previous)
+    cur_f = actionable(current)
+    slim = ("area", "title", "severity")
+    return {
+        "site": current.get("site", ""),
+        "previous_at": previous_at,
+        "previous_generated_at": previous.get("generated_at", ""),
+        "scores": scores,
+        "new": [{k: cur_f[key].get(k, "") for k in slim}
+                for key in sorted(cur_f) if key not in prev_f],
+        "resolved": [{k: prev_f[key].get(k, "") for k in slim}
+                     for key in sorted(prev_f) if key not in cur_f],
+    }
+
+
+def history_payload(base: str, findings: Sequence["Finding"],
+                    scores: Dict[str, Optional[float]]
+                    ) -> Dict[str, object]:
+    """Riga compatta per lo storico JSONL: cio' che serve al delta.
+
+    Contiene solo punteggi e rilievi azionabili (critici e
+    avvertenze, con area/titolo/gravita'): abbastanza per
+    compute_delta, abbastanza poco da tenere lo storico leggero.
+    """
+    return {
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "created_at": time.time(),
+        "site": base,
+        "tool_version": __version__,
+        "scores": {**scores, "overall": overall_score(scores)},
+        "findings": [
+            {"area": f.area, "severity": f.severity,
+             "title": f.title}
+            for f in findings
+            if f.severity in (SEV_CRITICAL, SEV_WARNING)
+        ],
+    }
+
+
+def read_history_last(path: str,
+                      site: str) -> Optional[Dict[str, object]]:
+    """Ultima riga dello storico per lo stesso sito.
+
+    Righe malformate e file assente vengono ignorati: lo storico
+    non deve mai impedire l'audit.
+    """
+    last = None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(row, dict) and row.get("site") == site:
+                    last = row
+    except OSError:
+        return None
+    return last
+
+
+def append_history(path: str, payload: Dict[str, object]) -> None:
+    """Accoda l'esecuzione allo storico JSONL."""
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
 def judge_unavailable() -> Optional[str]:
     """None se il giudizio LLM puo' funzionare, altrimenti il motivo.
 
@@ -3397,7 +3509,8 @@ def render_text(base: str, pages: List[Page],
                 k: int = 60,
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
-                judge: Optional[Dict[str, object]] = None) -> str:
+                judge: Optional[Dict[str, object]] = None,
+                delta: Optional[Dict[str, object]] = None) -> str:
     """Referto testuale per la console."""
     marks = {SEV_CRITICAL: "[X]", SEV_WARNING: "[!]",
              SEV_OK: "[v]", SEV_INFO: "[i]"}
@@ -3419,6 +3532,27 @@ def render_text(base: str, pages: List[Page],
     lines.append("  %-24s %5.1f/100" % ("COMPLESSIVO",
                                         overall_score(scores)))
     lines.append("")
+
+    if delta:
+        marks_d = {SEV_CRITICAL: "[X]", SEV_WARNING: "[!]"}
+        lines.append("RISPETTO ALL'ESECUZIONE PRECEDENTE  ·  %s"
+                     % (delta.get("previous_generated_at") or ""))
+        variazioni = [
+            "%s %+.1f" % (area, value) if value else "%s =" % area
+            for area, value in dict(delta["scores"]).items()]
+        if variazioni:
+            lines.append("  " + " · ".join(variazioni))
+        for label, items in (("Risolti", delta["resolved"]),
+                             ("Nuovi", delta["new"])):
+            lines.append("  %s (%d):" % (label, len(list(items)))
+                         if items else "  %s: nessuno" % label)
+            for f in items:
+                lines.append("    %s %s"
+                             % (marks_d.get(str(f["severity"]),
+                                            "[i]"), f["title"]))
+        lines.append("  Nota: rilievi confrontati per tipo (i "
+                     "conteggi nei titoli possono variare).")
+        lines.append("")
 
     cit = citability_profiles(pages, scores, market)
     if cit:
@@ -3710,7 +3844,8 @@ def render_html(base: str, pages: List[Page],
                 k: int = 60,
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
-                judge: Optional[Dict[str, object]] = None) -> str:
+                judge: Optional[Dict[str, object]] = None,
+                delta: Optional[Dict[str, object]] = None) -> str:
     """Referto HTML autonomo, leggibile in chiaro e in scuro."""
     esc = html.escape
     colors = {SEV_CRITICAL: "var(--bad)", SEV_WARNING: "var(--warn)",
@@ -3758,6 +3893,37 @@ def render_html(base: str, pages: List[Page],
         "style=\"width:%.0f%%;background:%s\"></div></div></div>"
         % (hue, total, total, hue))
     parts.append("</div>")
+
+    if delta:
+        parts.append(
+            "<section><h2>Rispetto all'esecuzione precedente</h2>"
+            "<p class=\"meta\">Confronto con l'audit del %s sullo "
+            "stesso sito: l'audit diventa monitoraggio. Rilievi "
+            "confrontati per tipo (i conteggi nei titoli possono "
+            "variare).</p>"
+            % esc(str(delta.get("previous_generated_at") or "")))
+        variazioni = " · ".join(
+            "%s <b>%+.1f</b>" % (esc(area), value) if value
+            else "%s =" % esc(area)
+            for area, value in dict(delta["scores"]).items())
+        if variazioni:
+            parts.append("<p class=\"meta\">%s</p>" % variazioni)
+        for label, items in (("Risolti", delta["resolved"]),
+                             ("Nuovi", delta["new"])):
+            parts.append("<h3>%s (%d)</h3>"
+                         % (label, len(list(items))))
+            if not items:
+                parts.append("<p class=\"meta\">Nessuno.</p>")
+            for f in items:
+                sev = str(f["severity"])
+                parts.append(
+                    "<div class=\"find\"><span class=\"ico\" "
+                    "style=\"background:%s\">%s</span>"
+                    "<div class=\"txt\"><b>%s</b></div></div>"
+                    % (colors.get(sev, "var(--muted)"),
+                       marks.get(sev, "i"),
+                       esc(str(f["title"]))))
+        parts.append("</section>")
 
     cit = citability_profiles(pages, scores, market)
     if cit:
@@ -4140,7 +4306,8 @@ def render_json(base: str, pages: List[Page],
                 k: int = 60,
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
-                judge: Optional[Dict[str, object]] = None) -> str:
+                judge: Optional[Dict[str, object]] = None,
+                delta: Optional[Dict[str, object]] = None) -> str:
     """Referto JSON, adatto a essere versionato o messo in pipeline."""
     payload = {
         "tool": "seo_rrf_audit.py",
@@ -4154,6 +4321,7 @@ def render_json(base: str, pages: List[Page],
         "citability_actions": citability_top_actions(
             findings, pages, scores, market),
         "judge": judge,
+        "delta": delta,
         "pages": [
             {
                 "url": p.url,
@@ -4449,6 +4617,15 @@ def build_parser() -> argparse.ArgumentParser:
                              "'orientale' Qwen e Kimi, 'globale' "
                              "pesa tutti allo stesso modo "
                              "(default %s)" % DEFAULT_MARKET)
+    parser.add_argument("--history", metavar="FILE",
+                        help="storico JSONL delle esecuzioni: "
+                             "legge l'ultima riga dello stesso "
+                             "sito per riportare nei referti il "
+                             "delta (punteggi per area, rilievi "
+                             "nuovi/risolti) e accoda una riga "
+                             "compatta per l'esecuzione corrente. "
+                             "Trasforma l'audit in monitoraggio "
+                             "anche da riga di comando/cron")
     parser.add_argument("--judge", choices=JUDGE_MODES,
                         default=DEFAULT_JUDGE,
                         help="giudizio LLM sulla citabilita' dei "
@@ -4610,11 +4787,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     judge_data = run_judge(results, pages, args.judge,
                            verbose=not args.quiet)
 
+    delta = None
+    current_row = history_payload(base, findings, scores)
+    if args.history:
+        previous = read_history_last(args.history, base)
+        if previous:
+            try:
+                delta = compute_delta(
+                    previous, current_row,
+                    float(previous.get("created_at") or 0))
+            except (ValueError, KeyError, TypeError):
+                delta = None  # riga precedente illeggibile
+
     renderers = {"text": render_text, "json": render_json,
                  "html": render_html}
     report = renderers[args.format](
         base, pages, findings, scores, results, mode, args.rrf_k,
-        competitive, market=args.market, judge=judge_data)
+        competitive, market=args.market, judge=judge_data,
+        delta=delta)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as handle:
@@ -4622,6 +4812,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("Referto scritto in %s" % args.output, file=sys.stderr)
     else:
         print(report)
+
+    if args.history:
+        try:
+            append_history(args.history, current_row)
+        except OSError as exc:
+            print("Avviso: impossibile aggiornare lo storico %s: %s"
+                  % (args.history, exc), file=sys.stderr)
 
     critical = sum(1 for f in findings if f.severity == SEV_CRITICAL)
     return 1 if critical else 0

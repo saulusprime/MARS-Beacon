@@ -314,7 +314,8 @@ def test_export_referto_storico_via_api(gui_base):
 
 def test_delta_fra_due_audit_stesso_sito(gui_base, site):
     """Il secondo audit sullo stesso dominio riporta il delta."""
-    cookie = _register(gui_base, email="delta@e.it")
+    cookie = _register(gui_base, email="delta@e.it",
+                       completo=True)
     token = cookie.split("=", 1)[1]
     status, _, _ = _api(gui_base, "/api/audit", {
         "url": site, "max_pages": 3, "delay": 0.0,
@@ -342,6 +343,11 @@ def test_delta_fra_due_audit_stesso_sito(gui_base, site):
     runs = gui.get_store().history(uid)
     assert len(runs) == 2
     assert all(r["has_report"] for r in runs)
+    # Dalla 2.11.0 anche i referti scaricati includono il delta.
+    status, body, _ = _api(gui_base, "/api/report/text",
+                           cookie=cookie)
+    assert status == 200
+    assert b"RISPETTO ALL'ESECUZIONE PRECEDENTE" in body
 
 
 # ---------------- storico citazioni IA ----------------

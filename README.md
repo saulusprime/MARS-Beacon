@@ -87,6 +87,7 @@ python3 seo_rrf_audit.py https://esempio.it \
 | `--delay SEC` | 0.5 | pausa fra le richieste HTTP |
 | `--competitor URL` | — | sito concorrente da confrontare (ripetibile, massimo 3). Ogni concorrente viene scansionato con gli stessi limiti; i corpora vengono fusi negli stessi indici BM25+vettoriale e interrogati con le stesse query (i temi del **tuo** sito): il referto riporta la **share of voice** — quanti dei primi 5 posti fusi appartengono a ciascun sito, con soglie rispetto alla parità — e le query vinte interamente dai concorrenti |
 | `--market occidentale\|globale\|orientale` | occidentale | pesi dei **profili di citabilità per assistente IA** nell'indice composito: `occidentale` privilegia ChatGPT/Perplexity (50%) e Claude (30%), `orientale` Qwen e Kimi (35% ciascuno), `globale` pesa tutti allo stesso modo. I profili sono stime euristiche derivate dai punteggi di area — la nota di onestà è sempre inclusa nel referto |
+| `--history FILE` | — | **storico JSONL delle esecuzioni**: legge l'ultima riga dello stesso sito e riporta nei referti la sezione "Rispetto all'esecuzione precedente" (variazioni dei punteggi per area, rilievi nuovi/risolti), poi accoda una riga compatta per l'esecuzione corrente. Con un audit schedulato (cron/systemd) trasforma l'audit in monitoraggio anche senza GUI |
 | `--judge auto\|on\|off` | auto | **giudizio LLM sulla citabilità**: un modello (Claude, SDK ufficiale Anthropic) valuta i passaggi migliori della simulazione RRF — max 5, una sola richiesta API per audit — con punteggio e motivazione per ciascuno e **scarto rispetto all'indice euristico**. `auto` (default) parte solo se `ANTHROPIC_API_KEY` è nell'ambiente, altrimenti viene saltato con motivo dichiarato nel referto: senza chiave l'audit resta interamente offline. `on` pretende la chiave (errore d'uso senza); `off` disattiva. I costi API sono a carico della chiave configurata |
 | `--render off\|auto\|always` | off | rendering JavaScript in browser headless (richiede Playwright; ripiega sul Chrome/Chromium di sistema). `auto` rende **solo** le pagine che l'euristica classifica come client-side; `always` tutte. Il DOM renderizzato sostituisce l'estrazione del contenuto, ma stato HTTP, redirect e tempi restano quelli della risposta reale, e il rilievo critico sul contenuto invisibile ai crawler senza JS scatta comunque. Rendering seriale, rispetta `--delay` e l'annullamento |
 | `--workers N` | 4 | richieste in parallelo durante la scansione (1–16; `1` = seriale). Il **ritmo verso il sito non cambia**: gli avvii delle richieste restano distanziati di `--delay` anche fra thread — i worker sovrappongono solo le attese di rete, quindi il tempo per pagina tende a `max(delay, latenza)` invece di `delay + latenza` |
@@ -426,7 +427,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 177 test, ~15 secondi, nessun accesso alla rete esterna
+pytest            # 181 test, ~15 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

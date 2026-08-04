@@ -64,7 +64,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.10.0"
+__version__ = "2.11.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -461,20 +461,6 @@ class Job:
         k = int(cfg["rrf_k"])
         base = str(cfg["url"])
         market = str(cfg.get("market", sra.DEFAULT_MARKET))
-        reports = {
-            "html": sra.render_html(base, pages, findings, scores,
-                                    results, mode, k, competitive,
-                                    market=market, judge=judge),
-            "json": sra.render_json(base, pages, findings, scores,
-                                    results, mode, k, competitive,
-                                    market=market, judge=judge),
-            "text": sra.render_text(base, pages, findings, scores,
-                                    results, mode, k, competitive,
-                                    market=market, judge=judge),
-        }
-        severities = [f.severity for f in findings]
-        clean, flagged, broken = sra.page_status_counts(pages,
-                                                        findings)
         delta = None
         if self.user_id:
             previous = get_store().last_audit_report(
@@ -483,10 +469,27 @@ class Job:
                 try:
                     delta = compute_delta(
                         json.loads(str(previous["report_json"])),
-                        json.loads(reports["json"]),
+                        sra.history_payload(base, findings, scores),
                         float(str(previous["created_at"])))
                 except (ValueError, KeyError, TypeError):
                     delta = None  # referto vecchio illeggibile
+        reports = {
+            "html": sra.render_html(base, pages, findings, scores,
+                                    results, mode, k, competitive,
+                                    market=market, judge=judge,
+                                    delta=delta),
+            "json": sra.render_json(base, pages, findings, scores,
+                                    results, mode, k, competitive,
+                                    market=market, judge=judge,
+                                    delta=delta),
+            "text": sra.render_text(base, pages, findings, scores,
+                                    results, mode, k, competitive,
+                                    market=market, judge=judge,
+                                    delta=delta),
+        }
+        severities = [f.severity for f in findings]
+        clean, flagged, broken = sra.page_status_counts(pages,
+                                                        findings)
         summary = {
             "site": base,
             "overall": sra.overall_score(scores),
@@ -532,58 +535,9 @@ class Job:
 JOB = Job()
 
 
-def _finding_key(finding: Dict[str, object]) -> Tuple[str, str]:
-    """Chiave stabile di un rilievo fra due audit.
-
-    I titoli incorporano conteggi che cambiano a ogni esecuzione
-    ("3 title non ottimizzati" -> "2 title non ottimizzati"): i
-    numeri vengono normalizzati a N perche' e' lo stesso problema
-    che evolve, non un rilievo nuovo.
-    """
-    return (str(finding.get("area", "")),
-            re.sub(r"\d+", "N", str(finding.get("title", ""))))
-
-
-def compute_delta(previous: Dict[str, object],
-                  current: Dict[str, object],
-                  previous_at: float) -> Dict[str, object]:
-    """Variazioni fra due referti JSON dello stesso sito.
-
-    Punteggi: differenza per area (e complessivo) dove entrambe le
-    esecuzioni hanno un valore. Rilievi: confronto dei soli critici
-    e avvertenze per (area, titolo normalizzato): "nuovi" = solo
-    nell'attuale, "risolti" = solo nel precedente. Euristica
-    dichiarata: un rilievo riformulato conta come nuovo + risolto.
-    """
-    def actionable(payload: Dict[str, object]) -> Dict[
-            Tuple[str, str], Dict[str, object]]:
-        out: Dict[Tuple[str, str], Dict[str, object]] = {}
-        for f in payload.get("findings") or []:
-            if f.get("severity") in ("critical", "warning"):
-                out.setdefault(_finding_key(f), f)
-        return out
-
-    prev_scores = previous.get("scores") or {}
-    cur_scores = current.get("scores") or {}
-    scores = {}
-    for area, value in cur_scores.items():
-        before = prev_scores.get(area)
-        if value is not None and before is not None:
-            scores[area] = round(float(value) - float(before), 1)
-
-    prev_f = actionable(previous)
-    cur_f = actionable(current)
-    slim = ("area", "title", "severity")
-    return {
-        "site": current.get("site", ""),
-        "previous_at": previous_at,
-        "previous_generated_at": previous.get("generated_at", ""),
-        "scores": scores,
-        "new": [{k: cur_f[key].get(k, "") for k in slim}
-                for key in sorted(cur_f) if key not in prev_f],
-        "resolved": [{k: prev_f[key].get(k, "") for k in slim}
-                     for key in sorted(prev_f) if key not in cur_f],
-    }
+# Dalla 2.11.0 il confronto fra esecuzioni vive nel core (riusato
+# anche dalla CLI con --history): l'alias mantiene la firma storica.
+compute_delta = sra.compute_delta
 
 
 def read_citations_history(path: str) -> List[Dict[str, object]]:

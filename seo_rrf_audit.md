@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.18.0, ~4630
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.19.0, ~4830
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -321,6 +321,23 @@ con proprietà e gating, doppio audit end-to-end); verifica visiva
 con sito modificato fra le due esecuzioni (FAQ aggiunta → 2 critici
 risolti, semantica +22,7).
 
+Novità 1.19.0 (2026-08-04): storico e delta nella CLI. Il confronto
+fra esecuzioni è migrato nel core (`compute_delta`, `_finding_key`;
+la GUI 2.11.0 lo riusa via alias) e la CLI guadagna `--history
+FILE`: legge l'ultima riga JSONL dello stesso sito, riporta il
+delta nei **tre referti** (sezione "Rispetto all'esecuzione
+precedente": variazioni dei punteggi per area, rilievi
+nuovi/risolti con gravità, chiave `delta` nel JSON) e accoda una
+riga compatta per l'esecuzione corrente (`history_payload`: solo
+punteggi e rilievi azionabili — abbastanza per il delta, abbastanza
+poco da tenere lo storico leggero; `read_history_last` ignora righe
+malformate e file assente, `append_history` fallisce con un avviso
+senza rompere l'audit). Stesso pattern JSONL del monitor citazioni:
+audit schedulato da cron + storico = monitoraggio headless. GUI
+2.11.0: il delta è calcolato prima dei render, così anche i tre
+referti scaricati includono la sezione. 4 test nuovi (181 totali)
+con doppia esecuzione CLI end-to-end.
+
 ## Uso
 
 ```
@@ -347,8 +364,9 @@ JavaScript con Playwright/Chrome), `--own-site` / `--ignore-robots accetto`
 voice), `--market occidentale|globale|orientale` (pesi dell'indice di
 citabilità composito), `--judge auto|on|off` (giudizio LLM sui passaggi
 migliori via API Anthropic; `auto`, il default, parte solo con
-ANTHROPIC_API_KEY presente), `--format text|json|html`, `--output`,
-`--quiet`, `--version`.
+ANTHROPIC_API_KEY presente), `--history FILE` (storico JSONL: delta nei
+referti e riga compatta accodata a ogni esecuzione), `--format
+text|json|html`, `--output`, `--quiet`, `--version`.
 
 Codici di uscita: `0` nessuna criticità, `1` almeno una criticità, `2` errore
 d'uso, `130` interruzione.
