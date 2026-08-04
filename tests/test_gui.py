@@ -79,7 +79,7 @@ def sra_version():
 # ---------------- statici e ambiente ----------------
 
 def test_statici_con_csp_e_traversal_negato(gui_base):
-    for path, atteso in (("/", b"Audit SEO"),
+    for path, atteso in (("/", b"MARS Audit"),
                          ("/", b"Lympha"),
                          ("/app.js", b"use strict"),
                          ("/config.js", b"__PUBLIC_PATH__"),

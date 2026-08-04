@@ -1,8 +1,9 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.37.0, ~6410
-righe, licenza MIT.
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.38.0, ~6420
+righe, licenza MIT. Dal 2026-08-04 il prodotto si chiama **MARS
+Audit** (Meta-fusion, Accessibility, Ranking & Security Audit).
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
 (default 10 MB, opzione `--max-body`): scarico a blocchi interrotto al
@@ -612,6 +613,16 @@ ogni cerchio un `<title>` con URL, link in ingresso e profondità;
 chiave `link_graph` nel JSON. Con questo la sezione widget è
 davvero conclusa. Pa11y 3/3; 3 test nuovi (258 totali), incluso
 il determinismo del layout e il tetto ai nodi.
+
+Novità 1.38.0 (2026-08-04): il prodotto si chiama **MARS Audit**
+(Meta-fusion, Accessibility, Ranking & Security Audit) — era
+"Audit SEO & Reciprocal Rank Fusion". Rinominate tutte le
+superfici visibili: header e title della GUI (2.17.0, con
+l'espansione come sottotitolo), tos.html, intestazioni dei
+referti text/html/markdown, descrizione della CLI, unit systemd,
+README e docstring. Nomi dei file, del repo e il campo `tool` del
+JSON restano invariati (nessun cambio di schema); i test e la
+verifica AT sono stati allineati al nuovo titolo.
 
 ## Uso
 

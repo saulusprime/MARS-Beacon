@@ -86,7 +86,7 @@ def main():
 
         # ---- Flusso 1: orientamento iniziale ----
         check(1, "titolo pagina annunciabile",
-              "Audit SEO" in page.title(), page.title())
+              "MARS Audit" in page.title(), page.title())
         page.keyboard.press("Tab")
         primo = page.evaluate(
             "document.activeElement.textContent.trim()")

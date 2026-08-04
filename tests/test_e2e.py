@@ -87,7 +87,7 @@ def test_renderer_coerenti_e_k_propagato(site):
 
     report_text = sra.render_text(
         site, pages, findings, scores, results, mode, 48)
-    assert "AUDIT SEO + RRF" in report_text
+    assert "MARS AUDIT" in report_text
     assert "PIANO DI REMEDIATION" in report_text
     assert "MATEMATICA DEL PROBLEMA" in report_text
     assert "sforzo:" in report_text

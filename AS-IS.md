@@ -1,11 +1,15 @@
 # AS-IS — Stato di fatto del progetto
 
+Il prodotto si chiama **MARS Audit** (Meta-fusion, Accessibility,
+Ranking & Security Audit) dal 2026-08-04; in precedenza "Audit SEO
+& Reciprocal Rank Fusion". I nomi dei file restano `seo_rrf_*`.
+
 Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 È il complemento di [TO-DO.md](TO-DO.md), che da qui in avanti elenca
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.37.0
+## Strumento CLI — `seo_rrf_audit.py` v1.38.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -264,7 +268,7 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.16.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.17.0 + `gui/`
 
 - **Grafo dell'architettura dei link** (v2.16.0, ultimo widget):
   layout force-directed Fruchterman-Reingold **deterministico,

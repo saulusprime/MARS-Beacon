@@ -13,7 +13,7 @@
 # reverse proxy con autenticazione davanti.
 
 [Unit]
-Description=Lympha Technologies - Audit SEO + RRF (interfaccia locale)
+Description=Lympha Technologies - MARS Audit (interfaccia locale)
 Documentation=file:///opt/seorrf/README.md
 After=network-online.target
 Wants=network-online.target

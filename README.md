@@ -1,4 +1,7 @@
-# SEORRF — Audit SEO + Reciprocal Rank Fusion
+# SEORRF — MARS Audit
+
+**MARS Audit** (*Meta-fusion, Accessibility, Ranking & Security
+Audit*) — fino al 2026-08-04 "Audit SEO + Reciprocal Rank Fusion".
 
 Strumento (Python 3, file singolo, ~2.000 righe, licenza MIT)
 che misura quanto un sito è **recuperabile e citabile dai motori di

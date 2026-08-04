@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Audit SEO e RRF (Reciprocal Rank Fusion) di un sito web.
+"""MARS Audit — Meta-fusion, Accessibility, Ranking & Security Audit.
+
+Audit SEO e RRF (Reciprocal Rank Fusion) di un sito web.
 
 Lo script esegue una scansione di un sito (via sitemap o crawling
 interno), ne estrae la struttura, e valuta quattro aree:
@@ -100,7 +102,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.37.0"
+__version__ = "1.38.0"
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
 # storico --history), indipendente dalla versione dello strumento:
@@ -4646,7 +4648,9 @@ def render_text(base: str, pages: List[Page],
              SEV_OK: "[v]", SEV_INFO: "[i]"}
     lines: List[str] = []
     lines.append("=" * 70)
-    lines.append("AUDIT SEO + RRF  ·  %s" % base)
+    lines.append("MARS AUDIT  ·  %s" % base)
+    lines.append("Meta-fusion, Accessibility, Ranking & Security "
+                 "Audit")
     lines.append("=" * 70)
     lines.append("Pagine analizzate : %d" % len([p for p in pages if p.ok]))
     lines.append("Chunk indicizzati : %d"
@@ -4989,10 +4993,12 @@ def render_html(base: str, pages: List[Page],
         "<meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,"
         "initial-scale=1\">"
-        "<title>Audit SEO + RRF - %s</title><style>%s</style>"
+        "<title>MARS Audit - %s</title><style>%s</style>"
         "</head><body><div class=\"wrap\">" % (esc(base), _CSS))
 
-    parts.append("<h1>Audit SEO + RRF</h1>")
+    parts.append("<h1>MARS Audit</h1>")
+    parts.append("<p class=\"meta\">Meta-fusion, Accessibility, "
+                 "Ranking &amp; Security Audit</p>")
     parts.append("<p class=\"sub\">%s</p>" % esc(base))
     parts.append(
         "<p class=\"meta\">Pagine analizzate: %d &middot; chunk "
@@ -5653,7 +5659,10 @@ def render_markdown(base: str, pages: List[Page],
     marks = {SEV_CRITICAL: "**[CRITICO]**", SEV_WARNING: "[AVVISO]",
              SEV_OK: "[ok]", SEV_INFO: "[info]"}
     out: List[str] = []
-    out.append("# Audit SEO + RRF — %s" % base)
+    out.append("# MARS Audit — %s" % base)
+    out.append("")
+    out.append("*Meta-fusion, Accessibility, Ranking & Security "
+               "Audit*")
     out.append("")
     out.append("Pagine analizzate: %d · chunk indicizzati: %d · "
                "recuperatore vettoriale: `%s`"
@@ -6063,7 +6072,9 @@ def build_parser() -> argparse.ArgumentParser:
     """Costruisce il parser degli argomenti da riga di comando."""
     parser = argparse.ArgumentParser(
         prog="seo_rrf_audit.py",
-        description="Audit SEO e Reciprocal Rank Fusion di un sito.",
+        description="MARS Audit (Meta-fusion, Accessibility, "
+                    "Ranking & Security Audit): audit SEO e "
+                    "Reciprocal Rank Fusion di un sito.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Esempio:\n"
                "  python3 seo_rrf_audit.py https://example.com "
