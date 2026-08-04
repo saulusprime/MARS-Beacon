@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.35.0, ~6130
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.36.0, ~6250
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -579,6 +579,23 @@ diversi, ordina per data da solo) e la GUI offre due select con
 "Confronta" e il risultato in stile delta. Pa11y locale rieseguito
 prima del push (3/3), heading senza salti. 4 test nuovi (252
 totali).
+
+Novità 1.36.0 (2026-08-04): le idee-widget rimandate (GUI 2.15.0).
+**Distribuzione della profondità di crawl**: `depth_distribution`
+riusa il BFS del grafo dei link (refactoring in `_build_link_edges`
+e `_bfs_depths`) e produce i bucket 0/1/2/3/4+ click più "solo da
+sitemap"; barre nel referto HTML e nella GUI, chiave
+`depth_distribution` nel JSON. **Mappa a bolle del posizionamento
+competitivo** (pattern Semrush): lo share of voice ora espone anche
+`presence` (in quante query il sito compare) e `queries_total`;
+bolla per sito con x = share, y = query coperte, raggio ∝ √chunk,
+in GUI e referto HTML — decorativa (aria-label che rimanda alle
+tabelle), i numeri restano nelle tabelle. **Form eventi nella
+GUI**: `POST /api/citations/events` (accesso richiesto, data
+AAAA-MM-GG validata, etichetta ≤ 120) accoda a `eventi.jsonl`; il
+form nella sezione citazioni aggiorna subito grafico e lista.
+Resta rimandato il solo grafo force-directed dell'architettura.
+Pa11y locale 3/3 prima del push. 3 test nuovi (255 totali).
 
 ## Uso
 

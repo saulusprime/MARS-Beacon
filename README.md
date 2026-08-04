@@ -171,6 +171,11 @@ Cosa offre:
   rispetto all'esecuzione precedente e **confronto fra due audit
   scelti** dallo storico con delta completo (punteggi,
   risolti/nuovi).
+- **Profondità di crawl e mappa a bolle**: istogramma dei click dalla
+  home (0/1/2/3/4+ e "solo da sitemap") e, col confronto competitivo,
+  la mappa a bolle share × query coperte × corpus (pattern Semrush) —
+  entrambi anche nel referto HTML; gli eventi del grafico citazioni
+  si aggiungono direttamente dalla GUI.
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, **profili di citabilità per assistente IA** (barre per
   profilo, indice composito col mercato scelto nel form e "top
@@ -468,7 +473,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 252 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 255 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

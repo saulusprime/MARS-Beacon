@@ -733,6 +733,17 @@
         <dl class="surface-math mb-4" id="surface-math-list"></dl>
       </div>
 
+      <div id="depth-block" hidden>
+        <h3 class="h5">Profondità di crawl</h3>
+        <p class="small text-muted mb-2">
+          Quanti click servono dalla home per raggiungere ogni
+          pagina lungo i link interni: oltre 3 click scansione e
+          peso calano; "solo da sitemap" indica pagine senza
+          percorso di link.
+        </p>
+        <div id="depth-bars" class="mb-4"></div>
+      </div>
+
       <div id="remediation-block" hidden>
         <h3 class="h5">Piano di remediation</h3>
         <p class="small text-muted mb-2" id="remediation-intro"></p>
@@ -765,6 +776,7 @@
         <h3 class="h5">Confronto competitivo</h3>
         <p class="small text-muted mb-2" id="competitive-intro"></p>
         <div id="share-bars" class="mb-3"></div>
+        <div id="sov-bubble" class="mb-3"></div>
         <div class="table-responsive mb-4" tabindex="0" role="group"
              aria-label="Tabella del confronto competitivo, area
                          scorrevole">
@@ -908,6 +920,41 @@
       <div id="cit-events-box" hidden>
         <h3 class="h6">Eventi annotati</h3>
         <ul class="small mb-3" id="cit-events"></ul>
+      </div>
+
+      <div class="mb-3">
+        <h3 class="h6">Aggiungi un evento</h3>
+        <div class="row align-items-end">
+          <div class="col-12 col-md-3">
+            <div class="form-group mb-2">
+              <label for="f-ev-date" class="active">Data</label>
+              <input type="date" class="form-control"
+                     id="f-ev-date">
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="form-group mb-2">
+              <label for="f-ev-label" class="active">Cosa è
+                successo</label>
+              <input type="text" class="form-control"
+                     id="f-ev-label" maxlength="120"
+                     placeholder="es. Pubblicate le FAQ">
+            </div>
+          </div>
+          <div class="col-12 col-md-3">
+            <div class="form-group mb-2">
+              <label for="f-ev-site" class="active">Sito
+                (facoltativo)</label>
+              <input type="text" class="form-control"
+                     id="f-ev-site" placeholder="miosito.it">
+            </div>
+          </div>
+          <div class="col-12 col-md-2 mb-2">
+            <button type="button" class="btn btn-outline-primary"
+                    id="btn-add-event">Aggiungi</button>
+          </div>
+        </div>
+        <p class="small" id="event-feedback" role="status"></p>
       </div>
 
       <div class="table-responsive" tabindex="0" role="group"

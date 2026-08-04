@@ -68,6 +68,34 @@
   el("audit-form").addEventListener("submit", onSubmit);
   el("f-robots").addEventListener("change", syncRobotsAck);
   el("btn-compare").addEventListener("click", runCompare);
+  el("btn-add-event").addEventListener("click", () => {
+    const feedback = el("event-feedback");
+    feedback.textContent = "";
+    fetch("api/citations/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: el("f-ev-date").value,
+        label: el("f-ev-label").value.trim(),
+        site: el("f-ev-site").value.trim(),
+      }),
+    })
+      .then((r) => r.json().then(
+        (data) => ({ status: r.status, data })))
+      .then(({ status, data }) => {
+        if (status !== 201) {
+          feedback.textContent = data.error ||
+            "Evento non salvato.";
+          return;
+        }
+        feedback.textContent = "Evento salvato.";
+        el("f-ev-label").value = "";
+        loadCitations();
+      })
+      .catch(() => {
+        feedback.textContent = "Errore di rete.";
+      });
+  });
   el("f-cit-site").addEventListener("change", (event) => {
     const entry = citSites[Number(event.target.value)];
     if (entry) {
@@ -1224,6 +1252,7 @@
     renderFindings(snap.findings || [],
       (snap.summary || {}).delta);
     renderSurfaceMath((snap.summary || {}).surface_math);
+    renderDepth((snap.summary || {}).depth_distribution);
     renderRemediation(snap.remediation || []);
     renderRrf(snap.rrf || []);
     renderCompetitive(snap.competitive);
@@ -1899,6 +1928,43 @@
     block.hidden = false;
   }
 
+  function renderDepth(depths) {
+    const block = el("depth-block");
+    const wrap = el("depth-bars");
+    wrap.textContent = "";
+    if (!depths || !depths.buckets) {
+      block.hidden = true;
+      return;
+    }
+    const massimo = Math.max(1,
+      ...depths.buckets.map((b) => b.count));
+    depths.buckets.forEach((bucket) => {
+      const row = document.createElement("div");
+      row.className = "score-row";
+      const name = document.createElement("span");
+      name.className = "score-label";
+      name.textContent = bucket.label;
+      row.appendChild(name);
+      const bar = document.createElement("div");
+      bar.className = "progress";
+      bar.setAttribute("aria-hidden", "true");
+      const fill = document.createElement("div");
+      fill.className = "progress-bar";
+      fill.style.width = (100 * bucket.count / massimo) + "%";
+      const critico = bucket.label.indexOf("4+") !== -1 ||
+        bucket.label.indexOf("sitemap") !== -1;
+      fill.style.backgroundColor = critico ? "#9a6a00" : "#1c6b45";
+      bar.appendChild(fill);
+      row.appendChild(bar);
+      const num = document.createElement("span");
+      num.className = "score-value";
+      num.textContent = String(bucket.count);
+      row.appendChild(num);
+      wrap.appendChild(row);
+    });
+    block.hidden = false;
+  }
+
   function renderRemediation(plan) {
     const block = el("remediation-block");
     const list = el("remediation-list");
@@ -1975,12 +2041,62 @@
     block.hidden = false;
   }
 
+  function renderSovBubble(comp) {
+    const box = el("sov-bubble");
+    box.textContent = "";
+    const presence = comp.presence || {};
+    const chunks = comp.chunks || {};
+    const totale = comp.queries_total || 0;
+    if (!totale || !Object.keys(presence).length) {
+      return;
+    }
+    const svg = svgNode("svg", {
+      viewBox: "0 0 420 190",
+      class: "history-trend-svg",
+      role: "img",
+      "aria-label": "Mappa a bolle del posizionamento " +
+        "competitivo: share of voice in orizzontale, query " +
+        "coperte in verticale, corpus come ampiezza; i valori " +
+        "sono nelle tabelle",
+    });
+    svg.appendChild(svgNode("line", {
+      x1: 40, y1: 160, x2: 400, y2: 160,
+      stroke: "#c3c2b7", "stroke-width": 1,
+    }));
+    svg.appendChild(svgNode("line", {
+      x1: 40, y1: 20, x2: 40, y2: 160,
+      stroke: "#c3c2b7", "stroke-width": 1,
+    }));
+    const massimo = Math.max(1,
+      ...Object.values(chunks));
+    comp.sites.forEach((host) => {
+      const mine = host === comp.main;
+      const x = 40 + 360 * (comp.share[host] || 0) / 100;
+      const y = 160 - 140 * (presence[host] || 0) / totale;
+      const r = 5 + 14 * Math.sqrt(
+        (chunks[host] || 0) / massimo);
+      const hue = mine ? "#186078" : "#6b7f83";
+      svg.appendChild(svgNode("circle", {
+        cx: x, cy: y, r: r, fill: hue, "fill-opacity": "0.55",
+        stroke: hue,
+      }));
+      const text = svgNode("text", {
+        x: x + r + 3, y: y + 3, "font-size": 10,
+        fill: "#14272b",
+      });
+      text.textContent = host + (mine ? " (tuo)" : "");
+      svg.appendChild(text);
+    });
+    box.appendChild(svg);
+  }
+
   function renderCompetitive(comp) {
     const block = el("competitive-block");
     if (!comp) {
       block.hidden = true;
       return;
     }
+    renderSovBubble(comp);
     const parity = 100 / Math.max(1, comp.sites.length);
     el("competitive-intro").textContent =
       "Share of voice sui primi " + comp.top_n + " posti delle " +

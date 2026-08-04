@@ -100,7 +100,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.35.0"
+__version__ = "1.36.0"
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
 # storico --history), indipendente dalla versione dello strumento:
@@ -1988,12 +1988,9 @@ def check_llms_txt(base: str, fetcher: Fetcher) -> Finding:
         url=url)
 
 
-def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
-    """Pagine orfane, profondita' di click e anchor generiche."""
-    good = [p for p in pages if p.ok]
-    if len(good) < 2:
-        return []
-
+def _build_link_edges(good: Sequence[Page]) -> Tuple[
+        Dict[str, Set[str]], Counter]:
+    """Grafo dei link interni: archi in uscita e conteggio entranti."""
     by_url: Dict[str, Page] = {}
     for p in good:
         by_url.setdefault(norm_url(p.url), p)
@@ -2014,6 +2011,63 @@ def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
                 outs.add(key)
                 incoming[key] += 1
         edges[src] = outs
+    return edges, incoming
+
+
+def _bfs_depths(edges: Dict[str, Set[str]],
+                home: str) -> Dict[str, int]:
+    """Profondita' in click dalla home lungo i link interni."""
+    if home not in edges:
+        return {}
+    depth = {home: 0}
+    queue = [home]
+    while queue:
+        node = queue.pop(0)
+        for dest in sorted(edges.get(node, ())):
+            if dest not in depth:
+                depth[dest] = depth[node] + 1
+                queue.append(dest)
+    return depth
+
+
+def depth_distribution(pages: Sequence[Page],
+                       base: str) -> Optional[Dict[str, object]]:
+    """Distribuzione della profondita' di crawl (widget).
+
+    Click dalla home lungo i link interni (stesso BFS del controllo
+    sul grafo): bucket 0/1/2/3/4+ piu' le pagine non raggiungibili
+    dai link, che arrivano solo dalla sitemap. None con meno di due
+    pagine analizzabili.
+    """
+    good = [p for p in pages if p.ok]
+    if len(good) < 2:
+        return None
+    edges, _incoming = _build_link_edges(good)
+    depth = _bfs_depths(edges, norm_url(base))
+    labels = ("0 (home)", "1 click", "2 click", "3 click",
+              "4+ click")
+    counts = [0, 0, 0, 0, 0]
+    unreachable = 0
+    for url in edges:
+        d = depth.get(url)
+        if d is None:
+            unreachable += 1
+        else:
+            counts[min(d, 4)] += 1
+    buckets = [{"label": label, "count": count}
+               for label, count in zip(labels, counts)]
+    buckets.append({"label": "solo da sitemap",
+                    "count": unreachable})
+    return {"pages": len(edges), "buckets": buckets}
+
+
+def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
+    """Pagine orfane, profondita' di click e anchor generiche."""
+    good = [p for p in pages if p.ok]
+    if len(good) < 2:
+        return []
+
+    edges, incoming = _build_link_edges(good)
 
     out: List[Finding] = []
     home = norm_url(base)
@@ -2037,14 +2091,7 @@ def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
             "Tutte le pagine hanno link interni in ingresso"))
 
     if home in edges:
-        depth = {home: 0}
-        queue = [home]
-        while queue:
-            node = queue.pop(0)
-            for dest in sorted(edges.get(node, ())):
-                if dest not in depth:
-                    depth[dest] = depth[node] + 1
-                    queue.append(dest)
+        depth = _bfs_depths(edges, home)
         deep = sorted(u for u, d in depth.items() if d > 3)
         if deep:
             out.append(Finding(
@@ -4051,6 +4098,11 @@ def simulate_share_of_voice(
             % (top_n, len(results)),
             "Query del confronto: %s." % elenco))
 
+    presence: Counter = Counter()
+    for res in results:
+        for host in set(res.owners):
+            presence[host] += 1
+
     payload: Dict[str, object] = {
         "main": main_host,
         "top_n": top_n,
@@ -4058,6 +4110,8 @@ def simulate_share_of_voice(
         "share": {h: round(share[h] * 100, 1) for h in sites},
         "chunks": {main_host: len(own_chunks),
                    **{h: len(c) for h, c in corpora.items()}},
+        "presence": {h: presence.get(h, 0) for h in sites},
+        "queries_total": len(results),
         "queries": [asdict(r) for r in results],
     }
     return payload, findings
@@ -5036,6 +5090,29 @@ def render_html(base: str, pages: List[Page],
             parts.append("</div></div>")
         parts.append("</section>")
 
+    depths = depth_distribution(pages, base)
+    if depths:
+        massimo = max(b["count"] for b in depths["buckets"]) or 1
+        parts.append(
+            "<section><h2>Profondita' di crawl</h2>"
+            "<p class=\"meta\">Quanti click servono dalla home per "
+            "raggiungere ogni pagina lungo i link interni: oltre 3 "
+            "click scansione e peso calano.</p>"
+            "<table class=\"citprof\"><tbody>")
+        for bucket in depths["buckets"]:
+            width = 100.0 * bucket["count"] / massimo
+            hue = ("var(--warn)" if "4+" in bucket["label"]
+                   or "sitemap" in bucket["label"]
+                   else "var(--good)")
+            parts.append(
+                "<tr><th>%s</th><td>%d</td><td style=\"width:50%%"
+                "\"><div class=\"bar\"><div class=\"fill\" "
+                "style=\"width:%.0f%%;background:%s\"></div></div>"
+                "</td></tr>"
+                % (esc(str(bucket["label"])), bucket["count"],
+                   width, hue))
+        parts.append("</tbody></table></section>")
+
     math = surface_math(pages)
     if math:
         effetto = ("~%.1fx occasioni di comparire nelle liste fuse"
@@ -5155,6 +5232,45 @@ def render_html(base: str, pages: List[Page],
                 "</div></td></tr>"
                 % (name, share[host], share[host], hue, parity))
         parts.append("</tbody></table>")
+
+        # Mappa a bolle (pattern Semrush): x = share of voice,
+        # y = query in cui il sito compare, raggio = corpus in
+        # chunk. Decorativa: i numeri sono nelle tabelle.
+        presence = competitive.get("presence") or {}
+        chunks_by = competitive.get("chunks") or {}
+        q_tot = int(competitive.get("queries_total") or 0)
+        if presence and q_tot:
+            parts.append(
+                "<p class=\"meta\">Mappa: orizzontale la share of "
+                "voice, verticale in quante query su %d il sito "
+                "compare, ampiezza della bolla il corpus in "
+                "chunk.</p>"
+                "<svg viewBox=\"0 0 420 190\" role=\"img\" "
+                "aria-label=\"Mappa a bolle del posizionamento "
+                "competitivo; i valori sono nelle tabelle\" "
+                "style=\"max-width:460px;width:100%%\">"
+                "<line x1=\"40\" y1=\"160\" x2=\"400\" y2=\"160\" "
+                "stroke=\"var(--line)\"/>"
+                "<line x1=\"40\" y1=\"20\" x2=\"40\" y2=\"160\" "
+                "stroke=\"var(--line)\"/>" % q_tot)
+            max_chunks = max(chunks_by.values()) or 1
+            for host in competitive["sites"]:
+                mine = host == competitive["main"]
+                x = 40 + 360 * float(share.get(host, 0)) / 100.0
+                y = 160 - 140 * presence.get(host, 0) / q_tot
+                r = 5 + 14 * ((chunks_by.get(host, 0)
+                               / max_chunks) ** 0.5)
+                hue = "var(--accent)" if mine else "var(--muted)"
+                parts.append(
+                    "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" "
+                    "fill=\"%s\" fill-opacity=\"0.55\" "
+                    "stroke=\"%s\"/>"
+                    "<text x=\"%.1f\" y=\"%.1f\" font-size=\"10\" "
+                    "fill=\"var(--fg)\">%s</text>"
+                    % (x, y, r, hue, hue, x + r + 3, y + 3,
+                       esc(host)))
+            parts.append("</svg>")
+
         parts.append("<table><thead><tr><th>Query</th>"
                      "<th>Tuoi passaggi</th><th>Migliore posizione"
                      "</th></tr></thead><tbody>")
@@ -5342,6 +5458,7 @@ def render_json(base: str, pages: List[Page],
         ],
         "findings": [f.as_dict() for f in findings],
         "surface_math": surface_math(pages),
+        "depth_distribution": depth_distribution(pages, base),
         "remediation": build_remediation(findings, pages, scores,
                                          market),
         "rrf_simulation": [asdict(r) for r in results],

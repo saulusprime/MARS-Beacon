@@ -92,14 +92,15 @@ Convenzioni trasversali da adottare in blocco:
   alfabetiche;
 - trend con **annotazioni-evento** ("qui abbiamo pubblicato le FAQ").
 
-Sezione completata il 2026-08-04 (v1.35.0/GUI v2.14.0 — vedi
-AS-IS): dei nove widget del concept board, i primi sei sono della
-v1.5.0; poi sono arrivati Top rilievi (vista compatta trans-area),
-pin-evento sul grafico citazioni (`eventi.jsonl` accanto allo
-storico), badge NUOVO sui rilievi in fisarmonica e confronto fra
-due audit scelti dallo storico. Gli eventi oggi si annotano a mano
-nel JSONL: un form nella GUI per aggiungerli è un possibile
-seguito.
+Sezione completata il 2026-08-04 (v1.35.0–v1.36.0 / GUI
+v2.14.0–v2.15.0 — vedi AS-IS): i nove widget del concept board più
+le idee rimandate (profondità di crawl, mappa a bolle competitiva,
+form per gli eventi del grafico citazioni). Unica idea ancora
+rimandata:
+
+- [ ] Grafo force-directed dell'architettura dei link interni
+      (pattern Screaming Frog): richiede un layout force in
+      vanilla JS — il grafo dati esiste già (`_build_link_edges`).
 
 Mockup interattivo dei nove widget con dati d'esempio (artefatto della
 sessione di analisi, 2026-08-03): board "SEO-RRF · Concept widget

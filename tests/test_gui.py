@@ -722,3 +722,36 @@ def test_confronto_fra_due_audit_scelti(gui_base):
     status, _, _ = _api(gui_base, "/api/history/compare?a=x&b=y",
                         cookie=cookie)
     assert status == 400
+
+
+def test_aggiunta_evento_via_api(gui_base, tmp_path, monkeypatch):
+    monkeypatch.setattr(gui, "CITATIONS_HISTORY",
+                        tmp_path / "citazioni.jsonl")
+    status, _, _ = _api(gui_base, "/api/citations/events",
+                        {"date": "2026-08-04", "label": "x"})
+    assert status == 401
+
+    cookie = _register(gui_base, email="eventi@e.it")
+    status, _, _ = _api(gui_base, "/api/citations/events",
+                        {"date": "4 agosto", "label": "x"},
+                        cookie=cookie)
+    assert status == 400
+    status, _, _ = _api(gui_base, "/api/citations/events",
+                        {"date": "2026-08-04", "label": ""},
+                        cookie=cookie)
+    assert status == 400
+
+    status, body, _ = _api(gui_base, "/api/citations/events",
+                           {"date": "2026-08-04",
+                            "label": "Pubblicate le FAQ",
+                            "site": "mio.it"}, cookie=cookie)
+    assert status == 201
+    salvato = (tmp_path / "eventi.jsonl").read_text(
+        encoding="utf-8")
+    assert "Pubblicate le FAQ" in salvato
+
+    status, body, _ = _api(gui_base, "/api/citations",
+                           cookie=cookie)
+    data = json.loads(body)
+    assert data["events"][0]["label"] == "Pubblicate le FAQ"
+    assert data["events"][0]["site"] == "mio.it"

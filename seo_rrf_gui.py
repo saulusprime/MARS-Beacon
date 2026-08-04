@@ -20,6 +20,8 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
                             dello stesso sito
     GET  /api/citations     storico del monitoraggio citazioni IA
                             (JSONL di seo_rrf_citations.py)
+    POST /api/citations/events  aggiunge un evento-annotazione al
+                            grafico citazioni (eventi.jsonl)
     GET  /api/events        avanzamento push (Server-Sent Events)
     POST /api/audit         avvia un check (richiede accesso; uno
                             per utente ogni ora)
@@ -66,7 +68,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.14.0"
+__version__ = "2.15.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -530,6 +532,8 @@ class Job:
             "pages_error": broken,
             "chunks": sum(len(p.chunks) for p in pages if p.ok),
             "surface_math": sra.surface_math(pages),
+            "depth_distribution": sra.depth_distribution(pages,
+                                                         base),
             "citability": sra.citability_profiles(pages, scores,
                                                   market),
             "citability_actions": sra.citability_top_actions(
@@ -1026,6 +1030,40 @@ class Handler(BaseHTTPRequestHandler):
                             cookie=self._cookie("", expire=True))
         elif path == "/api/profile":
             self._post_profile()
+        elif path == "/api/citations/events":
+            if self._session_user() is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+                return
+            raw = self._read_json()
+            if raw is None:
+                return
+            date = str(raw.get("date", "")).strip()
+            label = str(raw.get("label", "")).strip()
+            site = str(raw.get("site", "")).strip()
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+                self._send_json(400, {"error": "Data non valida: "
+                                               "usa AAAA-MM-GG."})
+                return
+            if not label or len(label) > 120:
+                self._send_json(400, {"error": "Etichetta "
+                                               "mancante o troppo "
+                                               "lunga (max 120)."})
+                return
+            evento = {"date": date, "label": label}
+            if site:
+                evento["site"] = site
+            try:
+                with open(CITATIONS_HISTORY.with_name(
+                        "eventi.jsonl"), "a",
+                        encoding="utf-8") as handle:
+                    handle.write(json.dumps(
+                        evento, ensure_ascii=False) + "\n")
+            except OSError as exc:
+                self._send_json(500, {"error": "impossibile "
+                                               "salvare l'evento: "
+                                               "%s" % exc})
+                return
+            self._send_json(201, {"ok": True, "event": evento})
         elif path == "/api/cancel":
             if self._session_user() is None:
                 self._send_json(401, {"error": "accesso richiesto"})

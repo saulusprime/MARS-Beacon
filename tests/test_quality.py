@@ -1020,3 +1020,50 @@ def test_gsc_cli_conflitto_e_file_mancante(tmp_path):
                    "--queries-gsc", str(tmp_path / "assente.csv"),
                    "--quiet"])
     assert rc == 2
+
+
+# ---------------- profondita' di crawl e bolle competitive ----------------
+
+def test_depth_distribution_bucket():
+    def pagina(url, targets=()):
+        page = sra.Page(url=url, status=200, text="x")
+        page.internal_targets = [sra.norm_url(t) for t in targets]
+        return page
+    pages = [
+        pagina("https://x.it/", ["https://x.it/a"]),
+        pagina("https://x.it/a", ["https://x.it/b"]),
+        pagina("https://x.it/b"),
+        pagina("https://x.it/solo-sitemap"),
+    ]
+    dist = sra.depth_distribution(pages, "https://x.it/")
+    buckets = {b["label"]: b["count"] for b in dist["buckets"]}
+    assert buckets["0 (home)"] == 1
+    assert buckets["1 click"] == 1
+    assert buckets["2 click"] == 1
+    assert buckets["solo da sitemap"] == 1
+    assert sra.depth_distribution(pages[:1],
+                                  "https://x.it/") is None
+
+    scores = {sra.AREA_TECH: 70.0, sra.AREA_LEX: 60.0,
+              sra.AREA_SEM: 50.0, sra.AREA_SD: 40.0,
+              sra.AREA_RRF: 30.0}
+    pagina_html = sra.render_html("https://x.it/", pages, [],
+                                  scores, [], "char-tfidf")
+    assert "Profondita' di crawl" in pagina_html
+    assert "solo da sitemap" in pagina_html
+
+
+def test_share_of_voice_presence_e_bolle():
+    testo = ("Il drenaggio linfatico manuale e' una tecnica di "
+             "massaggio dolce che favorisce il deflusso della "
+             "linfa e viene usato dopo un intervento chirurgico.")
+    own = [sra.Chunk("https://mio.it/a", "Drenaggio", testo, 0)]
+    corpora = {"altro.it": [
+        sra.Chunk("https://altro.it/x", "Guida",
+                  testo + " Versione del concorrente.", 0)]}
+    payload, _f = sra.simulate_share_of_voice(
+        "https://mio.it", own, corpora, ["drenaggio linfatico"])
+    assert payload["queries_total"] == 1
+    assert set(payload["presence"]) == {"mio.it", "altro.it"}
+    assert payload["presence"]["mio.it"] == 1
+    assert payload["chunks"]["altro.it"] == 1

@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.35.0
+## Strumento CLI — `seo_rrf_audit.py` v1.36.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -264,7 +264,17 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.14.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.15.0 + `gui/`
+
+- **Widget rimandati realizzati** (v2.15.0): **profondità di
+  crawl** (bucket di click dalla home più "solo da sitemap", barre
+  in GUI e referto HTML, `depth_distribution` nel JSON); **mappa a
+  bolle** del posizionamento competitivo (share × query coperte ×
+  corpus, `presence`/`queries_total` nello share of voice;
+  decorativa, i numeri restano nelle tabelle); **form eventi**
+  nella sezione citazioni (`POST /api/citations/events`, data
+  validata, etichetta ≤ 120 caratteri) che aggiorna subito grafico
+  e lista. Resta rimandato solo il grafo force-directed.
 
 - **Widget completati** (v2.14.0, chiusa la sezione del concept
   board): **Top rilievi** (primi 5 interventi con pallino +
@@ -468,7 +478,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 252 test in ~16 secondi** (`tests/`), senza rete
+- **Suite pytest: 255 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query
