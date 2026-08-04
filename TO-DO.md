@@ -16,9 +16,6 @@ analizzato e distillato qui il 2026-08-04; il documento originale
 non è nel repo) — tutti offline, per pagina, da innestare nelle
 aree esistenti:
 
-- [ ] **Densità informativa**: rilevare il "filler" di marketing
-      ("leader di mercato", "scopri di più", "contattaci per…") e
-      segnalare le pagine in cui satura il testo utile.
 - [ ] **Ciclo di vita dell'argomento**: verificare negli heading la
       copertura di definizione, storia, casi d'uso, limiti, FAQ e
       prospettive (oggi controlliamo solo FAQ, definizioni ed

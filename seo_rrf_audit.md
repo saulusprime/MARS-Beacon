@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.23.0, ~5130
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.24.0, ~5210
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -395,6 +395,19 @@ titolo sensazionalistico non risponde a niente, e i motori
 generativi selezionano titoli informativi. 3 test nuovi (201
 totali); trappola incontrata: le preposizioni articolate ("il
 segreto DEL…") vanno coperte esplicitamente nella regex.
+
+Novità 1.24.0 (2026-08-04): densità informativa (da Features.md).
+L'area semantica rileva il **filler di marketing** ("leader di
+mercato", "scopri di più", "contattaci per…", "qualità e
+professionalità" e gli equivalenti en/fr/de/es in `FILLER_RE`) e
+segnala le pagine **sature**: almeno 3 formule *e* almeno una ogni
+100 parole (entrambe le soglie, di prassi e dichiarate nel referto
+— il doppio requisito evita di punire una pagina lunga con tre
+call-to-action legittime). Avvertenza con evidenze (URL, conteggio
+e le formule trovate) ed esempio prima/dopo che sostituisce il
+filler con fatti verificabili; sotto soglia, OK con il conteggio
+totale. Pagine sotto le 50 parole escluse (il rumore dei
+segnaposto è già coperto altrove). 5 test nuovi (206 totali).
 
 ## Uso
 

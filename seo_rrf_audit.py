@@ -98,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.23.0"
+__version__ = "1.24.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -389,6 +389,37 @@ DIRECT_ANSWER_RE = re.compile(
 EXTRACT_MIN_WORDS = 20
 EXTRACT_MAX_WORDS = 120
 EXTRACT_GOOD_SHARE = 0.20
+
+# Filler di marketing: frasi che occupano spazio senza dire nulla
+# di estraibile. Un assistente non citera' mai "qualita' e
+# professionalita' al tuo servizio". Euristica dichiarata, cinque
+# lingue; soglie di prassi in _audit_filler.
+FILLER_RE = re.compile(
+    r"leader\s+(?:di\s+mercato|del\s+settore)"
+    r"|soluzioni\s+innovative|a\s+360\s+gradi|scopri\s+di\s+pi[uù]"
+    r"|clicca\s+qui|leggi\s+tutto|contattaci\s+per"
+    r"|richiedi\s+un\s+preventivo|iscriviti\s+alla\s+newsletter"
+    r"|seguici\s+su|senza\s+impegno|su\s+misura\s+per\s+te"
+    r"|qualit[aà]\s+e\s+professionalit[aà]|al\s+(?:tuo|vostro)\s+"
+    r"servizio|punto\s+di\s+riferimento|vasta\s+gamma"
+    r"|market\s+leader|industry[- ]leading|cutting[- ]edge"
+    r"|best\s+in\s+class|state\s+of\s+the\s+art|learn\s+more"
+    r"|click\s+here|read\s+more|contact\s+us\s+for"
+    r"|request\s+a\s+quote|sign\s+up\s+for|follow\s+us"
+    r"|one[- ]stop[- ]shop"
+    r"|leader\s+du\s+march[ée]|[aà]\s+la\s+pointe"
+    r"|en\s+savoir\s+plus|cliquez\s+ici|contactez[- ]nous"
+    r"|demandez\s+un\s+devis|suivez[- ]nous|large\s+gamme"
+    r"|marktf[üu]hrer|ma[ßs]geschneidert|erfahren\s+sie\s+mehr"
+    r"|klicken\s+sie\s+hier|kontaktieren\s+sie\s+uns"
+    r"|jetzt\s+anfragen|folgen\s+sie\s+uns|breites\s+sortiment"
+    r"|l[ií]der\s+del\s+mercado|descubre\s+m[aá]s"
+    r"|haz\s+clic\s+aqu[ií]|cont[aá]ctanos"
+    r"|solicita\s+un\s+presupuesto|s[ií]guenos|amplia\s+gama",
+    re.IGNORECASE,
+)
+FILLER_MIN_HITS = 3       # sotto, non e' saturazione
+FILLER_DENSITY = 0.01     # una formula ogni 100 parole
 
 # Formule clickbait in title e heading: engagement bait che i
 # motori generativi non premiano — un titolo informativo e' anche
@@ -2529,6 +2560,54 @@ def _audit_extractability(good: Sequence[Page]) -> List[Finding]:
         weight=1.5)]
 
 
+def _audit_filler(good: Sequence[Page]) -> List[Finding]:
+    """Densita' informativa: pagine sature di filler di marketing.
+
+    Una pagina e' "satura" quando le formule di FILLER_RE sono
+    almeno FILLER_MIN_HITS e almeno una ogni 100 parole
+    (FILLER_DENSITY): soglie di prassi, dichiarate nel referto.
+    Metrica da Features.md.
+    """
+    saturated: List[str] = []
+    total_hits = 0
+    for p in good:
+        if not p.text or p.word_count < 50:
+            continue
+        hits = FILLER_RE.findall(p.text)
+        total_hits += len(hits)
+        if len(hits) >= FILLER_MIN_HITS \
+                and len(hits) / p.word_count >= FILLER_DENSITY:
+            esempi = sorted({h.strip().lower() for h in hits})[:3]
+            saturated.append("%s (%d formule: %s)"
+                             % (p.url, len(hits),
+                                ", ".join("\"%s\"" % e
+                                          for e in esempi)))
+    if saturated:
+        return [Finding(
+            AREA_SEM, SEV_WARNING,
+            "%d pagina/e sature di formule di marketing"
+            % len(saturated),
+            "Il filler occupa spazio senza dire nulla di "
+            "estraibile (soglia di prassi: almeno %d formule e "
+            "una ogni 100 parole). %s"
+            % (FILLER_MIN_HITS, "; ".join(saturated[:5])),
+            "Sostituisci le formule generiche con informazioni "
+            "verificabili: numeri, durate, prezzi, procedure.",
+            example="Prima: \"Siamo leader di mercato, qualita' e "
+                    "professionalita' al tuo servizio.\"\n"
+                    "Dopo:  \"Dal 2012 abbiamo seguito oltre 400 "
+                    "pazienti post-operatori; la prima valutazione "
+                    "e' gratuita e dura 30 minuti.\"",
+            weight=1.5)]
+    if any(p.text and p.word_count >= 50 for p in good):
+        return [Finding(
+            AREA_SEM, SEV_OK,
+            "Filler di marketing sotto controllo",
+            "%d formule generiche in tutto il sito: il testo "
+            "utile domina." % total_hits)]
+    return []
+
+
 def audit_semantic(pages: List[Page]) -> List[Finding]:
     """Segnali che alimentano il recuperatore vettoriale."""
     out: List[Finding] = []
@@ -2546,6 +2625,7 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
         return out
 
     out.extend(_audit_extractability(good))
+    out.extend(_audit_filler(good))
 
     out.append(Finding(
         AREA_SEM, SEV_OK if len(chunks) >= 20 else SEV_WARNING,

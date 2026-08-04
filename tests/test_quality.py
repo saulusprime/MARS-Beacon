@@ -562,3 +562,67 @@ def test_titoli_informativi_ok():
     findings = sra._audit_clickbait([page])
     assert len(findings) == 1
     assert findings[0].severity == sra.SEV_OK
+
+
+# ---------------- densita' informativa (filler) ----------------
+
+def _pagina_con_testo(testo):
+    page = sra.Page(url="https://mio.it/", status=200, text=testo,
+                    word_count=len(testo.split()))
+    return page
+
+
+def test_filler_pagina_satura():
+    testo = ("Siamo leader di mercato con soluzioni innovative a "
+             "360 gradi. Scopri di più sui nostri servizi e "
+             "contattaci per un preventivo: qualità e "
+             "professionalità al tuo servizio. " + "parola " * 60)
+    findings = sra._audit_filler([_pagina_con_testo(testo)])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "sature di formule di marketing" in findings[0].title
+    assert "7 formule" in findings[0].detail
+    assert "a 360 gradi" in findings[0].detail
+    assert findings[0].fix and findings[0].example
+
+
+def test_filler_sotto_controllo():
+    testo = ("Il drenaggio linfatico e' una tecnica di massaggio "
+             "che favorisce il deflusso della linfa. Una seduta "
+             "dura 45 minuti e costa dai 40 agli 80 euro. Scopri "
+             "di più nella pagina dei servizi. " + "parola " * 200)
+    findings = sra._audit_filler([_pagina_con_testo(testo)])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_OK
+    assert "1 formule" in findings[0].detail
+
+
+def test_filler_serve_sia_conteggio_che_densita():
+    # 3 formule ma diluite in 600 parole: densita' sotto soglia.
+    testo = ("Scopri di più. Clicca qui. Seguici su Instagram. "
+             + "parola " * 600)
+    findings = sra._audit_filler([_pagina_con_testo(testo)])
+    assert findings[0].severity == sra.SEV_OK
+
+
+def test_filler_multilingua():
+    casi = (
+        "We are the market leader with cutting-edge solutions. "
+        "Learn more and contact us for a quote. " + "word " * 50,
+        "Leader du marché, cliquez ici pour en savoir plus et "
+        "contactez-nous sans attendre. " + "mot " * 50,
+        "Wir sind Marktführer: erfahren Sie mehr und "
+        "kontaktieren Sie uns, jetzt anfragen. " + "wort " * 50,
+        "Líder del mercado: descubre más, haz clic aquí y "
+        "contáctanos hoy. " + "palabra " * 50,
+    )
+    for testo in casi:
+        findings = sra._audit_filler([_pagina_con_testo(testo)])
+        assert findings[0].severity == sra.SEV_WARNING, testo[:40]
+
+
+def test_filler_ignora_pagine_brevissime():
+    findings = sra._audit_filler(
+        [_pagina_con_testo("Clicca qui. Scopri di più. Seguici "
+                           "su Facebook.")])
+    assert findings == []
