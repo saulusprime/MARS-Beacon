@@ -315,7 +315,10 @@ riproducibile.
    passaggi citabili da un assistente così come sono; soglia di
    prassi 20%), **densità informativa** (pagine sature di filler di
    marketing: almeno 3 formule e una ogni 100 parole, cinque
-   lingue), ampiezza del vocabolario, segnali **E-E-A-T**
+   lingue), **ciclo di vita dell'argomento** (copertura negli heading
+   di definizione, storia, casi d'uso, limiti, FAQ e prospettive, con
+   canovaccio delle sezioni mancanti), ampiezza del vocabolario,
+   segnali **E-E-A-T**
    (autore dichiarato, date di pubblicazione/aggiornamento, pagina
    "chi siamo", contatti verificabili). Stopword e pattern
    linguistici (definizioni, anafore, esempi, FAQ, domande) coprono
@@ -440,7 +443,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 206 test, ~15 secondi, nessun accesso alla rete esterna
+pytest            # 210 test, ~15 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

@@ -16,10 +16,6 @@ analizzato e distillato qui il 2026-08-04; il documento originale
 non è nel repo) — tutti offline, per pagina, da innestare nelle
 aree esistenti:
 
-- [ ] **Ciclo di vita dell'argomento**: verificare negli heading la
-      copertura di definizione, storia, casi d'uso, limiti, FAQ e
-      prospettive (oggi controlliamo solo FAQ, definizioni ed
-      esempi).
 - [ ] **Riferimenti bibliografici**: sezione fonti/bibliografia,
       link esterni a fonti primarie, citazioni `[1]` / (Autore,
       anno) — completa i segnali E-E-A-T esistenti.

@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.24.0, ~5210
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.25.0, ~5310
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -408,6 +408,21 @@ e le formule trovate) ed esempio prima/dopo che sostituisce il
 filler con fatti verificabili; sotto soglia, OK con il conteggio
 totale. Pagine sotto le 50 parole escluse (il rumore dei
 segnaposto è già coperto altrove). 5 test nuovi (206 totali).
+
+Novità 1.25.0 (2026-08-04): ciclo di vita dell'argomento (da
+Features.md). L'area semantica verifica in title e heading H1–H4
+dell'intero sito la copertura delle **sei sezioni canoniche** di
+una trattazione completa: definizione, storia, casi d'uso, limiti,
+FAQ, prospettive (`LIFECYCLE_SECTIONS`, cinque lingue). Soglie di
+prassi dichiarate: 5+/6 → OK con gli heading trovati come
+evidenza; 3–4 → avvertenza (peso 1) con l'elenco delle mancanti;
+0–2 → avvertenza pesante (peso 2). Il fix genera un **canovaccio
+di heading** per le sole sezioni mancanti (`LIFECYCLE_HINTS`),
+pronto per il piano di remediation; sforzo "giorni" (è lavoro di
+contenuto). La copertura può essere distribuita su più pagine: si
+valuta il sito, non la singola pagina. Alimenta la lente Kimi dei
+profili di citabilità. 4 test nuovi (210 totali), incluso il caso
+tedesco completo.
 
 ## Uso
 

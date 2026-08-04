@@ -626,3 +626,62 @@ def test_filler_ignora_pagine_brevissime():
         [_pagina_con_testo("Clicca qui. Scopri di più. Seguici "
                            "su Facebook.")])
     assert findings == []
+
+
+# ---------------- ciclo di vita dell'argomento ----------------
+
+def _sito_con_heading(*heading_per_pagina):
+    pages = []
+    for i, headings in enumerate(heading_per_pagina):
+        page = sra.Page(url="https://mio.it/p%d" % i, status=200,
+                        text="testo", word_count=300)
+        page.headings = [(2, h) for h in headings]
+        pages.append(page)
+    return pages
+
+
+def test_ciclo_di_vita_completo_anche_su_piu_pagine():
+    pages = _sito_con_heading(
+        ["Cos'è il drenaggio linfatico",
+         "Storia e origini della tecnica"],
+        ["Quando serve: casi d'uso",
+         "Limiti e controindicazioni"],
+        ["Domande frequenti",
+         "Prospettive e tendenze della riabilitazione"])
+    findings = sra._audit_lifecycle(pages)
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_OK
+    assert "6 su 6" in findings[0].title
+
+
+def test_ciclo_di_vita_scoperto_pesa_di_piu():
+    pages = _sito_con_heading(["I nostri servizi", "Contatti"])
+    findings = sra._audit_lifecycle(pages)
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "0 su 6" in findings[0].title
+    assert findings[0].weight == 2.0
+    assert "definizione" in findings[0].detail
+    assert "<h2>Domande frequenti</h2>" in findings[0].example
+    assert sra.estimate_effort(findings[0]) == sra.EFFORT_DAYS
+
+
+def test_ciclo_di_vita_incompleto_elenca_le_mancanti():
+    pages = _sito_con_heading(
+        ["Cos'è il drenaggio", "A cosa serve: applicazioni",
+         "Domande frequenti", "Rischi e controindicazioni"])
+    findings = sra._audit_lifecycle(pages)
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "4 su 6" in findings[0].title
+    assert findings[0].weight == 1.0
+    assert "storia" in findings[0].detail
+    assert "prospettive" in findings[0].detail
+
+
+def test_ciclo_di_vita_multilingua():
+    pages = _sito_con_heading(
+        ["Was ist Lymphdrainage", "Geschichte der Methode",
+         "Anwendungen und Einsatz", "Grenzen und Risiken",
+         "Häufig gestellte Fragen", "Zukunft und Trends"])
+    findings = sra._audit_lifecycle(pages)
+    assert findings[0].severity == sra.SEV_OK
+    assert "6 su 6" in findings[0].title

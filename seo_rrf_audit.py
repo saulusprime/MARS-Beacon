@@ -98,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.24.0"
+__version__ = "1.25.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -483,6 +483,53 @@ FAQ_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Ciclo di vita dell'argomento (da Features.md): le sei sezioni
+# che rendono completa una trattazione agli occhi dei motori
+# generativi. Copertura cercata in title e heading, cinque lingue.
+LIFECYCLE_SECTIONS: Tuple[Tuple[str, "re.Pattern[str]"], ...] = (
+    ("definizione", re.compile(
+        r"cos'?\s?[eè]|che\s+cos|definizion|cosa\s+significa"
+        r"|introduzion|what\s+is|definition|introduction"
+        r"|qu'?est[- ]ce|d[ée]finition|was\s+ist|qu[ée]\s+es"
+        r"|definici[oó]n", re.IGNORECASE)),
+    ("storia", re.compile(
+        r"storia|origin|evoluzion|history|evolution|histoire"
+        r"|geschichte|ursprung|historia|evoluci[oó]n",
+        re.IGNORECASE)),
+    ("casi d'uso", re.compile(
+        r"casi\s+d'?uso|applicazion|a\s+cosa\s+serve"
+        r"|quando\s+serve|come\s+si\s+usa|use\s+case|application"
+        r"|how\s+to\s+use|cas\s+d'usage|utilisation|anwendung"
+        r"|einsatz|casos\s+de\s+uso|aplicacion|\busos\b",
+        re.IGNORECASE)),
+    ("limiti", re.compile(
+        r"limit|controindicazion|svantagg|criticit|rischi"
+        r"|drawback|\brisk|side\s+effect|contre[- ]indication"
+        r"|inconv[ée]nient|grenzen|nachteil|risiken"
+        r"|kontraindikation|l[ií]mite|limitacion|contraindicacion"
+        r"|riesgo|desventaj", re.IGNORECASE)),
+    ("faq", re.compile(
+        r"\bfaq\b|domande\s+frequenti|domande\s+e\s+risposte"
+        r"|frequently\s+asked|foire\s+aux\s+questions"
+        r"|questions\s+fr[ée]quentes|h[äa]ufig\s+gestellte"
+        r"|h[äa]ufige\s+fragen|preguntas\s+frecuentes",
+        re.IGNORECASE)),
+    ("prospettive", re.compile(
+        r"prospettiv|futuro|tendenz|future|outlook|\btrend"
+        r"|avenir|perspective|tendance|zukunft|ausblick"
+        r"|perspectiva|tendencia", re.IGNORECASE)),
+)
+
+# Suggerimenti di heading per le sezioni mancanti del ciclo di vita.
+LIFECYCLE_HINTS: Dict[str, str] = {
+    "definizione": "Cos'e' <argomento>",
+    "storia": "Storia e origini di <argomento>",
+    "casi d'uso": "Quando serve <argomento>: casi d'uso",
+    "limiti": "Limiti e controindicazioni",
+    "faq": "Domande frequenti",
+    "prospettive": "Prospettive e tendenze",
+}
+
 # Pagine segnaposto lasciate dai CMS: rumore puro per il recupero.
 PLACEHOLDER_SLUGS: Tuple[str, ...] = (
     "sample-page", "pagina-di-esempio", "hello-world", "lorem-ipsum",
@@ -688,7 +735,8 @@ _EFFORT_DAYS_RE = re.compile(
     r"testo scarso|superficie|poche pagine|nessuna pagina|chunk"
     r"|consenso|share of voice|query senza|vinte interamente"
     r"|contenut|faq|orfan|profondit|vocabolario|autoconsist"
-    r"|molto javascript|heading in forma|definizion|esemp",
+    r"|molto javascript|heading in forma|definizion|esemp"
+    r"|ciclo di vita",
     re.IGNORECASE)
 _EFFORT_MINUTES_RE = re.compile(
     r"robots\.txt|sitemap|llms\.txt|noindex|canonical|title"
@@ -2608,6 +2656,55 @@ def _audit_filler(good: Sequence[Page]) -> List[Finding]:
     return []
 
 
+def _audit_lifecycle(good: Sequence[Page]) -> List[Finding]:
+    """Ciclo di vita dell'argomento negli heading (da Features.md).
+
+    Sei sezioni canoniche: definizione, storia, casi d'uso,
+    limiti, FAQ, prospettive. La copertura e' misurata su title e
+    heading H1-H4 dell'intero sito; soglie di prassi dichiarate:
+    5+/6 completo, 3-4 incompleto (peso 1), 0-2 scoperto (peso 2).
+    """
+    texts: List[str] = []
+    for p in good:
+        if p.title:
+            texts.append(p.title)
+        texts.extend(h for lvl, h in p.headings if lvl <= 4)
+    if not texts:
+        return []
+    covered: Dict[str, str] = {}
+    for name, pattern in LIFECYCLE_SECTIONS:
+        for text in texts:
+            if pattern.search(text):
+                covered[name] = text.strip()[:60]
+                break
+    missing = [name for name, _ in LIFECYCLE_SECTIONS
+               if name not in covered]
+    trovate = "; ".join(
+        "%s (\"%s\")" % (name, covered[name])
+        for name, _ in LIFECYCLE_SECTIONS if name in covered)
+    if len(covered) >= 5:
+        return [Finding(
+            AREA_SEM, SEV_OK,
+            "Ciclo di vita dell'argomento coperto (%d su 6)"
+            % len(covered),
+            "Sezioni trovate negli heading: %s." % trovate)]
+    return [Finding(
+        AREA_SEM, SEV_WARNING,
+        "Ciclo di vita dell'argomento incompleto (%d su 6)"
+        % len(covered),
+        "Una trattazione completa copre definizione, storia, casi "
+        "d'uso, limiti, FAQ e prospettive: e' il contenuto che i "
+        "motori generativi possono citare per ogni taglio di "
+        "domanda. %s Mancano: %s."
+        % ("Trovate: %s." % trovate if trovate else "",
+           ", ".join(missing)),
+        "Aggiungi le sezioni mancanti con heading espliciti "
+        "(anche distribuite su piu' pagine).",
+        example="\n".join("<h2>%s</h2>" % LIFECYCLE_HINTS[name]
+                          for name in missing),
+        weight=2.0 if len(covered) <= 2 else 1.0)]
+
+
 def audit_semantic(pages: List[Page]) -> List[Finding]:
     """Segnali che alimentano il recuperatore vettoriale."""
     out: List[Finding] = []
@@ -2626,6 +2723,7 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
 
     out.extend(_audit_extractability(good))
     out.extend(_audit_filler(good))
+    out.extend(_audit_lifecycle(good))
 
     out.append(Finding(
         AREA_SEM, SEV_OK if len(chunks) >= 20 else SEV_WARNING,
