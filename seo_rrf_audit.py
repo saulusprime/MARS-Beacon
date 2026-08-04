@@ -98,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.22.0"
+__version__ = "1.23.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -390,6 +390,33 @@ EXTRACT_MIN_WORDS = 20
 EXTRACT_MAX_WORDS = 120
 EXTRACT_GOOD_SHARE = 0.20
 
+# Formule clickbait in title e heading: engagement bait che i
+# motori generativi non premiano — un titolo informativo e' anche
+# piu' estraibile. Euristica dichiarata, cinque lingue.
+CLICKBAIT_RE = re.compile(
+    r"non\s+crederai|incredibile|scioccante|sconvolgente"
+    r"|devi\s+assolutamente|da\s+non\s+perdere|imperdibile"
+    r"|il\s+segreto\s+(?:di|del|della|dello|dei|degli|delle|per)"
+    r"|i\s+segreti\s+(?:di|del|della|dello|dei|degli|delle|per)"
+    r"|la\s+verit[aà]\s+su|quello\s+che\s+non\s+ti\s+dicono"
+    r"|\d+\s+motivi\s+per"
+    r"|you\s+won'?t\s+believe|shocking|unbelievable"
+    r"|mind[- ]blowing|the\s+secret\s+(?:of|to)"
+    r"|the\s+truth\s+about|\d+\s+reasons\s+why"
+    r"|what\s+they\s+don'?t\s+tell\s+you"
+    r"|vous\s+ne\s+croirez\s+(?:pas|jamais)|incroyable|choquant"
+    r"|le\s+secret\s+(?:de|du|des|pour)|la\s+v[ée]rit[ée]\s+sur"
+    r"|[aà]\s+ne\s+pas\s+manquer|\d+\s+raisons"
+    r"|du\s+wirst\s+nicht\s+glauben|unglaublich|schockierend"
+    r"|das\s+geheimnis|die\s+wahrheit\s+[üu]ber"
+    r"|\d+\s+gr[üu]nde,?\s+warum"
+    r"|no\s+creer[aá]s|incre[ií]ble|impactante"
+    r"|el\s+secreto\s+(?:de|del|para)|la\s+verdad\s+sobre"
+    r"|\d+\s+razones\s+por|lo\s+que\s+no\s+te\s+cuentan"
+    r"|!{2,}",
+    re.IGNORECASE,
+)
+
 EXAMPLE_RE = re.compile(
     r"\b(?:ad\s+esempio|per\s+esempio|esempio|es\.|caso\s+studio"
     r"|case\s+study|for\s+example|e\.g\."
@@ -636,7 +663,7 @@ _EFFORT_MINUTES_RE = re.compile(
     r"robots\.txt|sitemap|llms\.txt|noindex|canonical|title"
     r"|descript|segnaposto|senza attributo lang|hreflang|\balt\b"
     r"|contenuto identico|crawler ia bloccat|slug"
-    r"|noarchive|nocache|copilot",
+    r"|noarchive|nocache|copilot|clickbait",
     re.IGNORECASE)
 
 
@@ -2226,12 +2253,55 @@ def audit_technical(pages: List[Page], base: str,
     return out
 
 
+def _audit_clickbait(good: Sequence[Page]) -> List[Finding]:
+    """Formule clickbait in title e H1-H3 (da Features.md).
+
+    Un titolo sensazionalistico attira il click umano ma non dice
+    nulla di estraibile: i motori generativi selezionano passaggi
+    che rispondono, e "Non crederai a cosa..." non risponde a
+    niente. Euristica dichiarata; scandisce solo title e heading
+    (non il corpo) per contenere i falsi positivi.
+    """
+    colpiti: List[str] = []
+    for p in good:
+        sources = [("title", p.title)] + \
+            [("h%d" % lvl, txt) for lvl, txt in p.headings
+             if lvl <= 3]
+        for origin, text in sources:
+            if text and CLICKBAIT_RE.search(text):
+                colpiti.append("%s (%s: \"%s\")"
+                               % (p.url, origin, text[:60]))
+    if colpiti:
+        return [Finding(
+            AREA_LEX, SEV_WARNING,
+            "%d titoli o heading con formule clickbait"
+            % len(colpiti),
+            "Formule sensazionalistiche ed esclamazioni multiple "
+            "attirano il click ma non rispondono a niente: i "
+            "motori generativi selezionano titoli informativi. %s"
+            % "; ".join(colpiti[:5]),
+            "Riformula in stile informativo: il beneficio o la "
+            "risposta nel titolo, senza iperboli.",
+            example="Prima: \"Non crederai a cosa fa il "
+                    "drenaggio!!\"\n"
+                    "Dopo:  \"Drenaggio linfatico: benefici, "
+                    "durata e costi di una seduta\"",
+            weight=1.5)]
+    return [Finding(
+        AREA_LEX, SEV_OK,
+        "Nessuna formula clickbait in title e heading",
+        "Titoli in stile informativo su tutte le %d pagine "
+        "analizzate." % len(good))]
+
+
 def audit_lexical(pages: List[Page]) -> List[Finding]:
     """Segnali che alimentano il recuperatore lessicale (BM25)."""
     out: List[Finding] = []
     good = [p for p in pages if p.ok]
     if not good:
         return out
+
+    out.extend(_audit_clickbait(good))
 
     host = urlparse(good[0].url).netloc.lower()
 

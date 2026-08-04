@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.22.0, ~5060
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.23.0, ~5130
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -382,6 +382,19 @@ un'avvertenza con esempio prima/dopo; sopra, un OK con i conteggi.
 Il rilievo vive nell'area semantica, quindi alimenta la lente
 Claude dei profili di citabilità senza ritocchi ai pesi. 5 test
 nuovi (198 totali), incluso il caso multilingue.
+
+Novità 1.23.0 (2026-08-04): titoli clickbait (da Features.md).
+L'area lessicale scandisce title e H1–H3 (non il corpo, per
+contenere i falsi positivi) con `CLICKBAIT_RE` nelle cinque
+lingue: "non crederai…", "il segreto di/del…", "la verità su…",
+"N motivi per…", esclamazioni multiple e gli equivalenti
+en/fr/de/es. Formule trovate → avvertenza (peso 1.5, sforzo
+"minuti") con evidenze (URL, origine e testo) ed esempio
+prima/dopo; nessuna → OK. Razionale dichiarato come euristica: un
+titolo sensazionalistico non risponde a niente, e i motori
+generativi selezionano titoli informativi. 3 test nuovi (201
+totali); trappola incontrata: le preposizioni articolate ("il
+segreto DEL…") vanno coperte esplicitamente nella regex.
 
 ## Uso
 

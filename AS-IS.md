@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.22.0
+## Strumento CLI — `seo_rrf_audit.py` v1.23.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -69,6 +69,12 @@ sono nel [README.md](README.md).
   insieme — salgono in testa e portano un badge dedicato in
   HTML/GUI; senza dati di citabilità l'ordinamento resta
   gravità+peso.
+- **Titoli clickbait** (v1.23.0, da Features.md): title e H1–H3
+  scanditi con pattern sensazionalistici nelle cinque lingue ("non
+  crederai…", "il segreto di/del…", "N motivi per…", esclamazioni
+  multiple); avvertenza con evidenze ed esempio prima/dopo, sforzo
+  "minuti". Solo titoli e heading, non il corpo: falsi positivi
+  contenuti per costruzione.
 - **Estraibilità diretta** (v1.22.0, da Features.md): quota di
   paragrafi di 20–120 parole che aprono con una risposta esplicita
   (sì/no, "in sintesi", passo numerato, definizione in apertura —
@@ -380,7 +386,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 198 test in ~15 secondi** (`tests/`), senza rete
+- **Suite pytest: 201 test in ~15 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

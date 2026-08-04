@@ -515,3 +515,50 @@ def test_estraibilita_multilingua():
 def test_estraibilita_senza_paragrafi_sostanziosi():
     page = _pagina_con_paragrafi(["Poche parole qui."])
     assert sra._audit_extractability([page]) == []
+
+
+# ---------------- titoli clickbait ----------------
+
+def _pagina_con_titoli(title, headings):
+    page = sra.Page(url="https://mio.it/", status=200,
+                    text="testo", word_count=300, title=title)
+    page.headings = headings
+    return page
+
+
+def test_clickbait_rilevato_in_title_e_heading():
+    page = _pagina_con_titoli(
+        "Non crederai a cosa fa il drenaggio!!",
+        [(2, "Il segreto del drenaggio linfatico"),
+         (2, "Quanto costa una seduta"),
+         (4, "Incredibile offerta")])  # h4: fuori dal controllo
+    findings = sra._audit_clickbait([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "2 titoli o heading" in findings[0].title
+    assert findings[0].example
+    assert sra.estimate_effort(findings[0]) == sra.EFFORT_MINUTES
+
+
+def test_clickbait_multilingua():
+    casi = ("You won't believe these results",
+            "Vous ne croirez jamais ce résultat",
+            "Du wirst nicht glauben, was dann geschah",
+            "No creerás lo que pasó después",
+            "10 motivi per scegliere il drenaggio",
+            "Offerta speciale!!!")
+    for testo in casi:
+        page = _pagina_con_titoli(testo, [])
+        findings = sra._audit_clickbait([page])
+        assert findings[0].severity == sra.SEV_WARNING, testo
+
+
+def test_titoli_informativi_ok():
+    page = _pagina_con_titoli(
+        "Drenaggio linfatico manuale a Parma | Centro Esempio",
+        [(2, "Cos'è il drenaggio linfatico"),
+         (2, "Quanto costa una seduta"),
+         (3, "Il trattamento è doloroso?")])
+    findings = sra._audit_clickbait([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_OK

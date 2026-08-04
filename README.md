@@ -304,7 +304,10 @@ riproducibile.
    del testo).
 2. **Lessicale (BM25)** — title (30–65 caratteri), meta description
    (110–165), struttura H1, conteggio parole (soglie 300/700), slug,
-   attributi `alt`.
+   attributi `alt`, **formule clickbait** in title e H1–H3 ("non
+   crederai…", "il segreto di…", esclamazioni multiple, nelle cinque
+   lingue): l'engagement bait non risponde a niente e i motori
+   generativi selezionano titoli informativi.
 3. **Semantica (vettoriale)** — numero di chunk, autoconsistenza dei
    passaggi (aperture anaforiche), heading in forma di domanda, FAQ,
    definizioni, esempi, **estraibilità diretta** (quota di paragrafi
@@ -435,7 +438,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 198 test, ~15 secondi, nessun accesso alla rete esterna
+pytest            # 201 test, ~15 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

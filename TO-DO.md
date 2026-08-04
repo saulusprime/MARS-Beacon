@@ -19,9 +19,6 @@ aree esistenti:
 - [ ] **Densità informativa**: rilevare il "filler" di marketing
       ("leader di mercato", "scopri di più", "contattaci per…") e
       segnalare le pagine in cui satura il testo utile.
-- [ ] **Titoli clickbait**: pattern sensazionalistici in title e
-      H1–H3 ("non crederai…", "il segreto di…", esclamazioni
-      multiple) — engagement bait che deprime la citabilità.
 - [ ] **Ciclo di vita dell'argomento**: verificare negli heading la
       copertura di definizione, storia, casi d'uso, limiti, FAQ e
       prospettive (oggi controlliamo solo FAQ, definizioni ed
