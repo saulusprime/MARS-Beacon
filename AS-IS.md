@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.34.0
+## Strumento CLI — `seo_rrf_audit.py` v1.35.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -264,7 +264,18 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.13.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.14.0 + `gui/`
+
+- **Widget completati** (v2.14.0, chiusa la sezione del concept
+  board): **Top rilievi** (primi 5 interventi con pallino +
+  etichetta + guadagno sull'indice, anche nel referto HTML sotto
+  l'hero); **pin-evento** sul grafico citazioni da `eventi.jsonl`
+  accanto allo storico (linea tratteggiata + lista testuale
+  "Eventi annotati"); **badge NUOVO** sui rilievi comparsi
+  rispetto all'esecuzione precedente (match per area + titolo
+  normalizzato); **confronto fra due audit scelti** dallo storico
+  (`GET /api/history/compare`, stesso sito, ordinamento per data
+  lato server) con delta completo nella pagina.
 
 - **Referti Markdown e CSV scaricabili** (v2.13.0): due pulsanti in
   più nei risultati ("Scarica Markdown", "Scarica CSV rilievi"),
@@ -457,7 +468,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 249 test in ~16 secondi** (`tests/`), senza rete
+- **Suite pytest: 252 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

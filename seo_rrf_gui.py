@@ -16,6 +16,8 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
     GET  /api/history       storico degli audit dell'utente
     GET  /api/history/report?id=N  export del referto JSON salvato
                             (richiede profilo completo)
+    GET  /api/history/compare?a=N&b=N  delta fra due audit salvati
+                            dello stesso sito
     GET  /api/citations     storico del monitoraggio citazioni IA
                             (JSONL di seo_rrf_citations.py)
     GET  /api/events        avanzamento push (Server-Sent Events)
@@ -64,7 +66,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.13.0"
+__version__ = "2.14.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -565,6 +567,40 @@ JOB = Job()
 compute_delta = sra.compute_delta
 
 
+def read_citations_events(path: str) -> List[Dict[str, str]]:
+    """Eventi-annotazione per il grafico citazioni (pin-evento).
+
+    File JSONL accanto allo storico citazioni (eventi.jsonl): una
+    riga per evento, es.
+    ``{"date": "2026-07-21", "label": "Pubblicate le FAQ"}``
+    (campo opzionale "site" per filtrare). Righe malformate e file
+    assente vengono ignorati; scritto a mano o da automazioni.
+    """
+    events: List[Dict[str, str]] = []
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                date = str(row.get("date", "")).strip()[:10]
+                label = str(row.get("label", "")).strip()
+                if date and label:
+                    events.append({
+                        "date": date, "label": label,
+                        "site": str(row.get("site", "")).strip()})
+    except OSError:
+        pass
+    events.sort(key=lambda e: e["date"])
+    return events
+
+
 def read_citations_history(path: str) -> List[Dict[str, object]]:
     """Storico del monitor citazioni raggruppato per sito.
 
@@ -854,7 +890,55 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, {
                 "sites": read_citations_history(
-                    str(CITATIONS_HISTORY))})
+                    str(CITATIONS_HISTORY)),
+                "events": read_citations_events(
+                    str(CITATIONS_HISTORY.with_name(
+                        "eventi.jsonl")))})
+        elif path == "/api/history/compare":
+            user = self._session_user()
+            if user is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+                return
+            query = self.path.split("?", 1)[-1] \
+                if "?" in self.path else ""
+            params = dict(part.split("=", 1)
+                          for part in query.split("&")
+                          if "=" in part)
+            try:
+                id_a = int(params.get("a", ""))
+                id_b = int(params.get("b", ""))
+            except (ValueError, TypeError):
+                self._send_json(400, {"error": "id non validi"})
+                return
+            uid = int(user["id"])
+            rec_a = get_store().audit_report(uid, id_a)
+            rec_b = get_store().audit_report(uid, id_b)
+            if rec_a is None or rec_b is None or id_a == id_b:
+                self._send_json(404, {"error": "audit non "
+                                               "confrontabili"})
+                return
+            if rec_a["site"] != rec_b["site"]:
+                self._send_json(400, {
+                    "error": "Gli audit da confrontare devono "
+                             "riguardare lo stesso sito."})
+                return
+            older, newer = sorted(
+                (rec_a, rec_b),
+                key=lambda r: float(str(r["created_at"])))
+            try:
+                delta = sra.compute_delta(
+                    json.loads(str(older["report_json"])),
+                    json.loads(str(newer["report_json"])),
+                    float(str(older["created_at"])))
+            except (ValueError, KeyError, TypeError):
+                self._send_json(500, {"error": "referto salvato "
+                                               "illeggibile"})
+                return
+            self._send_json(200, {
+                "site": newer["site"],
+                "older_at": older["created_at"],
+                "newer_at": newer["created_at"],
+                "delta": delta})
         elif path == "/api/history/report":
             user = self._session_user()
             if user is None:

@@ -190,3 +190,12 @@ def test_cli_formato_md(site, tmp_path):
     testo = out.read_text(encoding="utf-8")
     assert testo.startswith("# Audit SEO + RRF")
     assert "- [ ] **1.**" in testo
+
+
+def test_referto_html_top_rilievi():
+    pages, scores, findings = _dati_render()
+    pagina = sra.render_html("https://mio.it", pages, findings,
+                             scores, [], "char-tfidf")
+    assert "Top rilievi" in pagina
+    assert "class=\"toplist\"" in pagina
+    assert "Sito non in HTTPS" in pagina

@@ -648,3 +648,77 @@ def test_eventi_sse(gui_base):
     assert body.startswith(b"data: ")
     snap = json.loads(body[len(b"data: "):].strip())
     assert snap["state"] == "idle"
+
+
+def test_eventi_citazioni_nel_grafico(gui_base, tmp_path,
+                                      monkeypatch):
+    monkeypatch.setattr(gui, "CITATIONS_HISTORY",
+                        _storico_citazioni(tmp_path))
+    eventi = tmp_path / "eventi.jsonl"
+    eventi.write_text(
+        json.dumps({"date": "2026-07-25",
+                    "label": "Pubblicate le FAQ"}) + "\n"
+        "{riga rotta\n" +
+        json.dumps({"date": "2026-08-01", "label": "Nuovo blog",
+                    "site": "mio.it"}) + "\n", encoding="utf-8")
+    cookie = _register(gui_base)
+    status, body, _ = _api(gui_base, "/api/citations",
+                           cookie=cookie)
+    assert status == 200
+    data = json.loads(body)
+    assert [e["label"] for e in data["events"]] == \
+        ["Pubblicate le FAQ", "Nuovo blog"]
+    assert data["events"][1]["site"] == "mio.it"
+
+
+def _referto_confronto(overall, findings):
+    return json.dumps({
+        "site": "https://mio.it",
+        "generated_at": "2026-08-04T10:00:00+0200",
+        "scores": {"Tecnica": overall, "overall": overall},
+        "findings": findings})
+
+
+def test_confronto_fra_due_audit_scelti(gui_base):
+    status, _, _ = _api(gui_base, "/api/history/compare?a=1&b=2")
+    assert status == 401
+
+    cookie = _register(gui_base, email="cmp@e.it")
+    token = cookie.split("=", 1)[1]
+    store = gui.get_store()
+    uid = int(store.user_by_token(token)["id"])
+    store.add_audit(uid, {"site": "https://mio.it",
+                          "overall": 40},
+                    _referto_confronto(40.0, [
+                        {"area": "Tecnica", "severity": "critical",
+                         "title": "Sito non in HTTPS"}]))
+    store.add_audit(uid, {"site": "https://mio.it",
+                          "overall": 60},
+                    _referto_confronto(60.0, []))
+    store.add_audit(uid, {"site": "https://altro.it",
+                          "overall": 50}, _referto_confronto(50, []))
+    runs = store.history(uid)  # dal piu' recente
+    id_vecchio = runs[2]["id"]
+    id_nuovo = runs[1]["id"]
+    id_altro = runs[0]["id"]
+
+    # Ordine invertito nei parametri: il server ordina per data.
+    status, body, _ = _api(
+        gui_base, "/api/history/compare?a=%d&b=%d"
+        % (id_nuovo, id_vecchio), cookie=cookie)
+    assert status == 200
+    data = json.loads(body)
+    assert data["delta"]["scores"]["overall"] == 20.0
+    assert [f["title"] for f in data["delta"]["resolved"]] == \
+        ["Sito non in HTTPS"]
+    assert data["delta"]["new"] == []
+
+    status, _, _ = _api(gui_base, "/api/history/compare?a=%d&b=%d"
+                        % (id_vecchio, id_altro), cookie=cookie)
+    assert status == 400, "siti diversi non confrontabili"
+    status, _, _ = _api(gui_base, "/api/history/compare?a=%d&b=%d"
+                        % (id_vecchio, id_vecchio), cookie=cookie)
+    assert status == 404, "stesso audit due volte"
+    status, _, _ = _api(gui_base, "/api/history/compare?a=x&b=y",
+                        cookie=cookie)
+    assert status == 400

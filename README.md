@@ -161,9 +161,16 @@ Cosa offre:
   monitoraggio citazioni (`--citations-history`, default
   `citazioni.jsonl` accanto agli script) e mostra la tendenza per
   provider (delta fra esecuzioni), il grafico multilinea del tasso di
-  citazione (una linea per provider più il complessivo) e la tabella
-  con tutti i valori — il ciclo si chiude: audita, correggi, misura le
-  citazioni reali.
+  citazione (una linea per provider più il complessivo) con i
+  **pin-evento** da `eventi.jsonl` ("qui abbiamo pubblicato le FAQ",
+  anche in lista testuale) e la tabella con tutti i valori — il ciclo
+  si chiude: audita, correggi, misura le citazioni reali.
+- **Top rilievi, badge NUOVO e confronto fra audit**: vista compatta
+  dei primi 5 interventi (pallino + etichetta + guadagno sull'indice,
+  anche nel referto HTML), badge "NUOVO" sui rilievi comparsi
+  rispetto all'esecuzione precedente e **confronto fra due audit
+  scelti** dallo storico con delta completo (punteggi,
+  risolti/nuovi).
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, **profili di citabilità per assistente IA** (barre per
   profilo, indice composito col mercato scelto nel form e "top
@@ -461,7 +468,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 249 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 252 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

@@ -47,6 +47,14 @@
   letter-spacing: .03em;
 }
 
+/* Rilievo nuovo rispetto all'esecuzione precedente. */
+.badge-new {
+  background-color: #7a2e8d;
+  color: #fff;
+  font-size: .72rem;
+  letter-spacing: .03em;
+}
+
 /* Rilievo trasversale: deprime piu' profili di citabilita'. */
 .badge-cross {
   background-color: var(--lt-teal-700, #0f4a5b);

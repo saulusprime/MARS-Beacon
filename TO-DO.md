@@ -92,37 +92,14 @@ Convenzioni trasversali da adottare in blocco:
   alfabetiche;
 - trend con **annotazioni-evento** ("qui abbiamo pubblicato le FAQ").
 
-Widget realizzabili **oggi** (dati già nel referto JSON; i primi sei
-della lista originale — anello del punteggio, meter per area con
-drill-down, tripletta di severità, barre del consenso con soglie,
-share of voice con tacca di parità, donut stato pagine — sono stati
-realizzati nella v1.5.0, vedi AS-IS):
-
-- [ ] Top rilievi ordinati per impatto con pallino di severità
-      (`findings`), come vista trasversale alle aree — pattern:
-      Top Issues di Ahrefs/Semrush. Dalla v1.17.0 il piano di
-      remediation è già una vista trans-area ordinata per gravità e
-      guadagno di citabilità (`index_gain` riusabile dal widget);
-      resta la resa compatta da dashboard accanto agli altri widget
-      di sintesi.
-- [ ] **Pin-evento** sul grafico delle citazioni IA ("qui abbiamo
-      pubblicato le FAQ"): il grafico per provider con tendenza è
-      realizzato nella GUI v2.9.0 (sezione "Citazioni IA nel
-      tempo"); restano le annotazioni-evento, che richiedono un
-      posto dove registrarle (es. campo `events` nel JSONL o file a
-      parte) — pattern: Visibility Index di Sistrix, Brand Radar di
-      Ahrefs.
-
-Widget che richiedono lo **storico degli audit** (in GUI c'è dalla
-v2.10.0 con referto JSON in database; per la CLI vedi "Storico e
-delta nella CLI" in P2 — Output e reportistica):
-
-- [ ] Badge "nuovo"/"risolto" **sui singoli rilievi nella
-      fisarmonica** e confronto fra **due audit scelti** dallo
-      storico (oggi il confronto è solo con l'esecuzione
-      precedente; le liste nuovi/risolti sono nei risultati dalla
-      v2.10.0) — pattern: Compare Crawls di Semrush, colonne
-      New/Fixed di Ahrefs.
+Sezione completata il 2026-08-04 (v1.35.0/GUI v2.14.0 — vedi
+AS-IS): dei nove widget del concept board, i primi sei sono della
+v1.5.0; poi sono arrivati Top rilievi (vista compatta trans-area),
+pin-evento sul grafico citazioni (`eventi.jsonl` accanto allo
+storico), badge NUOVO sui rilievi in fisarmonica e confronto fra
+due audit scelti dallo storico. Gli eventi oggi si annotano a mano
+nel JSONL: un form nella GUI per aggiungerli è un possibile
+seguito.
 
 Mockup interattivo dei nove widget con dati d'esempio (artefatto della
 sessione di analisi, 2026-08-03): board "SEO-RRF · Concept widget

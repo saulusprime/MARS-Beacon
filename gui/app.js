@@ -67,6 +67,7 @@
 
   el("audit-form").addEventListener("submit", onSubmit);
   el("f-robots").addEventListener("change", syncRobotsAck);
+  el("btn-compare").addEventListener("click", runCompare);
   el("f-cit-site").addEventListener("change", (event) => {
     const entry = citSites[Number(event.target.value)];
     if (entry) {
@@ -324,7 +325,116 @@
 
     renderTrend(runs.filter((r) => r.site === runs[0].site)
       .slice(0, 12).reverse());
+    renderCompareBox(runs);
     section.hidden = false;
+  }
+
+  function renderCompareBox(runs) {
+    const box = el("compare-box");
+    const confrontabili = runs.filter((r) => r.has_report);
+    if (confrontabili.length < 2) {
+      box.hidden = true;
+      return;
+    }
+    ["f-cmp-a", "f-cmp-b"].forEach((id, position) => {
+      const select = el(id);
+      select.textContent = "";
+      confrontabili.forEach((run, index) => {
+        const option = document.createElement("option");
+        option.value = String(run.id);
+        option.textContent =
+          new Date(run.created_at * 1000).toLocaleString("it-IT", {
+            day: "2-digit", month: "2-digit", year: "2-digit",
+            hour: "2-digit", minute: "2-digit",
+          }) + " — " + run.site + " (" +
+          Math.round(run.overall) + "/100)";
+        // Preselezione: penultima vs ultima esecuzione.
+        if ((position === 0 && index === 1) ||
+            (position === 1 && index === 0)) {
+          option.selected = true;
+        }
+        select.appendChild(option);
+      });
+    });
+    el("compare-error").textContent = "";
+    el("compare-result").hidden = true;
+    box.hidden = false;
+  }
+
+  function runCompare() {
+    const a = el("f-cmp-a").value;
+    const b = el("f-cmp-b").value;
+    el("compare-error").textContent = "";
+    fetch("api/history/compare?a=" + a + "&b=" + b)
+      .then((r) => r.json().then(
+        (data) => ({ status: r.status, data })))
+      .then(({ status, data }) => {
+        if (status !== 200) {
+          el("compare-error").textContent =
+            data.error || "Confronto non riuscito.";
+          el("compare-result").hidden = true;
+          return;
+        }
+        renderCompareResult(data);
+      })
+      .catch(() => {
+        el("compare-error").textContent = "Errore di rete.";
+      });
+  }
+
+  function renderCompareResult(data) {
+    const delta = data.delta;
+    const quando = (ts) =>
+      new Date(ts * 1000).toLocaleString("it-IT", {
+        day: "2-digit", month: "2-digit", year: "2-digit",
+        hour: "2-digit", minute: "2-digit",
+      });
+    el("cmp-intro").textContent =
+      data.site + ": confronto fra l'audit del " +
+      quando(data.older_at) + " e quello del " +
+      quando(data.newer_at) + ". Rilievi confrontati per tipo.";
+
+    const scores = el("cmp-scores");
+    scores.textContent = "";
+    Object.entries(delta.scores || {}).forEach(
+      ([area, value], index) => {
+        if (index) {
+          scores.appendChild(document.createTextNode(" · "));
+        }
+        const label = document.createElement("strong");
+        label.textContent = area + ": ";
+        scores.appendChild(label);
+        scores.appendChild(deltaNode(value));
+      });
+
+    const fill = (listId, titleId, items, titolo, vuoto) => {
+      const list = el(listId);
+      list.textContent = "";
+      el(titleId).textContent = titolo + " (" + items.length + ")";
+      if (!items.length) {
+        const item = document.createElement("li");
+        item.className = "text-muted small";
+        item.textContent = vuoto;
+        list.appendChild(item);
+        return;
+      }
+      items.forEach((f) => {
+        const item = document.createElement("li");
+        item.className = "mb-1";
+        item.appendChild(severityBadge(f.severity));
+        const text = document.createElement("span");
+        text.className = "ms-2";
+        text.textContent = f.title;
+        item.appendChild(text);
+        list.appendChild(item);
+      });
+    };
+    fill("cmp-resolved", "cmp-resolved-title",
+      delta.resolved || [], "Rilievi risolti",
+      "Nessun rilievo risolto.");
+    fill("cmp-new", "cmp-new-title", delta.new || [],
+      "Rilievi nuovi", "Nessun rilievo nuovo.");
+    el("compare-result").hidden = false;
   }
 
   /* Trend del punteggio complessivo (stile CrUX Vis: linea con
@@ -397,6 +507,7 @@
     { stroke: "#9c5400", dash: "2,4" },
   ];
   let citSites = [];
+  let citEvents = [];
 
   function loadCitations() {
     if (!me) {
@@ -404,8 +515,16 @@
     }
     fetch("api/citations")
       .then((r) => r.json())
-      .then((data) => renderCitations(data.sites || []))
+      .then((data) => {
+        citEvents = data.events || [];
+        renderCitations(data.sites || []);
+      })
       .catch(() => { /* lo storico citazioni non blocca il resto */ });
+  }
+
+  function eventsForSite(site) {
+    return citEvents.filter(
+      (e) => !e.site || site.indexOf(e.site) !== -1);
   }
 
   function renderCitations(sites) {
@@ -450,7 +569,25 @@
     const providers = citProviders(runs);
     renderCitSummary(runs, providers);
     renderCitChart(entry.site, runs, providers);
+    renderCitEvents(entry.site);
     renderCitTable(runs, providers);
+  }
+
+  function renderCitEvents(site) {
+    const box = el("cit-events-box");
+    const list = el("cit-events");
+    list.textContent = "";
+    const eventi = eventsForSite(site);
+    if (!eventi.length) {
+      box.hidden = true;
+      return;
+    }
+    eventi.forEach((event) => {
+      const item = document.createElement("li");
+      item.textContent = event.date + " — " + event.label;
+      list.appendChild(item);
+    });
+    box.hidden = false;
   }
 
   function renderCitSummary(runs, providers) {
@@ -561,6 +698,26 @@
         fill: serie.stroke,
       }));
       labels.push({ y: yOf(lastValue), serie: serie });
+    });
+
+    // Pin-evento: linea verticale tratteggiata sull'esecuzione
+    // successiva all'evento ("qui abbiamo pubblicato le FAQ").
+    const dates = runs.map((r) =>
+      String(r.generated_at || "").slice(0, 10));
+    eventsForSite(site).forEach((event) => {
+      let index = dates.findIndex((d) => d >= event.date);
+      if (index === -1) {
+        return; // evento successivo all'ultima esecuzione
+      }
+      const x = xOf(index);
+      svg.appendChild(svgNode("line", {
+        x1: x, x2: x, y1: yOf(100) - 8, y2: yOf(0),
+        stroke: "#9a6a00", "stroke-width": 1.5,
+        "stroke-dasharray": "3,3",
+      }));
+      svg.appendChild(svgNode("circle", {
+        cx: x, cy: yOf(100) - 10, r: 3.5, fill: "#9a6a00",
+      }));
     });
 
     // Etichette di fine linea (nome + valore): mai solo colore.
@@ -1060,10 +1217,12 @@
     renderHero(snap.summary);
     renderDelta((snap.summary || {}).delta);
     renderScores(snap.summary);
+    renderTopRilievi(snap.remediation || []);
     renderCitability(snap.summary || {});
     renderJudge((snap.summary || {}).judge,
       (snap.summary || {}).citability);
-    renderFindings(snap.findings || []);
+    renderFindings(snap.findings || [],
+      (snap.summary || {}).delta);
     renderSurfaceMath((snap.summary || {}).surface_math);
     renderRemediation(snap.remediation || []);
     renderRrf(snap.rrf || []);
@@ -1276,6 +1435,48 @@
     if (summary.pages_total) {
       hero.appendChild(pagesDonut(summary));
     }
+  }
+
+  function renderTopRilievi(plan) {
+    const block = el("toplist-block");
+    const list = el("toplist");
+    list.textContent = "";
+    if (!plan.length) {
+      block.hidden = true;
+      return;
+    }
+    plan.slice(0, 5).forEach((item) => {
+      const row = document.createElement("li");
+      row.className = "mb-1";
+      const dot = document.createElement("span");
+      dot.className = "sev-dot me-1";
+      dot.style.backgroundColor =
+        item.severity === "critical" ? "#9c2f26" : "#9a6a00";
+      row.appendChild(dot);
+      const sev = document.createElement("span");
+      sev.className = "small text-muted me-1";
+      sev.textContent =
+        (item.severity === "critical" ? "CRITICO" : "AVVISO") +
+        " · " + item.area + " — ";
+      row.appendChild(sev);
+      const title = document.createElement("strong");
+      title.textContent = item.title;
+      row.appendChild(title);
+      if (item.index_gain) {
+        const gain = document.createElement("span");
+        gain.className = "badge badge-effort ms-2";
+        gain.textContent = "+" +
+          item.index_gain.toFixed(1).replace(".", ",") + " indice";
+        row.appendChild(gain);
+      }
+      list.appendChild(row);
+    });
+    block.hidden = false;
+  }
+
+  function normFindingKey(finding) {
+    return finding.area + "|" +
+      String(finding.title).replace(/\d+/g, "N");
   }
 
   function renderDelta(delta) {
@@ -1562,7 +1763,7 @@
     return badge;
   }
 
-  function findingNode(finding) {
+  function findingNode(finding, isNew) {
     const box = document.createElement("div");
     box.className = "finding";
 
@@ -1573,6 +1774,12 @@
     title.className = "ms-2";
     title.textContent = finding.title;
     head.appendChild(title);
+    if (isNew) {
+      const nuovo = document.createElement("span");
+      nuovo.className = "badge badge-new ms-2";
+      nuovo.textContent = "NUOVO";
+      head.appendChild(nuovo);
+    }
     box.appendChild(head);
 
     if (finding.detail) {
@@ -1609,9 +1816,11 @@
     return parts.length ? " — " + parts.join(", ") : "";
   }
 
-  function renderFindings(findings) {
+  function renderFindings(findings, delta) {
     const acc = el("findings-acc");
     acc.textContent = "";
+    const newKeys = new Set(
+      ((delta || {}).new || []).map(normFindingKey));
 
     AREAS.forEach((area, index) => {
       const subset = findings
@@ -1649,7 +1858,8 @@
 
       const body = document.createElement("div");
       body.className = "accordion-body";
-      subset.forEach((f) => body.appendChild(findingNode(f)));
+      subset.forEach((f) => body.appendChild(
+        findingNode(f, newKeys.has(normFindingKey(f)))));
       collapse.appendChild(body);
       item.appendChild(collapse);
 

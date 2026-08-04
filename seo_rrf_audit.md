@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.34.0, ~6100
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.35.0, ~6130
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -559,6 +559,26 @@ in Excel/Sheets. GUI 2.13.0: entrambi scaricabili dai risultati
 ("Scarica Markdown", "Scarica CSV rilievi"), stesso gating del
 profilo completo. 3 test nuovi (249 totali), incluso il quoting
 CSV con `;` e `|` nei dettagli.
+
+Novità 1.35.0 (2026-08-04): completata la sezione widget del TO-DO
+(GUI 2.14.0). Quattro consegne: **Top rilievi** — la testa del
+piano di remediation come vista compatta trasversale alle aree
+(pallino + etichetta testuale + guadagno sull'indice), nel referto
+HTML sotto l'hero e nella GUI sopra i punteggi; **pin-evento** sul
+grafico delle citazioni — gli eventi vivono in `eventi.jsonl`
+accanto allo storico citazioni (una riga JSON per evento: date,
+label, site opzionale; `read_citations_events` ignora righe rotte
+e file assente) e la GUI disegna la linea tratteggiata
+sull'esecuzione successiva all'evento più la lista testuale
+"Eventi annotati" (mai solo grafica); **badge NUOVO** sui singoli
+rilievi in fisarmonica, abbinando i rilievi correnti alle voci
+`new` del delta per (area, titolo normalizzato); **confronto fra
+due audit scelti** dallo storico — `GET /api/history/compare?a=&b=`
+carica i due referti salvati dello stesso sito (400 se siti
+diversi, ordina per data da solo) e la GUI offre due select con
+"Confronta" e il risultato in stile delta. Pa11y locale rieseguito
+prima del push (3/3), heading senza salti. 4 test nuovi (252
+totali).
 
 ## Uso
 

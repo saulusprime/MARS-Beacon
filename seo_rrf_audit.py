@@ -100,7 +100,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.34.0"
+__version__ = "1.35.0"
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
 # storico --history), indipendente dalla versione dello strumento:
@@ -4840,6 +4840,29 @@ def render_html(base: str, pages: List[Page],
 
     parts.append(_render_hero(pages, findings, scores))
 
+    # Widget "Top rilievi": la testa del piano di remediation come
+    # vista compatta trasversale alle aree (pattern Top Issues di
+    # Ahrefs/Semrush); pallino + etichetta testuale, mai solo colore.
+    top_plan = build_remediation(findings, pages, scores, market)[:5]
+    if top_plan:
+        parts.append("<section class=\"toplist\"><h2>Top rilievi"
+                     "</h2><ol>")
+        for item in top_plan:
+            sev = str(item["severity"])
+            gain = ""
+            if item.get("index_gain"):
+                gain = (" <span class=\"eff\">+%.1f indice</span>"
+                        % item["index_gain"])
+            parts.append(
+                "<li><span class=\"dot\" style=\"background:%s\">"
+                "</span> <b>%s</b> <span class=\"meta\">[%s · %s]"
+                "</span>%s</li>"
+                % (colors.get(sev, "var(--muted)"),
+                   esc(str(item["title"])),
+                   "CRITICO" if sev == SEV_CRITICAL else "AVVISO",
+                   esc(str(item["area"])), gain))
+        parts.append("</ol></section>")
+
     parts.append("<div class=\"scores\">")
     for area, score in scores.items():
         if score is None:
@@ -5252,6 +5275,11 @@ padding:1px 8px;border-radius:999px;margin-left:6px;
 vertical-align:2px}
 .eff{background:var(--accent-soft);color:var(--accent)}
 .citprof .bar{min-width:110px;margin-top:4px}
+.toplist ol{margin:6px 0 0 18px;padding:0}
+.toplist li{margin:.35rem 0}
+.toplist .dot{display:inline-block;width:10px;height:10px;
+border-radius:50%;vertical-align:baseline;margin-right:2px}
+.toplist .meta{color:var(--muted);font-size:.85em}
 .crossb{display:inline-block;font-size:.68rem;font-weight:700;
 border-radius:4px;padding:1px 7px;margin-left:6px;
 background:var(--accent);color:#fff}

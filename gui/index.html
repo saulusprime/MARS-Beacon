@@ -645,6 +645,16 @@
 
       <div id="hero" class="audit-hero border rounded mb-4"></div>
 
+      <div id="toplist-block" hidden>
+        <h3 class="h5">Top rilievi</h3>
+        <p class="small text-muted mb-2">
+          La testa del piano di remediation, trasversale alle aree:
+          gravità come pallino ed etichetta, guadagno stimato
+          sull'indice di citabilità dove disponibile.
+        </p>
+        <ol id="toplist" class="mb-4"></ol>
+      </div>
+
       <div id="delta-block" hidden>
         <h3 class="h5">Rispetto all'esecuzione precedente</h3>
         <p class="small text-muted mb-2" id="delta-intro"></p>
@@ -821,6 +831,47 @@
         </table>
       </div>
 
+      <div id="compare-box" class="mt-3" hidden>
+        <h3 class="h6">Confronta due audit dello stesso sito</h3>
+        <div class="row align-items-end">
+          <div class="col-12 col-md-4">
+            <div class="form-group mb-2">
+              <label for="f-cmp-a" class="active">Prima
+                esecuzione</label>
+              <select class="form-select" id="f-cmp-a"></select>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="form-group mb-2">
+              <label for="f-cmp-b" class="active">Seconda
+                esecuzione</label>
+              <select class="form-select" id="f-cmp-b"></select>
+            </div>
+          </div>
+          <div class="col-12 col-md-4 mb-2">
+            <button type="button" class="btn btn-outline-primary"
+                    id="btn-compare">Confronta</button>
+          </div>
+        </div>
+        <p class="small text-danger" id="compare-error"
+           role="status"></p>
+        <div id="compare-result" hidden>
+          <p class="small text-muted mb-2" id="cmp-intro"></p>
+          <p class="mb-2" id="cmp-scores"></p>
+          <div class="row">
+            <div class="col-12 col-md-6">
+              <h4 class="h6" id="cmp-resolved-title">Rilievi
+                risolti</h4>
+              <ul class="list-unstyled mb-3" id="cmp-resolved"></ul>
+            </div>
+            <div class="col-12 col-md-6">
+              <h4 class="h6" id="cmp-new-title">Rilievi nuovi</h4>
+              <ul class="list-unstyled mb-3" id="cmp-new"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
       </div>
       </div>
     </div>
@@ -854,6 +905,10 @@
 
       <p class="small mb-2" id="cit-trend-summary"></p>
       <div id="cit-chart" class="mb-3"></div>
+      <div id="cit-events-box" hidden>
+        <h3 class="h6">Eventi annotati</h3>
+        <ul class="small mb-3" id="cit-events"></ul>
+      </div>
 
       <div class="table-responsive" tabindex="0" role="group"
            aria-label="Tabella dello storico citazioni, area
