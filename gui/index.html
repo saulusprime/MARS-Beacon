@@ -574,11 +574,13 @@
         <p class="mb-2" id="delta-scores"></p>
         <div class="row">
           <div class="col-12 col-md-6">
-            <h4 class="h6" id="delta-resolved-title"></h4>
+            <h4 class="h6" id="delta-resolved-title">Rilievi
+              risolti</h4>
             <ul class="list-unstyled mb-3" id="delta-resolved"></ul>
           </div>
           <div class="col-12 col-md-6">
-            <h4 class="h6" id="delta-new-title"></h4>
+            <h4 class="h6" id="delta-new-title">Rilievi
+              nuovi</h4>
             <ul class="list-unstyled mb-3" id="delta-new"></ul>
           </div>
         </div>
@@ -785,7 +787,15 @@
             Tasso di citazione: risposte che citano il sito fra le
             fonti sul totale delle risposte ottenute, per provider.
           </caption>
-          <thead></thead>
+          <!-- Intestazione statica minima (le colonne dei provider
+               vengono aggiunte dal JS): senza th la tabella verrebbe
+               scambiata per layout dagli strumenti di verifica. -->
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Complessivo</th>
+            </tr>
+          </thead>
           <tbody></tbody>
         </table>
       </div>
