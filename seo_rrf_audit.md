@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.32.0, ~5890
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.33.0, ~5900
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -533,6 +533,16 @@ configurabile con `--openai-model`, server finto nei test come
 per gli altri provider. La GUI mostra il terzo provider nello
 storico citazioni senza modifiche (colonne e linee sono
 dinamiche). 8 test nuovi (245 totali).
+
+Novità 1.33.0 (2026-08-04): `schema_version` nel JSON.
+`JSON_SCHEMA_VERSION = 1` compare nel referto JSON e nelle righe
+dello storico `--history` (i due formati persistiti a lungo).
+Contratto dichiarato nel codice: l'intero si incrementa **solo per
+cambi incompatibili** della struttura (campi rinominati/rimossi o
+semantica cambiata); le aggiunte di campi non lo toccano. I
+consumatori (pipeline, integrazioni, la stessa GUI) possono fare
+il gate su questo numero invece di interpretare la versione dello
+strumento, che cambia a ogni feature. 1 test nuovo (246 totali).
 
 ## Uso
 

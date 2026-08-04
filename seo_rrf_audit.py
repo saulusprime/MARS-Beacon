@@ -100,7 +100,15 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.32.0"
+__version__ = "1.33.0"
+
+# Versione dello SCHEMA del referto JSON (e delle righe dello
+# storico --history), indipendente dalla versione dello strumento:
+# si incrementa solo per cambi INCOMPATIBILI della struttura
+# (campi rinominati/rimossi o semantica cambiata); le aggiunte di
+# campi non la toccano. I consumatori possono fare il gate su
+# questo intero invece di interpretare la versione del tool.
+JSON_SCHEMA_VERSION = 1
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -4270,6 +4278,7 @@ def history_payload(base: str, findings: Sequence["Finding"],
         "created_at": time.time(),
         "site": base,
         "tool_version": __version__,
+        "schema_version": JSON_SCHEMA_VERSION,
         "scores": {**scores, "overall": overall_score(scores)},
         "findings": [
             {"area": f.area, "severity": f.severity,
@@ -5276,6 +5285,7 @@ def render_json(base: str, pages: List[Page],
     payload = {
         "tool": "seo_rrf_audit.py",
         "version": __version__,
+        "schema_version": JSON_SCHEMA_VERSION,
         "site": base,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "vector_retriever": mode,

@@ -71,8 +71,6 @@ volutamente fuori scope per la filosofia offline.
       in `deploy/` con notifica sulle regressioni via
       `--fail-under`-equivalente (oggi il gate è il codice di
       uscita sui critici).
-- [ ] Versionare lo schema del JSON (`"schema_version"`) per compatibilità
-      futura.
 - [ ] Referto HTML: CSS di stampa/esport PDF, ancore per rilievo,
       internazionalizzazione (oggi solo italiano).
 

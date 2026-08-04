@@ -99,7 +99,7 @@ python3 seo_rrf_audit.py https://esempio.it \
 | `--user-agent UA` | UA dello strumento | header `User-Agent` inviato con ogni richiesta. Il predefinito identifica lo strumento (`SeoRrfAudit/versione`) e rimanda alla pagina del progetto su GitHub, così chi legge i log del server sa chi è il bot |
 | *(robots.txt)* | rispetta | **dalla v1.13.0 i `Disallow` per l'agente `SeoRrfAudit` sono rispettati di default**: gli URL vietati non vengono scaricati e sono elencati nel referto. `--own-site` dichiara il sito di tua titolarità e li analizza comunque (i concorrenti restano protetti); `--ignore-robots accetto` li ignora ovunque, con accettazione **esplicita** di responsabilità (il valore letterale "accetto" è obbligatorio). `--respect-robots` resta accettato ma è deprecato (ora è il default) e non si combina con gli altri due |
 | `--max-body MB` | 10 | tetto al corpo di ogni risposta: lo scarico avviene a blocchi e si interrompe al superamento (o subito, se il `Content-Length` dichiarato eccede). Il corpo resta in RAM durante l'analisi: dimensiona il valore sulla memoria della tua macchina, di norma non oltre un decimo della RAM disponibile — lo script stesso avvisa all'avvio se il valore scelto è alto per la macchina in uso |
-| `--format text\|json\|html` | text | formato del referto |
+| `--format text\|json\|html` | text | formato del referto. Il JSON dichiara `schema_version` (oggi `1`): si incrementa solo per cambi incompatibili della struttura — è il numero su cui fare il gate nelle integrazioni |
 | `--output FILE` | stdout | scrive il referto su file |
 | `--quiet` | — | sopprime l'avanzamento su stderr |
 | `--version` | — | stampa la versione |
@@ -461,7 +461,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 245 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 246 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

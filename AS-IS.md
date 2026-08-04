@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.32.0
+## Strumento CLI — `seo_rrf_audit.py` v1.33.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -220,7 +220,10 @@ sono nel [README.md](README.md).
   di heading e title, senza query degeneri.
 - **Tre formati di referto** (`text`, `json`, `html` autonomo con tema
   chiaro/scuro) su stdout o file; codici di uscita `0/1/2/130` adatti
-  all'uso come gate in CI.
+  all'uso come gate in CI. Dalla v1.33.0 il JSON (e le righe dello
+  storico `--history`) dichiara **`schema_version`** (oggi `1`),
+  incrementato solo per cambi incompatibili della struttura: è il
+  numero su cui le integrazioni fanno il gate.
 - **Limite alla dimensione delle risposte** (v1.1.0): scarico a
   blocchi con tetto di 10 MB configurabile (`--max-body`), conteggio
   post-decompressione, rifiuto immediato se il `Content-Length`
@@ -446,7 +449,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 245 test in ~16 secondi** (`tests/`), senza rete
+- **Suite pytest: 246 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

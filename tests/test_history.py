@@ -110,3 +110,18 @@ def test_cli_due_esecuzioni_con_history(site, tmp_path):
     assert "Nuovi: nessuno" in testo, "sito immutato fra le corse"
     assert len(storico.read_text(
         encoding="utf-8").strip().splitlines()) == 2
+
+
+def test_schema_version_nel_referto_e_nello_storico():
+    pages = [sra.Page(url="https://mio.it/", status=200,
+                      text="x", word_count=300)]
+    scores = {sra.AREA_TECH: 70.0, sra.AREA_LEX: 60.0,
+              sra.AREA_SEM: 50.0, sra.AREA_SD: 40.0,
+              sra.AREA_RRF: 30.0}
+    payload = json.loads(sra.render_json(
+        "https://mio.it", pages, [], scores, [], "char-tfidf"))
+    assert payload["schema_version"] == sra.JSON_SCHEMA_VERSION
+    assert isinstance(payload["schema_version"], int)
+
+    riga = sra.history_payload("https://mio.it", [], scores)
+    assert riga["schema_version"] == sra.JSON_SCHEMA_VERSION
