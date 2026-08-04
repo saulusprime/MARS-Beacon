@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.25.0, ~5310
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.26.0, ~5380
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -423,6 +423,20 @@ contenuto). La copertura può essere distribuita su più pagine: si
 valuta il sito, non la singola pagina. Alimenta la lente Kimi dei
 profili di citabilità. 4 test nuovi (210 totali), incluso il caso
 tedesco completo.
+
+Novità 1.26.0 (2026-08-04): riferimenti bibliografici (da
+Features.md). Tre segnali sull'intero sito, a completamento
+dell'E-E-A-T: una **sezione fonti** negli heading H2–H4
+(`REFERENCES_HEADING_RE`: fonti, bibliografia, sitografia,
+references, Quellen, fuentes…), le **citazioni accademiche** nel
+testo (`CITATION_RE`: `[1]` o "(Autore, anno)") e i link esterni
+riportati come contesto — "fonti primarie" non è verificabile
+offline, quindi i link sono un indizio dichiarato, non un
+giudizio. Basta una sezione fonti *o* almeno 3 citazioni per l'OK
+(soglia di prassi); altrimenti avvertenza con esempio di sezione
+Fonti pronto (ISS, PubMed). Sforzo "ore". 5 test nuovi (215
+totali). Trappola: `.capitalize()` minuscolizza il resto della
+stringa — mai usarlo su testo che contiene evidenze citate.
 
 ## Uso
 

@@ -98,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.25.0"
+__version__ = "1.26.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -529,6 +529,21 @@ LIFECYCLE_HINTS: Dict[str, str] = {
     "faq": "Domande frequenti",
     "prospettive": "Prospettive e tendenze",
 }
+
+# Riferimenti bibliografici (da Features.md): sezione fonti negli
+# heading e citazioni accademiche nel testo. Completano i segnali
+# E-E-A-T: dare agli assistenti qualcosa da verificare.
+REFERENCES_HEADING_RE = re.compile(
+    r"riferiment|bibliograf|sitograf|\bfonti\b|references"
+    r"|bibliography|\bsources\b|r[ée]f[ée]rences|quellen"
+    r"|literaturverzeichnis|\bliteratur\b|referencias|fuentes",
+    re.IGNORECASE,
+)
+CITATION_RE = re.compile(
+    r"\[\d{1,3}\]"
+    r"|\([A-ZÀ-Ý][a-zà-ÿ]+(?:\s+et\s+al\.?)?,?\s+(?:19|20)\d{2}\)",
+)
+CITATIONS_GOOD = 3  # soglia di prassi, dichiarata nel referto
 
 # Pagine segnaposto lasciate dai CMS: rumore puro per il recupero.
 PLACEHOLDER_SLUGS: Tuple[str, ...] = (
@@ -2705,6 +2720,59 @@ def _audit_lifecycle(good: Sequence[Page]) -> List[Finding]:
         weight=2.0 if len(covered) <= 2 else 1.0)]
 
 
+def _audit_references(good: Sequence[Page]) -> List[Finding]:
+    """Riferimenti bibliografici (da Features.md).
+
+    Tre segnali sull'intero sito: una sezione fonti negli heading
+    H2-H4 (REFERENCES_HEADING_RE), citazioni accademiche nel testo
+    ([1] o (Autore, anno), CITATION_RE) e i link esterni come
+    contesto. Basta una sezione fonti O almeno CITATIONS_GOOD
+    citazioni per l'OK: soglia di prassi, dichiarata. "Fonti
+    primarie" non e' verificabile offline: i link esterni sono
+    riportati come indizio, non giudicati.
+    """
+    section = ""
+    citations = 0
+    external = 0
+    for p in good:
+        external += p.external_links
+        if not section:
+            for lvl, heading in p.headings:
+                if 2 <= lvl <= 4 \
+                        and REFERENCES_HEADING_RE.search(heading):
+                    section = heading.strip()[:60]
+                    break
+        citations += len(CITATION_RE.findall(p.text or ""))
+    if not any(p.text for p in good):
+        return []
+
+    contesto = ("Sezione fonti %s; %d citazioni accademiche nel "
+                "testo; %d link esterni in tutto il sito"
+                % ("\"%s\"" % section if section else "assente",
+                   citations, external))
+    if section or citations >= CITATIONS_GOOD:
+        return [Finding(
+            AREA_SEM, SEV_OK,
+            "Riferimenti a fonti presenti",
+            "%s (soglia di prassi: una sezione fonti o almeno %d "
+            "citazioni)." % (contesto, CITATIONS_GOOD))]
+    return [Finding(
+        AREA_SEM, SEV_WARNING,
+        "Nessun riferimento a fonti esterne",
+        "%s. Citare le fonti rafforza i segnali E-E-A-T e da' "
+        "agli assistenti IA qualcosa da verificare: i contenuti "
+        "con riferimenti sono piu' citabili." % contesto,
+        "Aggiungi una sezione \"Fonti\" con link a linee guida, "
+        "studi o documentazione ufficiale (o citazioni nel testo).",
+        example="<h2>Fonti</h2>\n<ul>\n"
+                "<li><a href=\"https://www.iss.it/...\">Istituto "
+                "Superiore di Sanita' — linee guida</a></li>\n"
+                "<li><a href=\"https://pubmed.ncbi.nlm.nih.gov/"
+                "...\">Studio clinico di riferimento</a></li>\n"
+                "</ul>",
+        weight=1.0)]
+
+
 def audit_semantic(pages: List[Page]) -> List[Finding]:
     """Segnali che alimentano il recuperatore vettoriale."""
     out: List[Finding] = []
@@ -2724,6 +2792,7 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
     out.extend(_audit_extractability(good))
     out.extend(_audit_filler(good))
     out.extend(_audit_lifecycle(good))
+    out.extend(_audit_references(good))
 
     out.append(Finding(
         AREA_SEM, SEV_OK if len(chunks) >= 20 else SEV_WARNING,

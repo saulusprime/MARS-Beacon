@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.25.0
+## Strumento CLI — `seo_rrf_audit.py` v1.26.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -69,6 +69,12 @@ sono nel [README.md](README.md).
   insieme — salgono in testa e portano un badge dedicato in
   HTML/GUI; senza dati di citabilità l'ordinamento resta
   gravità+peso.
+- **Riferimenti bibliografici** (v1.26.0, da Features.md): sezione
+  fonti negli heading (cinque lingue), citazioni accademiche nel
+  testo (`[1]`, "(Autore, anno)") e link esterni come contesto
+  dichiarato; OK con una sezione fonti o almeno 3 citazioni,
+  altrimenti avvertenza con esempio di sezione Fonti pronto.
+  Completa l'E-E-A-T nell'area semantica (lente Kimi).
 - **Ciclo di vita dell'argomento** (v1.25.0, da Features.md):
   copertura in title e heading H1–H4 delle sei sezioni canoniche —
   definizione, storia, casi d'uso, limiti, FAQ, prospettive
@@ -399,7 +405,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 210 test in ~15 secondi** (`tests/`), senza rete
+- **Suite pytest: 215 test in ~15 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

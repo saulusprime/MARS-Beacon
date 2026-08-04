@@ -685,3 +685,54 @@ def test_ciclo_di_vita_multilingua():
     findings = sra._audit_lifecycle(pages)
     assert findings[0].severity == sra.SEV_OK
     assert "6 su 6" in findings[0].title
+
+
+# ---------------- riferimenti bibliografici ----------------
+
+def _pagina_fonti(headings=(), testo="testo normale",
+                  external=0):
+    page = sra.Page(url="https://mio.it/", status=200, text=testo,
+                    word_count=len(testo.split()),
+                    external_links=external)
+    page.headings = [(2, h) for h in headings]
+    return page
+
+
+def test_riferimenti_sezione_fonti_ok():
+    page = _pagina_fonti(headings=["Fonti e riferimenti"],
+                         external=4)
+    findings = sra._audit_references([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_OK
+    assert "Fonti e riferimenti" in findings[0].detail
+
+
+def test_riferimenti_citazioni_nel_testo_ok():
+    testo = ("Lo studio dimostra l'efficacia [1] e la revisione "
+             "sistematica lo conferma [2]; vedi anche "
+             "(Rossi, 2023) per il protocollo completo.")
+    findings = sra._audit_references([_pagina_fonti(testo=testo)])
+    assert findings[0].severity == sra.SEV_OK
+    assert "3 citazioni" in findings[0].detail
+
+
+def test_riferimenti_assenti_avvertenza():
+    findings = sra._audit_references(
+        [_pagina_fonti(headings=["I nostri servizi"],
+                       testo="Offriamo massaggi e terapie.",
+                       external=2)])
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "2 link esterni" in findings[0].detail
+    assert findings[0].fix and "Fonti" in findings[0].example
+
+
+def test_riferimenti_quellen_tedesco():
+    page = _pagina_fonti(headings=["Quellen und Literatur"])
+    findings = sra._audit_references([page])
+    assert findings[0].severity == sra.SEV_OK
+
+
+def test_riferimenti_due_citazioni_non_bastano():
+    testo = "Efficace [1] e sicuro [2] secondo la letteratura."
+    findings = sra._audit_references([_pagina_fonti(testo=testo)])
+    assert findings[0].severity == sra.SEV_WARNING
