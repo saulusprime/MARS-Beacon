@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.28.0, ~5550
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.29.0, ~5630
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -468,6 +468,19 @@ per URL come evidenza); entrambe a posto → OK. Le pagine sotto i
 30 elementi sono fuori dal conto. Razionale: i chunker dei motori
 generativi segmentano sui tag di sezionamento. 4 test nuovi (224
 totali) su pagine HTML reali passate da parse_page.
+
+Novità 1.29.0 (2026-08-04): meta di base (da Features.md).
+L'area tecnica valuta charset e viewport (nuovi campi
+`Page.has_charset`/`has_viewport`) e — finalmente — la
+**completezza Open Graph**: gli `og:*` erano estratti fin dalla
+v1.0 senza mai essere giudicati. Quattro avvertenze possibili,
+tutte "minuti": pagine senza charset, senza viewport, senza alcun
+og:* (con la triade og:title/og:description/og:image pronta
+nell'esempio — le anteprime nei link condivisi e in molte
+risposte degli assistenti si costruiscono da lì), e Open Graph
+incompleto con l'elenco di cosa manca per URL. Tutto a posto →
+un solo OK cumulativo per non fare rumore. 3 test nuovi (227
+totali) su pagine HTML reali.
 
 ## Uso
 

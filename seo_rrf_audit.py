@@ -99,7 +99,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.28.0"
+__version__ = "1.29.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -775,7 +775,8 @@ _EFFORT_MINUTES_RE = re.compile(
     r"robots\.txt|sitemap|llms\.txt|noindex|canonical|title"
     r"|descript|segnaposto|senza attributo lang|hreflang|\balt\b"
     r"|contenuto identico|crawler ia bloccat|slug"
-    r"|noarchive|nocache|copilot|clickbait",
+    r"|noarchive|nocache|copilot|clickbait"
+    r"|charset|viewport|open graph",
     re.IGNORECASE)
 
 
@@ -913,6 +914,8 @@ class Page:
     semantic_tag_types: int = 0
     div_count: int = 0
     element_count: int = 0
+    has_charset: bool = False
+    has_viewport: bool = False
     generator: str = ""
     author: str = ""
     published: str = ""
@@ -1583,6 +1586,12 @@ def extract_content(page: Page, raw_html: str) -> None:
         if value:
             page.og[prop] = value
 
+    page.has_charset = bool(
+        soup.find("meta", charset=True)
+        or soup.find("meta", attrs={
+            "http-equiv": re.compile("content-type", re.IGNORECASE)}))
+    page.has_viewport = bool(_meta(soup, name="viewport"))
+
     canonical = soup.find("link", rel=lambda v: v and "canonical" in v)
     if canonical and canonical.get("href"):
         page.canonical = canonical["href"].strip()
@@ -2172,6 +2181,81 @@ def _audit_msft_ai_optout(pages: Sequence[Page]) -> List[Finding]:
     return out
 
 
+OG_CORE = ("og:title", "og:description", "og:image")
+
+
+def _audit_basic_meta(good: Sequence[Page]) -> List[Finding]:
+    """Meta di base: charset, viewport e completezza Open Graph.
+
+    Gli og:* sono estratti fin dalla v1.0 ma non erano mai stati
+    valutati (da Features.md). La triade minima per le anteprime
+    nei link condivisi e nelle risposte degli assistenti e'
+    og:title, og:description, og:image; charset e viewport sono
+    igiene tecnica di base (resa dei caratteri e mobile).
+    """
+    out: List[Finding] = []
+    no_charset = [p.url for p in good if not p.has_charset]
+    if no_charset:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d pagina/e senza charset dichiarato"
+            % len(no_charset),
+            ", ".join(sorted(no_charset)[:5]),
+            "Dichiara la codifica in testa all'<head>.",
+            example="<meta charset=\"utf-8\">"))
+    no_viewport = [p.url for p in good if not p.has_viewport]
+    if no_viewport:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d pagina/e senza meta viewport" % len(no_viewport),
+            "Senza viewport la resa mobile non e' dichiarata: %s"
+            % ", ".join(sorted(no_viewport)[:5]),
+            "Aggiungi il viewport responsive.",
+            example="<meta name=\"viewport\" "
+                    "content=\"width=device-width, "
+                    "initial-scale=1\">"))
+    no_og = [p.url for p in good if not p.og]
+    partial: List[str] = []
+    for p in good:
+        if p.og:
+            missing = [k for k in OG_CORE if not p.og.get(k)]
+            if missing:
+                partial.append("%s (manca %s)"
+                               % (p.url, ", ".join(missing)))
+    if no_og:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d pagina/e senza Open Graph" % len(no_og),
+            "Le anteprime nei link condivisi (e in molte risposte "
+            "degli assistenti) si costruiscono dagli og:*: senza, "
+            "titolo e immagine li decide chi incolla il link. %s"
+            % ", ".join(sorted(no_og)[:5]),
+            "Aggiungi almeno la triade og:title, og:description, "
+            "og:image.",
+            example="<meta property=\"og:title\" "
+                    "content=\"Drenaggio linfatico a Parma\">\n"
+                    "<meta property=\"og:description\" "
+                    "content=\"Sedute da 45 minuti con "
+                    "fisioterapisti certificati.\">\n"
+                    "<meta property=\"og:image\" "
+                    "content=\"https://esempio.it/img/"
+                    "studio.jpg\">"))
+    if partial:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "Open Graph incompleto su %d pagina/e" % len(partial),
+            "; ".join(partial[:5]),
+            "Completa la triade og:title, og:description, "
+            "og:image."))
+    if not out and good:
+        out.append(Finding(
+            AREA_TECH, SEV_OK,
+            "Meta di base a posto",
+            "charset, viewport e Open Graph completi su tutte le "
+            "%d pagine analizzate." % len(good)))
+    return out
+
+
 def audit_technical(pages: List[Page], base: str,
                     from_sitemap: bool) -> List[Finding]:
     """Controlli di indicizzabilita' e igiene tecnica."""
@@ -2299,6 +2383,7 @@ def audit_technical(pages: List[Page], base: str,
                     "content=\"index, follow\">"))
 
     out.extend(_audit_msft_ai_optout(good))
+    out.extend(_audit_basic_meta(good))
 
     no_canonical = [p for p in good if not p.canonical]
     if no_canonical:

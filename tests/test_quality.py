@@ -858,3 +858,53 @@ def test_pagine_piccole_fuori_dal_conto():
         "https://x.it/mini", _fake_response("https://x.it/mini",
                                             mini))
     assert sra._audit_semantic_html([page]) == []
+
+
+# ---------------- meta di base: charset, viewport, OG ----------------
+
+def _html_meta(head=""):
+    return ("<!DOCTYPE html><html lang=\"it\"><head><title>P"
+            "</title>%s</head><body><h1>Testo</h1><p>Contenuto "
+            "della pagina.</p></body></html>" % head)
+
+
+def test_meta_di_base_completi_ok():
+    head = ("<meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,"
+            "initial-scale=1\">"
+            "<meta property=\"og:title\" content=\"T\">"
+            "<meta property=\"og:description\" content=\"D\">"
+            "<meta property=\"og:image\" content=\"https://x.it/"
+            "i.jpg\">")
+    page = sra.parse_page(
+        "https://x.it/", _fake_response("https://x.it/",
+                                        _html_meta(head)))
+    assert page.has_charset and page.has_viewport
+    findings = sra._audit_basic_meta([page])
+    assert [f.severity for f in findings] == [sra.SEV_OK]
+
+
+def test_meta_di_base_tutti_assenti():
+    page = sra.parse_page(
+        "https://x.it/", _fake_response("https://x.it/",
+                                        _html_meta()))
+    findings = sra._audit_basic_meta([page])
+    titoli = " | ".join(f.title for f in findings)
+    assert "senza charset" in titoli
+    assert "senza meta viewport" in titoli
+    assert "senza Open Graph" in titoli
+    assert all(sra.estimate_effort(f) == sra.EFFORT_MINUTES
+               for f in findings)
+
+
+def test_open_graph_incompleto_dice_cosa_manca():
+    head = ("<meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width\">"
+            "<meta property=\"og:title\" content=\"T\">")
+    page = sra.parse_page(
+        "https://x.it/", _fake_response("https://x.it/",
+                                        _html_meta(head)))
+    findings = sra._audit_basic_meta([page])
+    og = [f for f in findings if "incompleto" in f.title]
+    assert og and "og:image" in og[0].detail
+    assert "og:description" in og[0].detail

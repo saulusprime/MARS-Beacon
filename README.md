@@ -297,7 +297,9 @@ riproducibile.
    soft-404 (200 con contenuto "pagina non trovata"), **opt-out IA di
    Microsoft** (meta `noarchive`/`nocache` che governano Bing
    Chat/Copilot e il training — Microsoft non ha un token robots.txt
-   dedicato; il meta scoped a `bingbot` prevale), grafo dei link
+   dedicato; il meta scoped a `bingbot` prevale), **meta di base**
+   (charset, viewport e completezza Open Graph: la triade
+   og:title/description/image governa le anteprime), grafo dei link
    interni (pagine orfane, profondità oltre 3 click, anchor generiche),
    pagine segnaposto del CMS, `noindex`, canonical, contenuto
    solo-JavaScript, hreflang, contenuti duplicati (deduplica per impronta
@@ -449,7 +451,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 224 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 227 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
