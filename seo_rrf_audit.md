@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.21.0, ~4990
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.22.0, ~5060
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -368,6 +368,20 @@ informativo che spiega il default e come attivare l'opt-out. Il
 meta scoped `<meta name="bingbot">` prevale su quello generico,
 come documentato da Microsoft. Nuovo campo `Page.bingbot_meta`;
 sforzo classificato "minuti". 4 test nuovi (193 totali).
+
+Novità 1.22.0 (2026-08-04): estraibilità diretta (primo dei
+controlli distillati da Features.md). L'area semantica misura la
+quota di paragrafi di 20–120 parole che aprono con una risposta
+esplicita — sì/no secco, "in sintesi", passo numerato
+(`DIRECT_ANSWER_RE`, nelle cinque lingue della v1.20) o una
+definizione nelle prime battute (riuso di `DEFINITION_RE`, come
+previsto dal TO-DO). Denominatore: i paragrafi sostanziosi (≥ 10
+parole), per non farsi gonfiare il conto dal boilerplate. Sotto la
+soglia di prassi del 20% (dichiarata nel referto) scatta
+un'avvertenza con esempio prima/dopo; sopra, un OK con i conteggi.
+Il rilievo vive nell'area semantica, quindi alimenta la lente
+Claude dei profili di citabilità senza ritocchi ai pesi. 5 test
+nuovi (198 totali), incluso il caso multilingue.
 
 ## Uso
 

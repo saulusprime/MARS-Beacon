@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.21.0
+## Strumento CLI — `seo_rrf_audit.py` v1.22.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -69,6 +69,13 @@ sono nel [README.md](README.md).
   insieme — salgono in testa e portano un badge dedicato in
   HTML/GUI; senza dati di citabilità l'ordinamento resta
   gravità+peso.
+- **Estraibilità diretta** (v1.22.0, da Features.md): quota di
+  paragrafi di 20–120 parole che aprono con una risposta esplicita
+  (sì/no, "in sintesi", passo numerato, definizione in apertura —
+  cinque lingue) sul totale dei paragrafi sostanziosi; sotto la
+  soglia di prassi del 20% scatta un'avvertenza con esempio
+  prima/dopo. Nell'area semantica: alimenta la lente Claude dei
+  profili di citabilità.
 - **Opt-out IA di Microsoft** (v1.21.0): l'area tecnica controlla i
   meta `noarchive`/`nocache` che governano Bing Chat/Copilot e il
   training Microsoft (non esiste un token robots.txt dedicato;
@@ -373,7 +380,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 193 test in ~15 secondi** (`tests/`), senza rete
+- **Suite pytest: 198 test in ~15 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

@@ -98,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.21.0"
+__version__ = "1.22.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -369,6 +369,26 @@ DEFINITION_RE = re.compile(
     r"|\bconsiste\s+en\b|\bse\s+define\s+como\b",
     re.IGNORECASE,
 )
+
+# Aperture "a risposta diretta" oltre alle definizioni: si'/no
+# secco, sintesi dichiarata, passo numerato. Con DEFINITION_RE in
+# apertura alimentano la metrica di estraibilita' diretta.
+DIRECT_ANSWER_RE = re.compile(
+    r"^(?:s[iì]|no|yes|oui|non|ja|nein),\s"
+    r"|^(?:in\s+sintesi|in\s+breve|la\s+risposta\s+(?:e'|è)"
+    r"|in\s+short|in\s+summary|the\s+answer\s+is"
+    r"|en\s+r[ée]sum[ée]|en\s+bref|kurz\s+gesagt|zusammenfassend"
+    r"|en\s+resumen|en\s+pocas\s+palabras)\b"
+    r"|^\d+[.)]\s",
+    re.IGNORECASE,
+)
+
+# Estraibilita' diretta: un paragrafo di 20-120 parole che apre con
+# la risposta e' citabile da un assistente cosi' com'e'. Soglie di
+# prassi (dichiarate nel referto), non standard normativi.
+EXTRACT_MIN_WORDS = 20
+EXTRACT_MAX_WORDS = 120
+EXTRACT_GOOD_SHARE = 0.20
 
 EXAMPLE_RE = re.compile(
     r"\b(?:ad\s+esempio|per\s+esempio|esempio|es\.|caso\s+studio"
@@ -2390,6 +2410,55 @@ def find_acronyms(pages: List[Page]) -> Dict[str, bool]:
     return dict(list(result.items())[:40])
 
 
+def _audit_extractability(good: Sequence[Page]) -> List[Finding]:
+    """Estraibilita' diretta: paragrafi citabili cosi' come sono.
+
+    Numeratore: paragrafi di EXTRACT_MIN-EXTRACT_MAX parole che
+    aprono con una risposta esplicita (DIRECT_ANSWER_RE) o con una
+    definizione nelle prime battute (DEFINITION_RE). Denominatore:
+    i paragrafi sostanziosi (>= 10 parole), per non farsi gonfiare
+    il conto dal boilerplate. Metrica da Features.md, innestata
+    nell'area semantica (alimenta la lente Claude dei profili di
+    citabilita').
+    """
+    substantial = [par for p in good for par in p.paragraphs
+                   if len(par.split()) >= 10]
+    if not substantial:
+        return []
+    direct = 0
+    for par in substantial:
+        words = len(par.split())
+        if not EXTRACT_MIN_WORDS <= words <= EXTRACT_MAX_WORDS:
+            continue
+        if DIRECT_ANSWER_RE.search(par) \
+                or DEFINITION_RE.search(par[:90]):
+            direct += 1
+    share = direct / len(substantial)
+    detail = ("%d paragrafi su %d aprono con una risposta "
+              "esplicita in %d-%d parole (%.0f%% contro una "
+              "soglia di prassi del %.0f%%): sono i passaggi che "
+              "un assistente puo' citare cosi' come sono."
+              % (direct, len(substantial), EXTRACT_MIN_WORDS,
+                 EXTRACT_MAX_WORDS, 100 * share,
+                 100 * EXTRACT_GOOD_SHARE))
+    if share >= EXTRACT_GOOD_SHARE:
+        return [Finding(AREA_SEM, SEV_OK,
+                        "Buona estraibilita' diretta", detail)]
+    return [Finding(
+        AREA_SEM, SEV_WARNING,
+        "Pochi paragrafi a risposta diretta", detail,
+        "Riformula i paragrafi chiave aprendo con la risposta "
+        "(\"X e' ...\", \"Si', ...\", \"In sintesi ...\") e "
+        "tienili fra %d e %d parole."
+        % (EXTRACT_MIN_WORDS, EXTRACT_MAX_WORDS),
+        example="Prima: \"Nel panorama attuale del benessere, "
+                "molte persone si chiedono quale percorso...\"\n"
+                "Dopo:  \"Il drenaggio linfatico e' un massaggio "
+                "dolce che favorisce il deflusso della linfa: "
+                "una seduta dura 45 minuti e costa 40-80 euro.\"",
+        weight=1.5)]
+
+
 def audit_semantic(pages: List[Page]) -> List[Finding]:
     """Segnali che alimentano il recuperatore vettoriale."""
     out: List[Finding] = []
@@ -2405,6 +2474,8 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
             "Scrivi paragrafi discorsivi di almeno 40-50 parole.",
             weight=3.0))
         return out
+
+    out.extend(_audit_extractability(good))
 
     out.append(Finding(
         AREA_SEM, SEV_OK if len(chunks) >= 20 else SEV_WARNING,

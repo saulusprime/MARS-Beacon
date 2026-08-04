@@ -307,7 +307,10 @@ riproducibile.
    attributi `alt`.
 3. **Semantica (vettoriale)** — numero di chunk, autoconsistenza dei
    passaggi (aperture anaforiche), heading in forma di domanda, FAQ,
-   definizioni, esempi, ampiezza del vocabolario, segnali **E-E-A-T**
+   definizioni, esempi, **estraibilità diretta** (quota di paragrafi
+   di 20–120 parole che aprono con una risposta esplicita: sono i
+   passaggi citabili da un assistente così come sono; soglia di
+   prassi 20%), ampiezza del vocabolario, segnali **E-E-A-T**
    (autore dichiarato, date di pubblicazione/aggiornamento, pagina
    "chi siamo", contatti verificabili). Stopword e pattern
    linguistici (definizioni, anafore, esempi, FAQ, domande) coprono
@@ -432,7 +435,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 193 test, ~15 secondi, nessun accesso alla rete esterna
+pytest            # 198 test, ~15 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

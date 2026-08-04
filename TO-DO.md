@@ -16,10 +16,6 @@ analizzato e distillato qui il 2026-08-04; il documento originale
 non è nel repo) — tutti offline, per pagina, da innestare nelle
 aree esistenti:
 
-- [ ] **Estraibilità diretta**: quota di paragrafi di 20–120 parole
-      che aprono con una risposta esplicita ("X è…", "Sì/No, …",
-      "In sintesi…") — estende le regex di definizioni già presenti
-      nell'area semantica.
 - [ ] **Densità informativa**: rilevare il "filler" di marketing
       ("leader di mercato", "scopri di più", "contattaci per…") e
       segnalare le pagine in cui satura il testo utile.

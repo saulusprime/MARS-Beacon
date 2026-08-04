@@ -432,3 +432,86 @@ def test_msft_optout_assente_ok_informativo():
     assert len(findings) == 1
     assert findings[0].severity == sra.SEV_OK
     assert "opt-out" in findings[0].title
+
+
+# ---------------- estraibilita' diretta ----------------
+
+_PAR_DIRETTO = ("Il drenaggio linfatico è una tecnica di massaggio "
+                "dolce che favorisce il deflusso della linfa verso "
+                "le stazioni linfonodali: una seduta tipica dura "
+                "quarantacinque minuti e costa fra i quaranta e "
+                "gli ottanta euro.")
+_PAR_SI_SECCO = ("Sì, il trattamento è indicato anche dopo un "
+                 "intervento chirurgico: il protocollo prevede in "
+                 "genere da cinque a dieci sedute distribuite su "
+                 "un ciclo di poche settimane, secondo il parere "
+                 "del medico curante.")
+_PAR_VAGO = ("Nel panorama attuale del benessere e della cura "
+             "della persona, molte persone si chiedono quale "
+             "percorso possa essere il più adatto alle proprie "
+             "esigenze quotidiane e ai propri ritmi di vita "
+             "sempre più frenetici e complessi.")
+
+
+def _pagina_con_paragrafi(paragrafi):
+    page = sra.Page(url="https://mio.it/", status=200,
+                    text=" ".join(paragrafi), word_count=300)
+    page.paragraphs = list(paragrafi)
+    return page
+
+
+def test_estraibilita_buona():
+    page = _pagina_con_paragrafi(
+        [_PAR_DIRETTO, _PAR_SI_SECCO, _PAR_VAGO])
+    findings = sra._audit_extractability([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_OK
+    assert "2 paragrafi su 3" in findings[0].detail
+
+
+def test_estraibilita_scarsa_con_fix():
+    page = _pagina_con_paragrafi([_PAR_VAGO, _PAR_VAGO, _PAR_VAGO,
+                                  _PAR_VAGO, _PAR_VAGO])
+    findings = sra._audit_extractability([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "0 paragrafi su 5" in findings[0].detail
+    assert findings[0].fix and findings[0].example
+
+
+def test_estraibilita_esclude_paragrafi_fuori_misura():
+    troppo_lungo = "%s %s" % (_PAR_DIRETTO,
+                              (_PAR_VAGO + " ") * 3)
+    assert len(troppo_lungo.split()) > sra.EXTRACT_MAX_WORDS
+    corto = "Il drenaggio è utile."  # apre bene ma < 20 parole
+    page = _pagina_con_paragrafi([troppo_lungo,
+                                  corto + " " + "parola " * 7])
+    findings = sra._audit_extractability([page])
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "0 paragrafi su 2" in findings[0].detail
+
+
+def test_estraibilita_multilingua():
+    frasi = [
+        "Oui, la séance dure quarante-cinq minutes et le drainage "
+        "lymphatique manuel reste une méthode douce adaptée aussi "
+        "aux personnes âgées comme aux sportifs après une "
+        "opération du genou.",
+        "Kurz gesagt ist die manuelle Lymphdrainage eine sanfte "
+        "Massagetechnik, die den Abfluss der Lymphe fördert und "
+        "nach Operationen sowie bei geschwollenen Beinen sehr "
+        "häufig verordnet wird.",
+        "En resumen, el drenaje linfático manual es un masaje "
+        "suave que favorece la salida de la linfa y se recomienda "
+        "después de una cirugía o cuando las piernas se hinchan "
+        "con frecuencia.",
+    ]
+    page = _pagina_con_paragrafi(frasi)
+    findings = sra._audit_extractability([page])
+    assert findings[0].severity == sra.SEV_OK
+    assert "3 paragrafi su 3" in findings[0].detail
+
+
+def test_estraibilita_senza_paragrafi_sostanziosi():
+    page = _pagina_con_paragrafi(["Poche parole qui."])
+    assert sra._audit_extractability([page]) == []
