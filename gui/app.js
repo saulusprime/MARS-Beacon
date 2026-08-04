@@ -1253,6 +1253,7 @@
       (snap.summary || {}).delta);
     renderSurfaceMath((snap.summary || {}).surface_math);
     renderDepth((snap.summary || {}).depth_distribution);
+    renderLinkGraph((snap.summary || {}).link_graph);
     renderRemediation(snap.remediation || []);
     renderRrf(snap.rrf || []);
     renderCompetitive(snap.competitive);
@@ -1962,6 +1963,69 @@
       row.appendChild(num);
       wrap.appendChild(row);
     });
+    block.hidden = false;
+  }
+
+  function renderLinkGraph(graph) {
+    const block = el("graph-block");
+    const box = el("graph-svg");
+    box.textContent = "";
+    if (!graph || !graph.links || !graph.links.length) {
+      block.hidden = true;
+      return;
+    }
+    el("graph-intro").textContent =
+      "Ogni cerchio è una pagina (ampiezza = link in ingresso), " +
+      "la home è al centro; in ambra le pagine oltre 3 click o " +
+      "senza percorso di link. Mostrate " + graph.nodes.length +
+      " pagine su " + graph.total +
+      ". Passa sui cerchi per i dettagli.";
+    const svg = svgNode("svg", {
+      viewBox: "0 0 " + graph.width + " " + graph.height,
+      class: "history-trend-svg",
+      role: "img",
+      "aria-label": "Grafo dei link interni: orfane e " +
+        "profondità sono nei rilievi dell'area tecnica",
+    });
+    graph.links.forEach((link) => {
+      const a = graph.nodes[link.source];
+      const b = graph.nodes[link.target];
+      svg.appendChild(svgNode("line", {
+        x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+        stroke: "#d8d8d2", "stroke-width": 0.8,
+      }));
+    });
+    const etichettati = graph.nodes.slice()
+      .sort((m, n) => (n.home - m.home) ||
+        (n.incoming - m.incoming))
+      .slice(0, 10)
+      .map((n) => n.url);
+    graph.nodes.forEach((node) => {
+      const problematico = node.depth === null || node.depth > 3;
+      const hue = node.home ? "#186078"
+        : problematico ? "#9a6a00" : "#1c6b45";
+      const r = Math.min(13, 4 + 1.5 * Math.sqrt(node.incoming));
+      const circle = svgNode("circle", {
+        cx: node.x, cy: node.y, r: r, fill: hue,
+        "fill-opacity": "0.75", stroke: hue,
+      });
+      const title = svgNode("title", {});
+      title.textContent = node.label + " — " + node.incoming +
+        " link in ingresso, " +
+        (node.depth === null ? "solo da sitemap"
+          : node.depth + " click");
+      circle.appendChild(title);
+      svg.appendChild(circle);
+      if (etichettati.indexOf(node.url) !== -1) {
+        const text = svgNode("text", {
+          x: node.x + r + 2, y: node.y + 3, "font-size": 9,
+          fill: "#14272b",
+        });
+        text.textContent = node.label.slice(0, 28);
+        svg.appendChild(text);
+      }
+    });
+    box.appendChild(svg);
     block.hidden = false;
   }
 

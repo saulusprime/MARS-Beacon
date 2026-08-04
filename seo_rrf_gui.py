@@ -68,7 +68,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.15.0"
+__version__ = "2.16.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -534,6 +534,7 @@ class Job:
             "surface_math": sra.surface_math(pages),
             "depth_distribution": sra.depth_distribution(pages,
                                                          base),
+            "link_graph": sra.link_graph_data(pages, base),
             "citability": sra.citability_profiles(pages, scores,
                                                   market),
             "citability_actions": sra.citability_top_actions(

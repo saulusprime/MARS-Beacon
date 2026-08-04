@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.36.0, ~6250
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.37.0, ~6410
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -596,6 +596,22 @@ AAAA-MM-GG validata, etichetta ≤ 120) accoda a `eventi.jsonl`; il
 form nella sezione citazioni aggiorna subito grafico e lista.
 Resta rimandato il solo grafo force-directed dell'architettura.
 Pa11y locale 3/3 prima del push. 3 test nuovi (255 totali).
+
+Novità 1.37.0 (2026-08-04): grafo force-directed dell'architettura
+dei link interni — l'ultimo widget (GUI 2.16.0). Scelta
+architetturale migliorativa rispetto alla nota del TO-DO: il
+layout force (Fruchterman-Reingold, `_force_layout`) è calcolato
+**in Python nel core**, deterministico (inizializzazione su
+cerchio, niente casualità: stesso input → stesso disegno,
+testabile) con la home ancorata al centro; così il **referto HTML
+resta senza JavaScript** e la GUI disegna le stesse posizioni
+precalcolate. `link_graph_data` limita i nodi a 60 (home per
+prima, poi i più linkati), etichetta i primi 10, colora per stato
+(home accent, oltre 3 click o solo-da-sitemap in ambra) e dà a
+ogni cerchio un `<title>` con URL, link in ingresso e profondità;
+chiave `link_graph` nel JSON. Con questo la sezione widget è
+davvero conclusa. Pa11y 3/3; 3 test nuovi (258 totali), incluso
+il determinismo del layout e il tetto ai nodi.
 
 ## Uso
 

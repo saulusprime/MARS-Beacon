@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.36.0
+## Strumento CLI — `seo_rrf_audit.py` v1.37.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -264,7 +264,17 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.15.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.16.0 + `gui/`
+
+- **Grafo dell'architettura dei link** (v2.16.0, ultimo widget):
+  layout force-directed Fruchterman-Reingold **deterministico,
+  calcolato in Python nel core** (`_force_layout`; stesso input →
+  stesso disegno, home ancorata al centro) e disegnato identico
+  nella GUI e nel referto HTML, che resta senza JavaScript. Max 60
+  nodi (i più linkati), etichette sui primi 10, ambra per pagine
+  oltre 3 click o solo-da-sitemap, `<title>` con i dettagli su
+  ogni nodo; `link_graph` nel JSON. La sezione widget del concept
+  board è conclusa per intero.
 
 - **Widget rimandati realizzati** (v2.15.0): **profondità di
   crawl** (bucket di click dalla home più "solo da sitemap", barre
@@ -478,7 +488,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 255 test in ~16 secondi** (`tests/`), senza rete
+- **Suite pytest: 258 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

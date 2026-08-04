@@ -1067,3 +1067,69 @@ def test_share_of_voice_presence_e_bolle():
     assert set(payload["presence"]) == {"mio.it", "altro.it"}
     assert payload["presence"]["mio.it"] == 1
     assert payload["chunks"]["altro.it"] == 1
+
+
+# ---------------- grafo force-directed dei link ----------------
+
+def _pagine_grafo():
+    def pagina(url, targets=()):
+        page = sra.Page(url=url, status=200, text="x")
+        page.internal_targets = [sra.norm_url(t) for t in targets]
+        return page
+    return [
+        pagina("https://x.it/", ["https://x.it/a",
+                                 "https://x.it/b"]),
+        pagina("https://x.it/a", ["https://x.it/b",
+                                  "https://x.it/"]),
+        pagina("https://x.it/b", ["https://x.it/"]),
+        pagina("https://x.it/orfana"),
+    ]
+
+
+def test_link_graph_dati_e_layout():
+    graph = sra.link_graph_data(_pagine_grafo(), "https://x.it/")
+    assert graph["total"] == 4
+    assert len(graph["nodes"]) == 4
+    assert graph["nodes"][0]["home"] is True
+    assert graph["nodes"][0]["label"] == "/"
+    # La home resta ancorata al centro del canvas.
+    assert graph["nodes"][0]["x"] == sra.GRAPH_W / 2
+    assert graph["nodes"][0]["y"] == sra.GRAPH_H / 2
+    for node in graph["nodes"]:
+        assert 0 <= node["x"] <= sra.GRAPH_W
+        assert 0 <= node["y"] <= sra.GRAPH_H
+    for link in graph["links"]:
+        assert 0 <= link["source"] < len(graph["nodes"])
+        assert 0 <= link["target"] < len(graph["nodes"])
+    orfana = [n for n in graph["nodes"] if "orfana" in n["url"]][0]
+    assert orfana["depth"] is None
+    assert sra.link_graph_data(_pagine_grafo()[:1],
+                               "https://x.it/") is None
+
+
+def test_link_graph_deterministico_e_limitato():
+    prima = sra.link_graph_data(_pagine_grafo(), "https://x.it/")
+    seconda = sra.link_graph_data(_pagine_grafo(), "https://x.it/")
+    assert prima == seconda, "stesso input, stesso disegno"
+
+    def pagina(url, targets=()):
+        page = sra.Page(url=url, status=200, text="x")
+        page.internal_targets = [sra.norm_url(t) for t in targets]
+        return page
+    tante = [pagina("https://x.it/",
+                    ["https://x.it/p%d" % i for i in range(80)])]
+    tante += [pagina("https://x.it/p%d" % i, ["https://x.it/"])
+              for i in range(80)]
+    graph = sra.link_graph_data(tante, "https://x.it/")
+    assert len(graph["nodes"]) == sra.GRAPH_MAX_NODES
+    assert graph["total"] == 81
+
+
+def test_referto_html_grafo():
+    scores = {sra.AREA_TECH: 70.0, sra.AREA_LEX: 60.0,
+              sra.AREA_SEM: 50.0, sra.AREA_SD: 40.0,
+              sra.AREA_RRF: 30.0}
+    pagina_html = sra.render_html("https://x.it/", _pagine_grafo(),
+                                  [], scores, [], "char-tfidf")
+    assert "Architettura dei link interni" in pagina_html
+    assert "link in ingresso" in pagina_html

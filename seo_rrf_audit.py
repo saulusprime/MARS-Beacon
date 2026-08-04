@@ -100,7 +100,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.36.0"
+__version__ = "1.37.0"
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
 # storico --history), indipendente dalla versione dello strumento:
@@ -2059,6 +2059,115 @@ def depth_distribution(pages: Sequence[Page],
     buckets.append({"label": "solo da sitemap",
                     "count": unreachable})
     return {"pages": len(edges), "buckets": buckets}
+
+
+# Grafo dell'architettura: dimensioni del canvas e tetto ai nodi.
+GRAPH_W, GRAPH_H = 460.0, 320.0
+GRAPH_MAX_NODES = 60
+
+
+def _force_layout(count: int, links: Sequence[Tuple[int, int]],
+                  width: float = GRAPH_W, height: float = GRAPH_H,
+                  iterations: int = 80) -> List[Tuple[float, float]]:
+    """Layout force-directed deterministico (Fruchterman-Reingold).
+
+    Inizializzazione su un cerchio (niente casualita': stesso
+    input, stesso disegno — testabile e riproducibile), repulsione
+    k^2/d fra tutti i nodi, attrazione d^2/k lungo gli archi,
+    raffreddamento geometrico. Il nodo 0 (la home) resta ancorato
+    al centro. Riferimento: Fruchterman & Reingold (1991).
+    """
+    if count == 0:
+        return []
+    cx, cy = width / 2.0, height / 2.0
+    if count == 1:
+        return [(cx, cy)]
+    radius = min(width, height) / 3.0
+    pos = [[cx + radius * math.cos(2 * math.pi * i / count),
+            cy + radius * math.sin(2 * math.pi * i / count)]
+           for i in range(count)]
+    pos[0] = [cx, cy]
+    k = (width * height / count) ** 0.5
+    temp = width / 8.0
+    for _ in range(iterations):
+        disp = [[0.0, 0.0] for _ in range(count)]
+        for i in range(count):
+            for j in range(i + 1, count):
+                dx = pos[i][0] - pos[j][0]
+                dy = pos[i][1] - pos[j][1]
+                dist = max(0.01, (dx * dx + dy * dy) ** 0.5)
+                force = k * k / dist
+                disp[i][0] += dx / dist * force
+                disp[i][1] += dy / dist * force
+                disp[j][0] -= dx / dist * force
+                disp[j][1] -= dy / dist * force
+        for a, b in links:
+            dx = pos[a][0] - pos[b][0]
+            dy = pos[a][1] - pos[b][1]
+            dist = max(0.01, (dx * dx + dy * dy) ** 0.5)
+            force = dist * dist / k
+            disp[a][0] -= dx / dist * force
+            disp[a][1] -= dy / dist * force
+            disp[b][0] += dx / dist * force
+            disp[b][1] += dy / dist * force
+        for i in range(1, count):  # la home (0) resta al centro
+            dx, dy = disp[i]
+            dist = max(0.01, (dx * dx + dy * dy) ** 0.5)
+            step = min(dist, temp)
+            pos[i][0] += dx / dist * step
+            pos[i][1] += dy / dist * step
+            pos[i][0] = min(width - 18.0, max(18.0, pos[i][0]))
+            pos[i][1] = min(height - 14.0, max(14.0, pos[i][1]))
+        temp *= 0.95
+    return [(round(x, 1), round(y, 1)) for x, y in pos]
+
+
+def link_graph_data(pages: Sequence[Page],
+                    base: str) -> Optional[Dict[str, object]]:
+    """Grafo dei link interni col layout gia' calcolato (widget).
+
+    Nodi limitati a GRAPH_MAX_NODES (home per prima, poi i piu'
+    linkati); archi solo fra nodi inclusi. Le posizioni vengono dal
+    layout force deterministico: il referto HTML statico e la GUI
+    disegnano lo stesso identico grafo senza JavaScript di layout.
+    None con meno di due pagine analizzabili.
+    """
+    good = [p for p in pages if p.ok]
+    if len(good) < 2:
+        return None
+    edges, incoming = _build_link_edges(good)
+    home = norm_url(base)
+    urls = sorted(edges, key=lambda u: (u != home,
+                                        -incoming[u], u))
+    urls = urls[:GRAPH_MAX_NODES]
+    index = {u: i for i, u in enumerate(urls)}
+    depth = _bfs_depths(edges, home)
+    links: List[Tuple[int, int]] = []
+    for src, outs in edges.items():
+        if src not in index:
+            continue
+        for dest in sorted(outs):
+            if dest in index:
+                links.append((index[src], index[dest]))
+    positions = _force_layout(len(urls), links)
+    nodes = []
+    for i, url in enumerate(urls):
+        nodes.append({
+            "url": url,
+            "label": urlparse(url).path or "/",
+            "incoming": incoming[url],
+            "depth": depth.get(url),
+            "home": url == home,
+            "x": positions[i][0],
+            "y": positions[i][1],
+        })
+    return {
+        "width": GRAPH_W,
+        "height": GRAPH_H,
+        "total": len(edges),
+        "nodes": nodes,
+        "links": [{"source": a, "target": b} for a, b in links],
+    }
 
 
 def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
@@ -5113,6 +5222,58 @@ def render_html(base: str, pages: List[Page],
                    width, hue))
         parts.append("</tbody></table></section>")
 
+    graph = link_graph_data(pages, base)
+    if graph and graph["links"]:
+        parts.append(
+            "<section><h2>Architettura dei link interni</h2>"
+            "<p class=\"meta\">Ogni cerchio e' una pagina "
+            "(ampiezza = link in ingresso), la home e' al centro; "
+            "in ambra le pagine oltre 3 click o senza percorso. "
+            "Mostrate %d pagine su %d.</p>"
+            "<svg viewBox=\"0 0 %.0f %.0f\" role=\"img\" "
+            "aria-label=\"Grafo dei link interni; orfane e "
+            "profondita' sono nei rilievi dell'area tecnica\" "
+            "style=\"max-width:520px;width:100%%\">"
+            % (len(graph["nodes"]), graph["total"],
+               graph["width"], graph["height"]))
+        nodes = graph["nodes"]
+        for link in graph["links"]:
+            a = nodes[link["source"]]
+            b = nodes[link["target"]]
+            parts.append(
+                "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" "
+                "y2=\"%.1f\" stroke=\"var(--line)\" "
+                "stroke-width=\"0.8\"/>"
+                % (a["x"], a["y"], b["x"], b["y"]))
+        labelled = {n["url"] for n in sorted(
+            nodes, key=lambda n: (not n["home"],
+                                  -n["incoming"]))[:10]}
+        for node in nodes:
+            problematico = (node["depth"] is None
+                            or node["depth"] > 3)
+            hue = ("var(--accent)" if node["home"] else
+                   "var(--warn)" if problematico else
+                   "var(--good)")
+            r = min(13.0, 4.0 + 1.5 * node["incoming"] ** 0.5)
+            profondita = ("%d click" % node["depth"]
+                          if node["depth"] is not None
+                          else "solo da sitemap")
+            parts.append(
+                "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" "
+                "fill=\"%s\" fill-opacity=\"0.75\" stroke=\"%s\">"
+                "<title>%s — %d link in ingresso, %s</title>"
+                "</circle>"
+                % (node["x"], node["y"], r, hue, hue,
+                   esc(str(node["label"])), node["incoming"],
+                   profondita))
+            if node["url"] in labelled:
+                parts.append(
+                    "<text x=\"%.1f\" y=\"%.1f\" font-size=\"9\" "
+                    "fill=\"var(--fg)\">%s</text>"
+                    % (node["x"] + r + 2, node["y"] + 3,
+                       esc(str(node["label"])[:28])))
+        parts.append("</svg></section>")
+
     math = surface_math(pages)
     if math:
         effetto = ("~%.1fx occasioni di comparire nelle liste fuse"
@@ -5459,6 +5620,7 @@ def render_json(base: str, pages: List[Page],
         "findings": [f.as_dict() for f in findings],
         "surface_math": surface_math(pages),
         "depth_distribution": depth_distribution(pages, base),
+        "link_graph": link_graph_data(pages, base),
         "remediation": build_remediation(findings, pages, scores,
                                          market),
         "rrf_simulation": [asdict(r) for r in results],

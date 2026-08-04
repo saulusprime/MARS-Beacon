@@ -176,6 +176,11 @@ Cosa offre:
   la mappa a bolle share × query coperte × corpus (pattern Semrush) —
   entrambi anche nel referto HTML; gli eventi del grafico citazioni
   si aggiungono direttamente dalla GUI.
+- **Grafo dell'architettura dei link** (pattern Screaming Frog):
+  layout force-directed **deterministico calcolato in Python** (il
+  referto HTML resta senza JavaScript), home al centro, ampiezza dei
+  nodi = link in ingresso, ambra per le pagine oltre 3 click o senza
+  percorso, dettagli al passaggio del mouse.
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, **profili di citabilità per assistente IA** (barre per
   profilo, indice composito col mercato scelto nel form e "top
@@ -473,7 +478,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 255 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 258 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
