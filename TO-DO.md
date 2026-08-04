@@ -11,11 +11,6 @@ sono proposte.
 
 ## P1 — Qualità dell'analisi
 
-- [ ] Opt-out IA di Microsoft: non esiste un token robots.txt dedicato
-      (Bingbot è ricerca classica); valutare un controllo dei meta tag
-      `noarchive`/`nocache` che governano Bing Chat/Copilot e il
-      training Microsoft.
-
 Nuovi controlli tratti da Features.md (concept "Citability Index"
 analizzato e distillato qui il 2026-08-04; il documento originale
 non è nel repo) — tutti offline, per pagina, da innestare nelle

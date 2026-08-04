@@ -98,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.20.0"
+__version__ = "1.21.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -615,7 +615,8 @@ _EFFORT_DAYS_RE = re.compile(
 _EFFORT_MINUTES_RE = re.compile(
     r"robots\.txt|sitemap|llms\.txt|noindex|canonical|title"
     r"|descript|segnaposto|senza attributo lang|hreflang|\balt\b"
-    r"|contenuto identico|crawler ia bloccat|slug",
+    r"|contenuto identico|crawler ia bloccat|slug"
+    r"|noarchive|nocache|copilot",
     re.IGNORECASE)
 
 
@@ -749,6 +750,7 @@ class Page:
     description: str = ""
     canonical: str = ""
     meta_robots: str = ""
+    bingbot_meta: str = ""
     generator: str = ""
     author: str = ""
     published: str = ""
@@ -1402,6 +1404,7 @@ def extract_content(page: Page, raw_html: str) -> None:
         page.title = soup.title.string.strip()
     page.description = _meta(soup, name="description")
     page.meta_robots = _meta(soup, name="robots")
+    page.bingbot_meta = _meta(soup, name="bingbot")
     page.generator = _meta(soup, name="generator")
     page.author = _meta(soup, name="author")
     page.published = _meta(soup, prop="article:published_time")
@@ -1934,6 +1937,74 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
     return out
 
 
+def _audit_msft_ai_optout(pages: Sequence[Page]) -> List[Finding]:
+    """Opt-out dall'IA di Microsoft: meta noarchive/nocache.
+
+    Microsoft non ha un token robots.txt dedicato all'IA (Bingbot
+    e' il crawler della ricerca classica): l'uso dei contenuti in
+    Bing Chat/Copilot e nel training dei modelli generativi si
+    governa coi meta robots. NOARCHIVE esclude dalle risposte e
+    dal training; NOCACHE limita a URL, titolo e snippet (mostrati
+    nelle risposte e usati per il training); il meta scoped
+    <meta name="bingbot"> prevale per Bing su quello generico;
+    nessuno dei due tocca la ricerca classica. Fonte: Bing Blogs,
+    settembre 2023, "Announcing new options for webmasters to
+    control usage of their content in Bing Chat".
+    """
+    good = [p for p in pages if p.ok]
+    if not good:
+        return []
+    noarchive: List[str] = []
+    nocache: List[str] = []
+    for p in good:
+        # Per Bing il meta bingbot, se presente, prevale su robots.
+        combined = (p.bingbot_meta or p.meta_robots or "").lower()
+        if "noarchive" in combined:
+            noarchive.append(p.url)
+        elif "nocache" in combined:
+            nocache.append(p.url)
+
+    out: List[Finding] = []
+    if noarchive:
+        out.append(Finding(
+            AREA_TECH, SEV_WARNING,
+            "%d pagina/e escluse da Copilot (noarchive)"
+            % len(noarchive),
+            "Il meta noarchive esclude il contenuto dalle risposte "
+            "di Bing Chat/Copilot e dal training dei modelli "
+            "Microsoft (la ricerca classica non cambia): su queste "
+            "pagine la citabilita' sul canale Microsoft e' zero. "
+            "%s" % ", ".join(sorted(noarchive)[:5]),
+            "Se l'esclusione non e' voluta rimuovi noarchive; per "
+            "una presenza parziale (solo titolo, URL e snippet) "
+            "usa nocache.",
+            example="<meta name=\"bingbot\" content=\"nocache\">",
+            weight=2.0))
+    if nocache:
+        out.append(Finding(
+            AREA_TECH, SEV_INFO,
+            "%d pagina/e con presenza parziale in Copilot "
+            "(nocache)" % len(nocache),
+            "Con nocache Bing Chat/Copilot mostra solo URL, titolo "
+            "e snippet della pagina e usa solo quegli elementi per "
+            "il training Microsoft. %s"
+            % ", ".join(sorted(nocache)[:5]),
+            "Scelta legittima di opt-out parziale: verifica solo "
+            "che sia voluta. Per la piena citabilita' su Copilot "
+            "rimuovi il meta."))
+    if not noarchive and not nocache:
+        out.append(Finding(
+            AREA_TECH, SEV_OK,
+            "Nessun opt-out IA di Microsoft attivo",
+            "Non esiste un token robots.txt dedicato all'IA di "
+            "Microsoft: il controllo passa dai meta "
+            "noarchive/nocache, qui assenti. I contenuti sono "
+            "quindi utilizzabili nelle risposte di Copilot e nel "
+            "training Microsoft; per l'opt-out usa noarchive "
+            "(totale) o nocache (parziale)."))
+    return out
+
+
 def audit_technical(pages: List[Page], base: str,
                     from_sitemap: bool) -> List[Finding]:
     """Controlli di indicizzabilita' e igiene tecnica."""
@@ -2059,6 +2130,8 @@ def audit_technical(pages: List[Page], base: str,
             example="Se la pagina deve essere indicizzata, rimuovi "
                     "il meta o usa:\n<meta name=\"robots\" "
                     "content=\"index, follow\">"))
+
+    out.extend(_audit_msft_ai_optout(good))
 
     no_canonical = [p for p in good if not p.canonical]
     if no_canonical:

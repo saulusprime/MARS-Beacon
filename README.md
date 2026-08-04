@@ -294,7 +294,10 @@ riproducibile.
    CCBot, MistralAI-User), `llms.txt`, sitemap (anche `.xml.gz`, con
    priorità agli URL a `lastmod` più recente), URL in errore,
    catene di redirect interne (http/https, www/non-www, catene multiple),
-   soft-404 (200 con contenuto "pagina non trovata"), grafo dei link
+   soft-404 (200 con contenuto "pagina non trovata"), **opt-out IA di
+   Microsoft** (meta `noarchive`/`nocache` che governano Bing
+   Chat/Copilot e il training — Microsoft non ha un token robots.txt
+   dedicato; il meta scoped a `bingbot` prevale), grafo dei link
    interni (pagine orfane, profondità oltre 3 click, anchor generiche),
    pagine segnaposto del CMS, `noindex`, canonical, contenuto
    solo-JavaScript, hreflang, contenuti duplicati (deduplica per impronta
@@ -429,7 +432,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 189 test, ~15 secondi, nessun accesso alla rete esterna
+pytest            # 193 test, ~15 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.20.0, ~4920
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.21.0, ~4990
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -353,6 +353,21 @@ template della **lingua prevalente del sito** (`dominant_language`
 dagli attributi lang; QUERY_TEMPLATES it/en/fr/de/es, default
 italiano invariato — anche per le lingue non supportate). 8 test
 nuovi (189 totali) con frasi campione nelle tre lingue.
+
+Novità 1.21.0 (2026-08-04): opt-out IA di Microsoft. Microsoft non
+ha un token robots.txt dedicato all'IA (Bingbot è ricerca
+classica): l'uso dei contenuti in Bing Chat/Copilot e nel training
+si governa coi meta robots, e l'area tecnica ora li controlla
+(`_audit_msft_ai_optout`, semantiche verificate sulla fonte
+primaria e citate nel codice — Bing Blogs, settembre 2023).
+`noarchive` → avvertenza (esclusione totale dalle risposte Copilot
+e dal training: citabilità zero sul canale Microsoft; la ricerca
+classica non cambia); `nocache` → informativo (presenza parziale:
+solo URL, titolo e snippet, anche per il training); assenti → OK
+informativo che spiega il default e come attivare l'opt-out. Il
+meta scoped `<meta name="bingbot">` prevale su quello generico,
+come documentato da Microsoft. Nuovo campo `Page.bingbot_meta`;
+sforzo classificato "minuti". 4 test nuovi (193 totali).
 
 ## Uso
 

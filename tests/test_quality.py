@@ -379,3 +379,56 @@ def test_eeat_warning_con_esempio():
     findings = sra.audit_eeat([page])
     assert all(f.example for f in findings
                if f.severity == sra.SEV_WARNING)
+
+
+# ---------------- opt-out IA di Microsoft ----------------
+
+def _pagina_con_meta(url, extra_head=""):
+    html_text = ("<!DOCTYPE html><html lang=\"it\"><head>"
+                 "<title>Pagina</title>%s</head><body><h1>Testo"
+                 "</h1><p>Contenuto della pagina di prova con "
+                 "abbastanza parole utili.</p></body></html>"
+                 % extra_head)
+    return sra.parse_page(url, _fake_response(url, html_text))
+
+
+def test_msft_optout_noarchive_avvertenza():
+    page = _pagina_con_meta(
+        "https://mio.it/a",
+        "<meta name=\"robots\" content=\"noarchive\">")
+    findings = sra._audit_msft_ai_optout([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "noarchive" in findings[0].title
+    assert "Copilot" in findings[0].title
+    assert sra.estimate_effort(findings[0]) == sra.EFFORT_MINUTES
+
+
+def test_msft_optout_nocache_informativo():
+    page = _pagina_con_meta(
+        "https://mio.it/b",
+        "<meta name=\"bingbot\" content=\"nocache\">")
+    findings = sra._audit_msft_ai_optout([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_INFO
+    assert "nocache" in findings[0].title
+
+
+def test_msft_optout_bingbot_prevale_su_robots():
+    """L'esempio documentato da Microsoft: bingbot vince per Bing."""
+    page = _pagina_con_meta(
+        "https://mio.it/c",
+        "<meta name=\"robots\" content=\"noarchive\">"
+        "<meta name=\"bingbot\" content=\"nocache\">")
+    findings = sra._audit_msft_ai_optout([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_INFO, \
+        "il meta scoped a bingbot prevale su quello generico"
+
+
+def test_msft_optout_assente_ok_informativo():
+    page = _pagina_con_meta("https://mio.it/d")
+    findings = sra._audit_msft_ai_optout([page])
+    assert len(findings) == 1
+    assert findings[0].severity == sra.SEV_OK
+    assert "opt-out" in findings[0].title
