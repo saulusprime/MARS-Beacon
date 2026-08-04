@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.26.0
+## Strumento CLI — `seo_rrf_audit.py` v1.27.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -69,6 +69,12 @@ sono nel [README.md](README.md).
   insieme — salgono in testa e portano un badge dedicato in
   HTML/GUI; senza dati di citabilità l'ordinamento resta
   gravità+peso.
+- **Freschezza dei contenuti** (v1.27.0, da Features.md): età
+  dell'aggiornamento dichiarato più recente (meta article:*_time e
+  date JSON-LD), soglie di prassi a un anno (avvertenza) e due
+  anni (peso doppio), pagine più datate come evidenza e fix con
+  meta datato a oggi; senza alcuna data nessun rilievo — la
+  presenza è già coperta dall'E-E-A-T, niente doppia punizione.
 - **Riferimenti bibliografici** (v1.26.0, da Features.md): sezione
   fonti negli heading (cinque lingue), citazioni accademiche nel
   testo (`[1]`, "(Autore, anno)") e link esterni come contesto
@@ -405,7 +411,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 215 test in ~15 secondi** (`tests/`), senza rete
+- **Suite pytest: 220 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

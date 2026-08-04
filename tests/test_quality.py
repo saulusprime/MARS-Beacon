@@ -736,3 +736,64 @@ def test_riferimenti_due_citazioni_non_bastano():
     testo = "Efficace [1] e sicuro [2] secondo la letteratura."
     findings = sra._audit_references([_pagina_fonti(testo=testo)])
     assert findings[0].severity == sra.SEV_WARNING
+
+
+# ---------------- freschezza dei contenuti ----------------
+
+_OGGI = datetime.date(2026, 8, 4)
+
+
+def _pagina_datata(url, modified="", published="", jsonld=None):
+    page = sra.Page(url=url, status=200, text="testo",
+                    word_count=300, modified=modified,
+                    published=published)
+    if jsonld:
+        page.jsonld_raw = jsonld
+    return page
+
+
+def test_freschezza_recente_ok():
+    page = _pagina_datata("https://mio.it/",
+                          modified="2026-06-01T10:00:00+02:00")
+    findings = sra._audit_freshness([page], today=_OGGI)
+    assert findings[0].severity == sra.SEV_OK
+    assert "2026-06-01" in findings[0].detail
+
+
+def test_freschezza_oltre_un_anno_avvertenza():
+    page = _pagina_datata("https://mio.it/",
+                          published="2025-05-01")
+    findings = sra._audit_freshness([page], today=_OGGI)
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "un anno" in findings[0].title
+    assert findings[0].weight == 1.0
+    assert sra.estimate_effort(findings[0]) == sra.EFFORT_DAYS
+
+
+def test_freschezza_oltre_due_anni_pesa_doppio():
+    pages = [
+        _pagina_datata("https://mio.it/a", published="2023-01-10"),
+        _pagina_datata("https://mio.it/b", published="2022-06-05"),
+    ]
+    findings = sra._audit_freshness(pages, today=_OGGI)
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "due anni" in findings[0].title
+    assert findings[0].weight == 2.0
+    assert "2022-06-05" in findings[0].detail  # la piu' datata
+
+
+def test_freschezza_da_jsonld():
+    page = _pagina_datata(
+        "https://mio.it/", jsonld=[{
+            "@type": "Article", "headline": "Guida",
+            "dateModified": "2026-07-15"}])
+    findings = sra._audit_freshness([page], today=_OGGI)
+    assert findings[0].severity == sra.SEV_OK
+    assert "2026-07-15" in findings[0].detail
+
+
+def test_freschezza_senza_date_nessun_rilievo():
+    page = _pagina_datata("https://mio.it/")
+    assert sra._audit_freshness([page], today=_OGGI) == []
+    rotta = _pagina_datata("https://mio.it/", modified="ieri sera")
+    assert sra._audit_freshness([rotta], today=_OGGI) == []

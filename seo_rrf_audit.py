@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import datetime
 import gzip
 import hashlib
 import html
@@ -98,7 +99,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.26.0"
+__version__ = "1.27.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -529,6 +530,11 @@ LIFECYCLE_HINTS: Dict[str, str] = {
     "faq": "Domande frequenti",
     "prospettive": "Prospettive e tendenze",
 }
+
+# Freschezza dei contenuti (da Features.md): eta' dell'ultimo
+# aggiornamento dichiarato. Soglie di prassi a uno e due anni.
+FRESH_WARN_DAYS = 365
+FRESH_STALE_DAYS = 730
 
 # Riferimenti bibliografici (da Features.md): sezione fonti negli
 # heading e citazioni accademiche nel testo. Completano i segnali
@@ -2720,6 +2726,77 @@ def _audit_lifecycle(good: Sequence[Page]) -> List[Finding]:
         weight=2.0 if len(covered) <= 2 else 1.0)]
 
 
+def _page_last_update(page: Page) -> Optional["datetime.date"]:
+    """Data di aggiornamento piu' recente dichiarata dalla pagina.
+
+    Guarda i meta article:published_time/modified_time e i campi
+    datePublished/dateModified nel JSON-LD; le date non ISO vengono
+    ignorate (la validita' dei formati e' gia' un controllo
+    Schema.org).
+    """
+    raw_dates = [d for d in (page.modified, page.published) if d]
+    for node in _jsonld_nodes(page.jsonld_raw):
+        for key in ("dateModified", "datePublished"):
+            value = node.get(key)
+            if isinstance(value, str):
+                raw_dates.append(value)
+    parsed = []
+    for raw in raw_dates:
+        try:
+            parsed.append(
+                datetime.date.fromisoformat(raw.strip()[:10]))
+        except ValueError:
+            continue
+    return max(parsed) if parsed else None
+
+
+def _audit_freshness(good: Sequence[Page],
+                     today: Optional["datetime.date"] = None
+                     ) -> List[Finding]:
+    """Freschezza dei contenuti (da Features.md).
+
+    La *presenza* delle date e' gia' un segnale E-E-A-T: qui se ne
+    valuta l'**eta'**. Conta l'aggiornamento dichiarato piu'
+    recente dell'intero sito; le pagine piu' vecchie sono riportate
+    come evidenza. Senza alcuna data non c'e' rilievo (per non
+    punire due volte lo stesso difetto). Soglie di prassi: oltre
+    un anno avvertenza, oltre due anni peso doppio.
+    """
+    today = today or datetime.date.today()
+    dated: List[Tuple["datetime.date", str]] = []
+    for p in good:
+        last = _page_last_update(p)
+        if last:
+            dated.append((last, p.url))
+    if not dated:
+        return []
+    newest, newest_url = max(dated)
+    age = (today - newest).days
+    if age <= FRESH_WARN_DAYS:
+        return [Finding(
+            AREA_SEM, SEV_OK,
+            "Contenuti aggiornati di recente",
+            "Ultimo aggiornamento dichiarato: %s su %s (%d giorni "
+            "fa)." % (newest.isoformat(), newest_url, max(0, age)))]
+    stale = sorted(dated)[:5]
+    quanto = ("due anni" if age > FRESH_STALE_DAYS else "un anno")
+    return [Finding(
+        AREA_SEM, SEV_WARNING,
+        "Contenuti fermi da oltre %s" % quanto,
+        "L'aggiornamento dichiarato piu' recente e' del %s (%d "
+        "giorni fa). I motori generativi preferiscono fonti "
+        "mantenute: una data ferma segnala contenuto "
+        "potenzialmente superato. Pagine piu' datate: %s."
+        % (newest.isoformat(), age,
+           ", ".join("%s (%s)" % (url, day.isoformat())
+                     for day, url in stale)),
+        "Rivedi i contenuti chiave e dichiara l'aggiornamento con "
+        "article:modified_time o dateModified nel JSON-LD.",
+        example="<meta property=\"article:modified_time\" "
+                "content=\"%s\">" % today.isoformat(),
+        weight=2.0 if age > FRESH_STALE_DAYS else 1.0)]
+
+
 def _audit_references(good: Sequence[Page]) -> List[Finding]:
     """Riferimenti bibliografici (da Features.md).
 
@@ -2793,6 +2870,7 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
     out.extend(_audit_filler(good))
     out.extend(_audit_lifecycle(good))
     out.extend(_audit_references(good))
+    out.extend(_audit_freshness(good))
 
     out.append(Finding(
         AREA_SEM, SEV_OK if len(chunks) >= 20 else SEV_WARNING,

@@ -321,7 +321,9 @@ riproducibile.
    (sezione fonti, citazioni `[1]`/(Autore, anno), link esterni come
    contesto), ampiezza del vocabolario, segnali **E-E-A-T**
    (autore dichiarato, date di pubblicazione/aggiornamento, pagina
-   "chi siamo", contatti verificabili). Stopword e pattern
+   "chi siamo", contatti verificabili) e **freschezza** (età
+   dell'ultimo aggiornamento dichiarato: oltre un anno avvertenza,
+   oltre due peso doppio). Stopword e pattern
    linguistici (definizioni, anafore, esempi, FAQ, domande) coprono
    **italiano, inglese, francese, tedesco e spagnolo** (v1.20.0).
 4. **Dati strutturati** — inventario dei tipi JSON-LD, entità principale,
@@ -444,7 +446,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 215 test, ~15 secondi, nessun accesso alla rete esterna
+pytest            # 220 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

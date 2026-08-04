@@ -16,9 +16,6 @@ analizzato e distillato qui il 2026-08-04; il documento originale
 non è nel repo) — tutti offline, per pagina, da innestare nelle
 aree esistenti:
 
-- [ ] **Freschezza dei contenuti**: oggi verifichiamo solo la
-      *presenza* di published/modified; valutarne l'età (contenuto
-      datato senza aggiornamenti → avvertenza).
 - [ ] **HTML semantico**: uso di `<article>`/`<section>`/
       `<details>`/`<figure>`, rapporto div/elementi ("divitis") —
       i chunker dei motori generativi segmentano su questi tag.

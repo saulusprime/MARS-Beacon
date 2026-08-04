@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.26.0, ~5380
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.27.0, ~5460
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -437,6 +437,20 @@ giudizio. Basta una sezione fonti *o* almeno 3 citazioni per l'OK
 Fonti pronto (ISS, PubMed). Sforzo "ore". 5 test nuovi (215
 totali). Trappola: `.capitalize()` minuscolizza il resto della
 stringa — mai usarlo su testo che contiene evidenze citate.
+
+Novità 1.27.0 (2026-08-04): freschezza dei contenuti (da
+Features.md). La *presenza* delle date era già un segnale E-E-A-T:
+ora se ne valuta l'**età**. `_page_last_update` raccoglie la data
+più recente dichiarata da ogni pagina (meta
+article:published/modified_time e datePublished/dateModified nel
+JSON-LD, formati non ISO ignorati); `_audit_freshness` giudica
+l'aggiornamento più recente dell'intero sito con soglie di prassi
+a **un anno** (avvertenza) e **due anni** (peso doppio), elencando
+le pagine più datate come evidenza. Senza alcuna data non c'è
+rilievo: il difetto è già coperto dall'E-E-A-T, e non si punisce
+due volte. Fix con meta `article:modified_time` pronto datato a
+oggi; sforzo "giorni". Il parametro `today` iniettabile rende i
+test deterministici. 5 test nuovi (220 totali).
 
 ## Uso
 
