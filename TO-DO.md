@@ -116,8 +116,6 @@ in P1), distribuzione della profondità di crawl.
       verifica il contratto ARIA (23/23 controlli, registrata in
       docs/ACCESSIBILITA.md §1.1); da rieseguire prima della
       sessione umana e a ogni modifica di flusso.
-- [ ] Aggiornare la vendorizzazione di Bootstrap Italia con uno script
-      dedicato (`update-vendor.sh`) che scarichi e potri i formati legacy.
 - [ ] Incorporare il logo nel referto HTML autonomo (oggi la firma è
       testuale per contenere il peso del file) e valutare i font
       Titillium Web incorporati nel referto per la resa offline.

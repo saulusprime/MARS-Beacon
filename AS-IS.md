@@ -419,7 +419,11 @@ sono nel [README.md](README.md).
   alla volta con `409`), `GET /api/status` (stato, log, sintesi,
   rilievi, esiti RRF), `GET /api/report/{html,json,text}` con
   `?download=1`.
-- **Frontend Bootstrap Italia 2.18.2 in vanilla JavaScript**, asset
+- **Frontend Bootstrap Italia 2.18.3 in vanilla JavaScript**
+  (aggiornata dalla 2.18.2 il 2026-08-04 con
+  `tools/update-vendor.sh`, che scarica da npm e pota i formati
+  legacy — ttf/eot/map e non minificati; file `VERSIONE` nel
+  vendor), asset
   vendorizzati in `gui/vendor` (CSS, bundle JS, font woff/woff2,
   sprite icone, licenza): funziona offline, nessun CDN. Modulo con
   tutti i parametri della CLI e suggerimenti contestuali, avanzamento

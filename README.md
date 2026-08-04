@@ -121,8 +121,9 @@ framework) per configurare l'audit da modulo, seguire l'avanzamento in
 tempo reale e fruire direttamente del referto. Non richiede dipendenze
 oltre a quelle dello script: il server è solo libreria standard e gli
 asset di Bootstrap Italia sono vendorizzati in `gui/vendor` (funziona
-anche senza rete). Una sola scansione del sito produce tutti e tre i
-formati di referto.
+anche senza rete; si aggiornano con `tools/update-vendor.sh`, che
+scarica il pacchetto ufficiale da npm e pota i formati legacy). Una
+sola scansione del sito produce tutti i formati di referto.
 
 Cosa offre:
 
