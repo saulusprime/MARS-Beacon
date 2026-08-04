@@ -300,7 +300,9 @@ riproducibile.
    dedicato; il meta scoped a `bingbot` prevale), **meta di base**
    (charset, viewport e completezza Open Graph: la triade
    og:title/description/image governa le anteprime), grafo dei link
-   interni (pagine orfane, profondità oltre 3 click, anchor generiche),
+   interni (pagine orfane, profondità oltre 3 click, anchor generiche,
+   **varietà degli anchor**: dopo la deduplica del menu, lo stesso
+   testo verso destinazioni diverse è un'avvertenza),
    pagine segnaposto del CMS, `noindex`, canonical, contenuto
    solo-JavaScript, hreflang, contenuti duplicati (deduplica per impronta
    del testo).
@@ -451,7 +453,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 227 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 232 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

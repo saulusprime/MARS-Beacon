@@ -99,7 +99,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.29.0"
+__version__ = "1.30.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -531,6 +531,14 @@ LIFECYCLE_HINTS: Dict[str, str] = {
     "prospettive": "Prospettive e tendenze",
 }
 
+# Varieta' degli anchor interni (da Features.md): dopo la
+# deduplica delle coppie (testo, destinazione) — il menu ripetuto
+# su ogni pagina conta una volta — un profilo sano ha un testo per
+# destinazione. Lo stesso testo verso destinazioni diverse e'
+# ambiguita' ("leggi" -> 5 pagine). Soglie di prassi.
+ANCHOR_MIN_PAIRS = 10
+ANCHOR_VARIETY_GOOD = 0.8
+
 # HTML semantico (da Features.md): i chunker dei motori generativi
 # segmentano sui tag di sezionamento; una pagina di soli <div> e'
 # piu' difficile da spezzare in blocchi coerenti. Soglie di prassi
@@ -923,6 +931,8 @@ class Page:
     contact_links: int = 0
     generic_anchors: int = 0
     internal_targets: List[str] = field(default_factory=list)
+    internal_anchors: List[Tuple[str, str]] = field(
+        default_factory=list)
     og: Dict[str, str] = field(default_factory=dict)
     hreflang: List[str] = field(default_factory=list)
     headings: List[Tuple[int, str]] = field(default_factory=list)
@@ -1637,10 +1647,14 @@ def extract_content(page: Page, raw_html: str) -> None:
         target = urlparse(absolute).netloc
         if target == host:
             page.internal_links += 1
-            page.internal_targets.append(norm_url(absolute))
+            target_norm = norm_url(absolute)
+            page.internal_targets.append(target_norm)
             text = " ".join(anchor.get_text(" ").split())
             if GENERIC_ANCHOR_RE.match(text):
                 page.generic_anchors += 1
+            if len(text) >= 3:
+                page.internal_anchors.append(
+                    (text.lower(), target_norm))
         elif target:
             page.external_links += 1
 
@@ -2181,6 +2195,59 @@ def _audit_msft_ai_optout(pages: Sequence[Page]) -> List[Finding]:
     return out
 
 
+def _audit_anchor_variety(good: Sequence[Page]) -> List[Finding]:
+    """Varieta' del profilo di anchor interni (da Features.md).
+
+    Estende il controllo sulle anchor generiche: le coppie (testo,
+    destinazione) vengono deduplicate sull'intero sito (il menu
+    identico su ogni pagina conta una volta), poi la varieta' e'
+    testi unici / coppie uniche. Sotto ANCHOR_VARIETY_GOOD lo
+    stesso testo punta a piu' destinazioni: chi legge (umano o
+    modello) non puo' prevedere dove porta il link. Sotto
+    ANCHOR_MIN_PAIRS coppie non si giudica.
+    """
+    pairs: Set[Tuple[str, str]] = set()
+    for p in good:
+        pairs.update(p.internal_anchors)
+    if len(pairs) < ANCHOR_MIN_PAIRS:
+        return []
+    by_text: Dict[str, Set[str]] = {}
+    for text, target in pairs:
+        by_text.setdefault(text, set()).add(target)
+    ratio = len(by_text) / len(pairs)
+    if ratio >= ANCHOR_VARIETY_GOOD:
+        return [Finding(
+            AREA_TECH, SEV_OK,
+            "Profilo di anchor interni vario",
+            "%d testi unici su %d coppie testo-destinazione "
+            "(%.0f%%; soglia di prassi: %.0f%%)."
+            % (len(by_text), len(pairs), 100 * ratio,
+               100 * ANCHOR_VARIETY_GOOD))]
+    ambigui = sorted(
+        ((text, targets) for text, targets in by_text.items()
+         if len(targets) > 1),
+        key=lambda item: -len(item[1]))[:3]
+    return [Finding(
+        AREA_TECH, SEV_WARNING,
+        "Profilo di anchor interni ripetitivo",
+        "%d testi unici su %d coppie testo-destinazione (%.0f%%, "
+        "soglia di prassi %.0f%%): lo stesso testo porta a "
+        "destinazioni diverse e chi legge — umano o modello — non "
+        "puo' prevedere dove va il link. %s"
+        % (len(by_text), len(pairs), 100 * ratio,
+           100 * ANCHOR_VARIETY_GOOD,
+           "; ".join("\"%s\" -> %d destinazioni"
+                     % (text, len(targets))
+                     for text, targets in ambigui)),
+        "Usa anchor descrittivi e distinti per destinazione: il "
+        "testo del link deve dire cosa si trova dall'altra parte.",
+        example="Prima: \"Leggi tutto\" -> /servizi, \"Leggi "
+                "tutto\" -> /prezzi\n"
+                "Dopo:  \"Tutti i servizi di drenaggio\" -> "
+                "/servizi, \"Prezzi delle sedute\" -> /prezzi",
+        weight=1.0)]
+
+
 OG_CORE = ("og:title", "og:description", "og:image")
 
 
@@ -2384,6 +2451,7 @@ def audit_technical(pages: List[Page], base: str,
 
     out.extend(_audit_msft_ai_optout(good))
     out.extend(_audit_basic_meta(good))
+    out.extend(_audit_anchor_variety(good))
 
     no_canonical = [p for p in good if not p.canonical]
     if no_canonical:

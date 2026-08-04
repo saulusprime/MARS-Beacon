@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.29.0, ~5630
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.30.0, ~5700
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -481,6 +481,21 @@ risposte degli assistenti si costruiscono da lì), e Open Graph
 incompleto con l'elenco di cosa manca per URL. Tutto a posto →
 un solo OK cumulativo per non fare rumore. 3 test nuovi (227
 totali) su pagine HTML reali.
+
+Novità 1.30.0 (2026-08-04): varietà degli anchor interni — ultimo
+dei **nove controlli distillati da Features.md, ora tutti
+realizzati** (v1.22.0→v1.30.0). `extract_content` raccoglie le
+coppie (testo, destinazione) dei link interni (nuovo campo
+`Page.internal_anchors`, testi ≥ 3 caratteri, minuscoli). Il
+controllo deduplica le coppie sull'intero sito — **il menu
+identico su ogni pagina conta una volta**, evitando il falso
+positivo strutturale — e misura testi unici / coppie uniche: sotto
+l'80% (soglia di prassi) lo stesso testo punta a destinazioni
+diverse ("leggi tutto" → 8 pagine) e chi legge, umano o modello,
+non può prevedere dove porta il link. Avvertenza con i testi
+ambigui come evidenza ed esempio prima/dopo; sotto le 10 coppie
+non si giudica. Nell'area tecnica, accanto alle anchor generiche
+che estende. 5 test nuovi (232 totali).
 
 ## Uso
 

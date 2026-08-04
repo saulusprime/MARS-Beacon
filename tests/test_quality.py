@@ -908,3 +908,64 @@ def test_open_graph_incompleto_dice_cosa_manca():
     og = [f for f in findings if "incompleto" in f.title]
     assert og and "og:image" in og[0].detail
     assert "og:description" in og[0].detail
+
+
+# ---------------- varieta' degli anchor interni ----------------
+
+def _pagina_anchor(coppie):
+    page = sra.Page(url="https://mio.it/", status=200,
+                    text="testo", word_count=300)
+    page.internal_anchors = coppie
+    return page
+
+
+def test_anchor_vari_ok():
+    coppie = [("servizio %d" % i, "https://mio.it/s%d" % i)
+              for i in range(12)]
+    findings = sra._audit_anchor_variety([_pagina_anchor(coppie)])
+    assert findings[0].severity == sra.SEV_OK
+    assert "12 testi unici su 12 coppie" in findings[0].detail
+
+
+def test_menu_ripetuto_non_penalizza():
+    """Lo stesso menu su ogni pagina si deduplica: una coppia."""
+    menu = [("servizi", "https://mio.it/servizi"),
+            ("prezzi", "https://mio.it/prezzi")]
+    extra = [("pagina %d" % i, "https://mio.it/p%d" % i)
+             for i in range(10)]
+    pages = [_pagina_anchor(menu + extra[:5]),
+             _pagina_anchor(menu + extra[5:])]
+    findings = sra._audit_anchor_variety(pages)
+    assert findings[0].severity == sra.SEV_OK
+
+
+def test_stesso_testo_verso_piu_destinazioni():
+    coppie = [("leggi tutto", "https://mio.it/p%d" % i)
+              for i in range(8)]
+    coppie += [("contatti", "https://mio.it/contatti"),
+               ("chi siamo", "https://mio.it/chi-siamo"),
+               ("servizi", "https://mio.it/servizi")]
+    findings = sra._audit_anchor_variety([_pagina_anchor(coppie)])
+    assert findings[0].severity == sra.SEV_WARNING
+    assert "\"leggi tutto\" -> 8 destinazioni" in findings[0].detail
+    assert findings[0].fix and findings[0].example
+
+
+def test_pochi_anchor_nessun_giudizio():
+    coppie = [("servizi", "https://mio.it/servizi")]
+    assert sra._audit_anchor_variety(
+        [_pagina_anchor(coppie)]) == []
+
+
+def test_estrazione_anchor_interni():
+    html_text = ("<!DOCTYPE html><html lang=\"it\"><head><title>P"
+                 "</title></head><body>"
+                 "<a href=\"/servizi\">Tutti i servizi</a>"
+                 "<a href=\"/prezzi\">OK</a>"  # < 3 caratteri: fuori
+                 "<a href=\"https://altro.it/x\">Esterno</a>"
+                 "</body></html>")
+    page = sra.parse_page(
+        "https://mio.it/", _fake_response("https://mio.it/",
+                                          html_text))
+    assert page.internal_anchors == [
+        ("tutti i servizi", "https://mio.it/servizi")]

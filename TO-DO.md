@@ -11,14 +11,13 @@ sono proposte.
 
 ## P1 — Qualità dell'analisi
 
-Nuovi controlli tratti da Features.md (concept "Citability Index"
-analizzato e distillato qui il 2026-08-04; il documento originale
-non è nel repo) — tutti offline, per pagina, da innestare nelle
-aree esistenti:
-
-- [ ] **Varietà degli anchor interni**: oltre alle anchor generiche
-      già segnalate, misurare la varietà del profilo (rapporto testi
-      unici/totali).
+I nove controlli distillati da Features.md (concept "Citability
+Index", 2026-08-04; documento originale non nel repo) sono TUTTI
+realizzati fra la v1.22.0 e la v1.30.0 — estraibilità diretta,
+densità informativa, clickbait, ciclo di vita, riferimenti
+bibliografici, freschezza, HTML semantico, meta di base, varietà
+degli anchor — ciascuno innestato nell'area che alimenta la lente
+di citabilità prevista (vedi AS-IS).
 
 ## P2 — Citabilità multi-modello (da Features.md)
 
@@ -38,10 +37,11 @@ remediation annotato e ordinato per guadagno di citabilità, badge
 sui rilievi che deprimono più profili — vedi AS-IS) e il **giudizio
 LLM** nella v1.18.0/GUI v2.8.0 (`--judge`, **attivo di default** in
 `auto` per decisione di progetto del 2026-08-04: parte da solo con
-la chiave presente, senza chiave l'audit resta offline); quando i
-nuovi controlli del P1 qui sopra saranno implementati, andranno
-innestati come componenti dei profili (estraibilità/densità →
-Claude, ciclo di vita/riferimenti → Kimi, HTML semantico → Qwen).
+la chiave presente, senza chiave l'audit resta offline). I nove
+controlli del P1 sono stati innestati nelle aree previste
+(estraibilità/densità → semantica/Claude, ciclo di
+vita/riferimenti → semantica/Kimi, HTML semantico → dati
+strutturati/Qwen): le lenti li assorbono senza ritocchi ai pesi.
 
 - [ ] **Ancora di realtà facoltativa**: verifica del posizionamento
       sulle query dell'audit via un'API di ricerca esterna (es.
