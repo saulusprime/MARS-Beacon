@@ -13,6 +13,8 @@ Provider supportati:
                 Richiede: pip install anthropic e ANTHROPIC_API_KEY
                 (o un profilo `ant auth login`).
   - perplexity  Perplexity Sonar. Richiede PERPLEXITY_API_KEY.
+  - openai      ChatGPT via Responses API con web_search.
+                Richiede OPENAI_API_KEY.
 
 Le chiavi API si passano SOLO via variabili d'ambiente, mai da
 riga di comando.
@@ -43,9 +45,10 @@ from urllib.parse import urlparse
 
 import requests
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 DEFAULT_MODEL = "claude-opus-5"
+OPENAI_MODEL = "gpt-5.6"
 MAX_QUERIES = 15
 WEB_SEARCH_MAX_USES = 5
 PAUSE_TURN_RESTARTS = 5
@@ -215,9 +218,85 @@ class PerplexityProvider:
         return answer
 
 
+class OpenAIProvider:
+    """ChatGPT con ricerca web, via Responses API.
+
+    POST /v1/responses con tool ``{"type": "web_search"}``: le
+    citazioni stanno nelle annotation ``url_citation`` dei blocchi
+    di testo del messaggio; le fonti consultate, quando esposte,
+    nel campo ``sources`` dell'item ``web_search_call``. Fonte:
+    developers.openai.com, guida "Web search" (verificata il
+    2026-08-04).
+    """
+
+    name = "openai"
+    endpoint = "https://api.openai.com/v1/responses"
+
+    def __init__(self, model: str = OPENAI_MODEL,
+                 api_key: Optional[str] = None,
+                 endpoint: Optional[str] = None) -> None:
+        self.api_key = api_key or os.environ.get(
+            "OPENAI_API_KEY", "")
+        if not self.api_key:
+            raise RuntimeError(
+                "provider 'openai' richiede la variabile "
+                "d'ambiente OPENAI_API_KEY")
+        if endpoint:
+            self.endpoint = endpoint
+        self.model = model
+
+    def ask(self, query: str) -> ProviderAnswer:
+        answer = ProviderAnswer(provider=self.name, query=query)
+        try:
+            resp = requests.post(
+                self.endpoint,
+                headers={"Authorization": "Bearer %s"
+                                          % self.api_key},
+                json={"model": self.model,
+                      "tools": [{"type": "web_search"}],
+                      "input": query},
+                timeout=90)
+        except requests.RequestException as exc:
+            answer.ok = False
+            answer.error = "errore di rete: %s" % exc
+            return answer
+        if resp.status_code != 200:
+            answer.ok = False
+            answer.error = "HTTP %d" % resp.status_code
+            return answer
+        data = resp.json()
+        for item in data.get("output", []) or []:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "message":
+                for block in item.get("content", []) or []:
+                    if not isinstance(block, dict):
+                        continue
+                    for ann in block.get("annotations", []) or []:
+                        if isinstance(ann, dict) \
+                                and ann.get("type") \
+                                == "url_citation":
+                            url = str(ann.get("url", ""))
+                            if url and url not in answer.cited_urls:
+                                answer.cited_urls.append(url)
+            elif item.get("type") == "web_search_call":
+                action = item.get("action")
+                sources = []
+                if isinstance(action, dict):
+                    sources = action.get("sources") or []
+                sources = sources or item.get("sources") or []
+                for src in sources:
+                    url = (src.get("url", "")
+                           if isinstance(src, dict) else str(src))
+                    if url and url not in answer.searched_urls:
+                        answer.searched_urls.append(url)
+        return answer
+
+
 PROVIDERS = {
     "anthropic": AnthropicProvider,
     "perplexity": PerplexityProvider,
+    "openai": OpenAIProvider,
 }
 
 
@@ -450,6 +529,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", default=DEFAULT_MODEL,
                         help="modello Claude per il provider "
                              "anthropic (default %s)" % DEFAULT_MODEL)
+    parser.add_argument("--openai-model", default=OPENAI_MODEL,
+                        dest="openai_model",
+                        help="modello per il provider openai "
+                             "(default %s)" % OPENAI_MODEL)
     parser.add_argument("--max-queries", type=int, default=MAX_QUERIES,
                         help="numero massimo di query (default %d)"
                              % MAX_QUERIES)
@@ -491,6 +574,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         try:
             if name == "anthropic":
                 providers.append(AnthropicProvider(model=args.model))
+            elif name == "openai":
+                providers.append(
+                    OpenAIProvider(model=args.openai_model))
             else:
                 providers.append(PROVIDERS[name]())
         except RuntimeError as exc:

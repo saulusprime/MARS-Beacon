@@ -969,3 +969,54 @@ def test_estrazione_anchor_interni():
                                           html_text))
     assert page.internal_anchors == [
         ("tutti i servizi", "https://mio.it/servizi")]
+
+
+# ---------------- query reali da Search Console ----------------
+
+def test_gsc_csv_italiano_ordinato_per_clic(tmp_path):
+    csv_it = tmp_path / "Query.csv"
+    csv_it.write_text(
+        "Query principali,Clic,Impressioni,CTR,Posizione\n"
+        "drenaggio linfatico parma,120,\"1.540\",\"7,79%\",\"3,2\"\n"
+        "linfodrenaggio costo,45,890,\"5,06%\",\"5,1\"\n"
+        "drenaggio linfatico parma,10,100,\"10%\",\"9\"\n"
+        "pressoterapia,300,\"2.100\",\"14,29%\",\"2,4\"\n"
+        ",,,,\n", encoding="utf-8")
+    queries = sra.load_gsc_queries(str(csv_it))
+    assert queries == ["pressoterapia",
+                       "drenaggio linfatico parma",
+                       "linfodrenaggio costo"], \
+        "ordinate per clic, deduplicate, righe vuote ignorate"
+
+
+def test_gsc_csv_inglese_punto_e_virgola(tmp_path):
+    csv_en = tmp_path / "Queries.csv"
+    csv_en.write_text(
+        "Top queries;Clicks;Impressions;CTR;Position\n"
+        "lymphatic drainage;10;500;2%;4.1\n"
+        "manual massage;25;300;8.3%;2.2\n", encoding="utf-8")
+    queries = sra.load_gsc_queries(str(csv_en))
+    assert queries == ["manual massage", "lymphatic drainage"]
+
+
+def test_gsc_rispetta_il_limite(tmp_path):
+    righe = ["Query,Clic,Impressioni"]
+    righe += ["query %02d,%d,10" % (i, 100 - i) for i in range(30)]
+    path = tmp_path / "molte.csv"
+    path.write_text("\n".join(righe) + "\n", encoding="utf-8")
+    queries = sra.load_gsc_queries(str(path))
+    assert len(queries) == sra.GSC_QUERIES_LIMIT
+    assert queries[0] == "query 00"
+
+
+def test_gsc_cli_conflitto_e_file_mancante(tmp_path):
+    qfile = tmp_path / "q.txt"
+    qfile.write_text("una query\n", encoding="utf-8")
+    rc = sra.main(["https://x.it", "--queries", str(qfile),
+                   "--queries-gsc", str(tmp_path / "g.csv"),
+                   "--quiet"])
+    assert rc == 2
+    rc = sra.main(["https://x.it",
+                   "--queries-gsc", str(tmp_path / "assente.csv"),
+                   "--quiet"])
+    assert rc == 2

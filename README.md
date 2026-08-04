@@ -82,6 +82,7 @@ python3 seo_rrf_audit.py https://esempio.it \
 |---|---|---|
 | `--max-pages N` | 25 | numero massimo di pagine analizzate |
 | `--queries FILE` | — | una query per riga; se omesso le query sono auto-generate dai bigrammi tematici di heading e title, **nella lingua prevalente del sito** (it/en/fr/de/es dall'attributo `lang`; default italiano) |
+| `--queries-gsc CSV` | — | **query reali da Google Search Console**: l'export CSV "Query" del rapporto Rendimento (intestazioni it/en, virgola o punto e virgola) — prime 15 per clic e impressioni, deduplicate. La simulazione RRF gira sulle domande vere degli utenti invece che sui bigrammi. Non combinabile con `--queries` |
 | `--embeddings MODELLO` | auto | modello sentence-transformers per il recupero vettoriale reale. Se omesso e la libreria è installata viene usato il modello multilingue predefinito; `none` forza il proxy char-TFIDF |
 | `--rrf-k N` | 60 | costante k della formula RRF (propagata a tutti i renderer) |
 | `--top-n N` | 5 | posti fusi considerati per query (1–20): governa il consenso e la share of voice |
@@ -229,8 +230,12 @@ citati i concorrenti (`--competitor`, max 3).
   di ricerca web; modello predefinito `claude-opus-5`, configurabile
   con `--model`; le richieste declinate dai classificatori vengono
   rieseguite sul modello di ripiego raccomandato grazie al fallback
-  server-side attivo di default) e `perplexity` (Sonar, citazioni
-  native). Ripetibile; OpenAI in TO-DO.
+  server-side attivo di default), `perplexity` (Sonar, citazioni
+  native) e `openai` (ChatGPT via **Responses API** con lo strumento
+  `web_search`: citazioni dalle annotation `url_citation`, fonti
+  consultate dal campo `sources`; modello predefinito `gpt-5.6`,
+  configurabile con `--openai-model`, chiave da `OPENAI_API_KEY`).
+  Ripetibile.
 - **Monitoraggio nel tempo**: `--history FILE` accoda ogni esecuzione
   a uno storico JSONL e il referto mostra il **delta** rispetto alla
   precedente; `--fail-under PCT` fa uscire con codice `1` sotto
@@ -456,7 +461,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 237 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 245 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.31.0
+## Strumento CLI — `seo_rrf_audit.py` v1.32.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -213,8 +213,11 @@ sono nel [README.md](README.md).
   non trovata" nel title/H1, o nel corpo se molto breve); i
   Content-Type non analizzabili (PDF, immagini, archivi) non vengono
   scaricati: stato e header bastano a classificarli nel referto.
-- **Query di prova** da file (`--queries`) o auto-generate dai
-  bigrammi tematici di heading e title, senza query degeneri.
+- **Query di prova** da file (`--queries`), **reali da Google
+  Search Console** (`--queries-gsc`, v1.32.0: export CSV del
+  rapporto Rendimento, intestazioni it/en, prime 15 per clic e
+  impressioni deduplicate) o auto-generate dai bigrammi tematici
+  di heading e title, senza query degeneri.
 - **Tre formati di referto** (`text`, `json`, `html` autonomo con tema
   chiaro/scuro) su stdout o file; codici di uscita `0/1/2/130` adatti
   all'uso come gate in CI.
@@ -405,7 +408,7 @@ sono nel [README.md](README.md).
   filesystem in sola lettura e riavvio automatico, per le
   installazioni presso i clienti.
 
-## Monitoraggio citazioni IA — `seo_rrf_citations.py` v1.0.0
+## Monitoraggio citazioni IA — `seo_rrf_citations.py` v1.1.0
 
 - Interroga assistenti IA con ricerca web sulle query target del sito
   (da file o riusate dal referto JSON dell'audit con `--from-audit`) e
@@ -413,8 +416,11 @@ sono nel [README.md](README.md).
   **consultato**, o sostituito dai **concorrenti** (max 3).
 - Provider: **anthropic** (SDK ufficiale, `claude-opus-5` con
   strumento `web_search`, gestione `pause_turn`/`refusal`, fallback
-  server-side attivo di default) e **perplexity** (Sonar). Chiavi API
-  solo via variabili d'ambiente.
+  server-side attivo di default), **perplexity** (Sonar) e
+  **openai** (v1.1.0: ChatGPT via Responses API con `web_search`,
+  citazioni dalle annotation `url_citation`, fonti consultate dal
+  campo `sources`; modello `gpt-5.6` configurabile con
+  `--openai-model`). Chiavi API solo via variabili d'ambiente.
 - **Storico JSONL** con delta fra esecuzioni, soglia `--fail-under`
   con codice d'uscita 1 per l'alerting, referti text/JSON, limiti di
   costo (max 15 query, max 5 ricerche per risposta, pausa fra query).
@@ -440,7 +446,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 237 test in ~16 secondi** (`tests/`), senza rete
+- **Suite pytest: 245 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

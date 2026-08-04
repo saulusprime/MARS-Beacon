@@ -50,14 +50,40 @@ FAKE_PERPLEXITY = {
 }
 
 
+FAKE_OPENAI = {
+    "id": "resp_test",
+    "object": "response",
+    "model": "gpt-5.6",
+    "output": [
+        {"type": "web_search_call", "status": "completed",
+         "action": {"type": "search", "query": "drenaggio",
+                    "sources": [{"url": "https://mio.it/faq"},
+                                {"url": "https://terzo.it/blog"}]}},
+        {"type": "message", "role": "assistant", "content": [
+            {"type": "output_text",
+             "text": "Il drenaggio linfatico è una tecnica...",
+             "annotations": [
+                 {"type": "url_citation",
+                  "url": "https://www.mio.it/servizi",
+                  "title": "Servizi"},
+                 {"type": "url_citation",
+                  "url": "https://altro.it/guida",
+                  "title": "Guida"},
+             ]}]},
+    ],
+}
+
+
 class FakeApiHandler(BaseHTTPRequestHandler):
-    """Risponde come Anthropic o Perplexity a seconda del percorso."""
+    """Risponde come Anthropic, OpenAI o Perplexity per percorso."""
 
     def do_POST(self):  # noqa: N802 - firma di BaseHTTPServer
         length = int(self.headers.get("Content-Length", "0"))
         self.rfile.read(length)
         if self.path.startswith("/v1/messages"):
             body = json.dumps(FAKE_MESSAGE).encode("utf-8")
+        elif self.path.startswith("/v1/responses"):
+            body = json.dumps(FAKE_OPENAI).encode("utf-8")
         else:
             body = json.dumps(FAKE_PERPLEXITY).encode("utf-8")
         self.send_response(200)
@@ -179,3 +205,43 @@ def test_fail_under(fake_api, tmp_path, capsys, monkeypatch):
                    "--quiet", "--fail-under", "50"])
     capsys.readouterr()
     assert rc == 1, "Perplexity finto non cita mio.it: sotto soglia"
+
+
+def test_openai_provider_cita_e_consulta(fake_api):
+    provider = src.OpenAIProvider(
+        api_key="test-key",
+        endpoint=fake_api + "/v1/responses")
+    answer = provider.ask("cos'e' il drenaggio linfatico")
+    assert answer.ok
+    assert "https://www.mio.it/servizi" in answer.cited_urls
+    assert "https://altro.it/guida" in answer.cited_urls
+    assert "https://mio.it/faq" in answer.searched_urls
+
+
+def test_openai_senza_chiave_rifiutato(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    try:
+        src.OpenAIProvider()
+        assert False, "attesa RuntimeError senza OPENAI_API_KEY"
+    except RuntimeError as exc:
+        assert "OPENAI_API_KEY" in str(exc)
+
+
+def test_openai_registrato_fra_i_provider():
+    assert src.PROVIDERS["openai"] is src.OpenAIProvider
+
+
+def test_monitor_con_tre_provider(fake_api):
+    providers = [
+        src.AnthropicProvider(api_key="k", base_url=fake_api),
+        src.PerplexityProvider(api_key="k", endpoint=fake_api),
+        src.OpenAIProvider(api_key="k",
+                           endpoint=fake_api + "/v1/responses"),
+    ]
+    payload = src.run_monitor("https://mio.it",
+                              ["cos'e' il drenaggio"],
+                              providers, delay=0.0, verbose=False)
+    stats = payload["providers"]
+    assert set(stats) == {"anthropic", "perplexity", "openai"}
+    assert stats["openai"]["site_cited"] == 1
+    assert stats["openai"]["rate"] == 100.0

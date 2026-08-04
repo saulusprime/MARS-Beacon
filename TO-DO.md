@@ -53,10 +53,13 @@ commerciale, non di sviluppo — il white-label è già in P2 — GUI).
 
 ## P2 — Simulazione RRF più realistica
 
-- [ ] Query reali da **Google Search Console** (import CSV/API) al posto dei
-      soli bigrammi auto-generati.
-- [ ] Provider **OpenAI** nel monitoraggio citazioni (Responses API con
-      web_search) accanto ad anthropic e perplexity.
+Sezione completata il 2026-08-04: query reali da Search Console
+(`--queries-gsc`, v1.32.0), parametri esposti (`--top-n`,
+`--rrf-weights`, `--chunk-words`, v1.31.0) e provider **openai**
+nel monitor citazioni (v1.1.0) — vedi AS-IS. Restano qui le idee
+"online" collegate: l'ancora di realtà (Brave Search API) è in
+P2 — Citabilità multi-modello; l'import da API GSC (OAuth) è
+volutamente fuori scope per la filosofia offline.
 
 ## P2 — Output e reportistica
 

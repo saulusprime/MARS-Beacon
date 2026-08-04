@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import csv
 import datetime
 import gzip
 import hashlib
@@ -99,7 +100,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.31.0"
+__version__ = "1.32.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -3669,6 +3670,72 @@ QUERY_BANNED = {
 }
 
 
+# Query reali da Google Search Console: quante prenderne dal CSV.
+GSC_QUERIES_LIMIT = 15
+
+
+def load_gsc_queries(path: str,
+                     limit: int = GSC_QUERIES_LIMIT) -> List[str]:
+    """Query reali dall'export CSV di Google Search Console.
+
+    Legge il CSV "Query" dell'export Rendimento (intestazioni
+    italiane o inglesi, delimitatore virgola o punto e virgola,
+    BOM tollerato), ordina per clic e poi impressioni decrescenti
+    e restituisce fino a ``limit`` query deduplicate. Righe vuote
+    o coi numeri illeggibili non fermano l'import: clic e
+    impressioni sono interi, i separatori delle migliaia vengono
+    ignorati.
+    """
+    with open(path, encoding="utf-8-sig", newline="") as handle:
+        sample = handle.read(4096)
+        handle.seek(0)
+        delimiter = (";" if sample.count(";") > sample.count(",")
+                     else ",")
+        reader = csv.reader(handle, delimiter=delimiter)
+        header = next(reader, None)
+        if not header:
+            return []
+        low = [h.strip().lower() for h in header]
+
+        def col(*prefixes: str) -> Optional[int]:
+            for i, name in enumerate(low):
+                if any(name.startswith(p) for p in prefixes):
+                    return i
+            return None
+
+        q_col = col("query", "top quer", "consultas")
+        q_col = 0 if q_col is None else q_col
+        c_col = col("clic", "click")
+        i_col = col("impression", "impressioni")
+
+        def num(row: List[str], idx: Optional[int]) -> int:
+            if idx is None or idx >= len(row):
+                return 0
+            digits = re.sub(r"[^\d]", "", row[idx])
+            return int(digits) if digits else 0
+
+        rows: List[Tuple[int, int, str]] = []
+        for row in reader:
+            if not row or q_col >= len(row):
+                continue
+            query = row[q_col].strip()
+            if query:
+                rows.append((num(row, c_col), num(row, i_col),
+                             query))
+
+    rows.sort(key=lambda r: (-r[0], -r[1]))
+    seen: Set[str] = set()
+    out: List[str] = []
+    for _clicks, _imps, query in rows:
+        if query.lower() in seen:
+            continue
+        seen.add(query.lower())
+        out.append(query)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def dominant_language(pages: Sequence[Page]) -> str:
     """Lingua prevalente dichiarata dalle pagine (default 'it').
 
@@ -5489,6 +5556,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--queries", metavar="FILE",
                         help="file con una query per riga; se omesso "
                              "le query sono generate dai temi del sito")
+    parser.add_argument("--queries-gsc", metavar="CSV",
+                        dest="queries_gsc",
+                        help="export CSV 'Query' di Google Search "
+                             "Console (Rendimento): usa le query "
+                             "reali (prime %d per clic e "
+                             "impressioni) al posto di quelle "
+                             "auto-generate; non combinabile con "
+                             "--queries" % GSC_QUERIES_LIMIT)
     parser.add_argument("--embeddings", metavar="MODELLO", default="",
                         help="modello sentence-transformers per il "
                              "recupero vettoriale reale. Se omesso e "
@@ -5708,6 +5783,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               % (args.max_body, ram, max(1.0, ram * 0.1)),
               file=sys.stderr)
 
+    if args.queries and args.queries_gsc:
+        print("--queries e --queries-gsc non sono combinabili: "
+              "scegli una sola sorgente di query.", file=sys.stderr)
+        return 2
+
     queries: List[str] = []
     if args.queries:
         try:
@@ -5717,6 +5797,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print("Impossibile leggere %s: %s" % (args.queries, exc),
                   file=sys.stderr)
             return 2
+    elif args.queries_gsc:
+        try:
+            queries = load_gsc_queries(args.queries_gsc)
+        except OSError as exc:
+            print("Impossibile leggere %s: %s"
+                  % (args.queries_gsc, exc), file=sys.stderr)
+            return 2
+        if not queries:
+            print("Nessuna query utilizzabile in %s."
+                  % args.queries_gsc, file=sys.stderr)
+            return 2
+        if not args.quiet:
+            print("%d query reali da Search Console" % len(queries),
+                  file=sys.stderr)
 
     try:
         pages, findings, scores, results, mode, competitive = \

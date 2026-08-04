@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.31.0, ~5790
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.32.0, ~5890
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -513,6 +513,26 @@ server e inclusi nelle preimpostazioni. 5 test nuovi (237 totali)
 con la fusione pesata ancorata a mano (2/61+1/62). Nota di
 architettura: il chunking di default resta in extract_content; con
 un target diverso i chunk si ricostruiscono dai blocchi conservati.
+
+Novità 1.32.0 (2026-08-04): query reali da Google Search Console.
+`--queries-gsc CSV` legge l'export "Query" del rapporto Rendimento
+(`load_gsc_queries`: intestazioni italiane o inglesi, virgola o
+punto e virgola, BOM tollerato, separatori delle migliaia
+ignorati — clic e impressioni sono interi), ordina per clic poi
+impressioni, deduplica e usa le prime 15 come query della
+simulazione: le domande vere degli utenti al posto dei bigrammi
+auto-generati. Non combinabile con `--queries` (errore d'uso
+esplicito); righe illeggibili ignorate senza fermare l'import.
+Chiude "Simulazione RRF più realistica" insieme al provider
+OpenAI del monitor citazioni (v1.1.0): Responses API con
+`web_search` — citazioni dalle annotation `url_citation`, fonti
+consultate dal campo `sources` dell'item `web_search_call`
+(semantiche verificate su developers.openai.com e citate nel
+codice), chiave solo da `OPENAI_API_KEY`, modello `gpt-5.6`
+configurabile con `--openai-model`, server finto nei test come
+per gli altri provider. La GUI mostra il terzo provider nello
+storico citazioni senza modifiche (colonne e linee sono
+dinamiche). 8 test nuovi (245 totali).
 
 ## Uso
 
