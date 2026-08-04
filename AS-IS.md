@@ -1,11 +1,11 @@
 # AS-IS — Stato di fatto del progetto
 
-Fotografia di ciò che è **già realizzato e verificato** al 2026-08-03.
+Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 È il complemento di [TO-DO.md](TO-DO.md), che da qui in avanti elenca
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.10.0
+## Strumento CLI — `seo_rrf_audit.py` v1.18.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -37,7 +37,50 @@ sono nel [README.md](README.md).
   consenso per query nell'area RRF, evidenze E-E-A-T (dove sono
   stati trovati autore, date, chi-siamo, contatti), URL coinvolti
   nei rilievi su canonical/description/H1/noindex, esempi testuali
-  dei chunk anaforici e degli heading interrogativi.
+  dei chunk anaforici e degli heading interrogativi. Dalla v1.14.0
+  ogni intervento porta la **stima dello sforzo** (minuti/ore/giorni)
+  incrociata con la priorità: i critici da minuti sono marcati
+  **quick win** (badge in HTML/GUI, campi `effort`/`quick_win` nel
+  JSON); e tutti i referti includono **"la matematica del problema"**
+  — superficie attuale vs potenziale in chunk con proiezione
+  dichiarata e moltiplicatore dell'effetto sull'RRF (`surface_math`
+  nel JSON) — chiudendo il divario col referto consegnato a mano di
+  miaweb.art.
+- **Profili di citabilità per assistente IA** (v1.15.0, "lenti per
+  modello" da Features.md): quattro profili — Claude,
+  ChatGPT/Perplexity, Qwen, Kimi — che ripesano i punteggi di area
+  (più la profondità editoriale: parole medie per pagina sul target
+  di 900 di `surface_math`) secondo ciò che ciascun assistente
+  plausibilmente premia, con rinormalizzazione dei pesi se un'area
+  non ha punteggio. Indice composito pesato per mercato (`--market
+  occidentale|globale|orientale`, default occidentale). In tutti e
+  tre i referti (chiave JSON `citability`, sezione testuale, tabella
+  HTML con barre) con **nota di onestà sempre inclusa**: stime
+  euristiche derivate dalle metriche dell'audit, non comportamento
+  documentato dai vendor. Dalla v1.16.0 la sezione riporta le **top
+  azioni prioritarie**: le prime voci del piano di remediation
+  annotate con il profilo che guadagna di più dall'intervento
+  (variazione esatta del punteggio d'area proiettata sui pesi
+  rinormalizzati del profilo; `citability_actions` nel JSON).
+  Dalla v1.17.0 l'intero piano di remediation è annotato con i
+  guadagni (`index_gain`, `profiles_hit`, `cross`) e, a parità di
+  gravità, ordina per guadagno sull'indice composito del mercato
+  scelto: i **problemi trasversali** — che deprimono più profili
+  insieme — salgono in testa e portano un badge dedicato in
+  HTML/GUI; senza dati di citabilità l'ordinamento resta
+  gravità+peso.
+- **Giudizio LLM sulla citabilità** (v1.18.0, "LLM as judge"),
+  **attivo di default** in modalità `auto` per decisione di
+  progetto: dopo l'audit un modello (SDK ufficiale Anthropic,
+  `claude-opus-5` con fallback server-side, chiave solo da
+  `ANTHROPIC_API_KEY`) valuta il primo passaggio fuso di ogni query
+  (deduplicato, max 5, una sola richiesta API) con punteggio 0–100
+  e motivazione. Nei tre referti: verdetti, media e **scarto
+  giudice-euristica** rispetto all'indice composito, con nota di
+  onestà. Senza chiave o SDK il giudizio si salta con motivo
+  dichiarato e l'audit resta interamente offline; `--judge on` lo
+  pretende (errore d'uso senza chiave), `off` lo spegne; errori
+  API, refusal e risposte malformate non fermano mai il referto.
 - **Qualità del markup Schema.org** (v1.8.0): proprietà minime per
   23 tipi (fra cui Product, VideoObject, ImageObject, Event, Recipe,
   HowTo, JobPosting, Review, AggregateRating, Course, i tipi medici)
@@ -59,6 +102,23 @@ sono nel [README.md](README.md).
   `--max-pages` non copre tutto) con ripiego sul crawling BFS
   interno; deduplica dei contenuti identici per impronta del testo
   (conservato l'URL più corto).
+- **Rendering JavaScript facoltativo** (v1.12.0): `--render
+  off|auto|always` con Playwright (Chromium proprio o Chrome di
+  sistema come ripiego). `auto` rende solo le pagine classificate
+  client-side dall'euristica; il DOM renderizzato sostituisce solo
+  l'estrazione del contenuto, mentre stato/redirect/tempi restano
+  della risposta HTTP reale; il rilievo critico sul contenuto
+  invisibile ai crawler senza JS scatta comunque (`raw_js_heavy`).
+  Rendering seriale (Playwright sync non è thread-safe), rispetta
+  delay e annullamento, verifica di disponibilità all'avvio. Select
+  dedicata nella GUI con disponibilità esposta da /api/env.
+- **Scansione concorrente** (v1.11.0): `--workers` (default 4, max
+  16, 1 = seriale) scarica le pagine — del sito e dei concorrenti —
+  con un pool di thread **senza cambiare il ritmo verso il sito**: il
+  throttle del Fetcher assegna atomicamente gli slot di partenza
+  distanziati di `--delay` anche fra thread; sessione HTTP ed esito
+  d'errore sono per-thread; l'annullamento interrompe anche i worker
+  in attesa. Campo dedicato nella GUI, incluso nelle preimpostazioni.
 - **Robustezza del crawling** (v1.5.0): rilievi sulle catene di
   redirect interne (http→https, www/non-www, URL spostati, catene a
   più passaggi, con `final_url` e conteggio nel referto JSON);
@@ -77,11 +137,18 @@ sono nel [README.md](README.md).
   dichiarato eccede, esclusione riportata nel referto fra gli URL in
   errore e avviso all'avvio se il valore scelto supera un decimo
   della RAM disponibile della macchina.
-- **Rispetto opzionale del robots.txt** (v1.2.0): con
-  `--respect-robots` gli URL vietati all'agente `SeoRrfAudit` non
-  vengono scaricati, né dalla lista sitemap né durante il crawling
-  BFS, e sono elencati nel referto come rilievo informativo.
-  Predefinito spento: un audit del proprio sito ispeziona tutto.
+- **Robots.txt rispettato di default** (v1.2.0 opt-in, ribaltato in
+  default nella v1.13.0): i `Disallow` per l'agente `SeoRrfAudit`
+  vengono rispettati — né dalla sitemap né in crawling BFS — con
+  rilievo informativo sugli URL esclusi. `--own-site` dichiara la
+  titolarità del sito e analizza tutto (i concorrenti restano sempre
+  protetti); `--ignore-robots accetto` ignora i Disallow ovunque con
+  **accettazione esplicita di responsabilità** (valore letterale
+  obbligatorio, registrata nel referto); `--respect-robots` è
+  deprecato e confligge con le altre due. GUI: select a tre modalità
+  con default "titolarità dichiarata" (coperta dalle condizioni di
+  servizio) e checkbox di responsabilità obbligatoria per "ignora",
+  validata lato server.
 - **Confronto competitivo** (v1.4.0): con `--competitor URL`
   (ripetibile, max 3) i siti concorrenti vengono scansionati con gli
   stessi limiti (senza generare rilievi propri), i corpora fusi negli
@@ -101,7 +168,43 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.1.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.9.0 + `gui/`
+
+- **Citazioni IA nel tempo** (v2.9.0): sezione dedicata che legge
+  lo storico JSONL del monitor citazioni (`GET /api/citations`,
+  accesso richiesto; percorso con `--citations-history`, default
+  `citazioni.jsonl` accanto agli script) con sintesi e tendenza
+  per provider (delta fra esecuzioni), grafico SVG multilinea del
+  tasso di citazione (una linea per provider più il complessivo,
+  tratteggi ed etichette di fine linea, mai solo colore), tabella
+  accessibile con tutti i valori e selettore del sito se lo
+  storico ne contiene più d'uno; righe malformate o file assente
+  non rompono mai la GUI.
+
+- **Giudizio LLM nella GUI** (v2.8.0): select nel form (auto
+  predefinito / obbligatorio / spento; "obbligatorio" è validato
+  lato server contro la disponibilità reale di SDK e chiave, con
+  motivo nell'errore), disponibilità esposta da `/api/env` e
+  suggerimento contestuale aggiornato quando manca la chiave;
+  nei risultati blocco con modello, media, scarto
+  giudice-euristica e tabella dei verdetti (query, punteggio,
+  motivazione), nota di onestà nella caption.
+
+- **Problemi trasversali nel piano** (v2.7.0): il piano di
+  remediation mostrato in GUI usa l'ordinamento per gravità e
+  guadagno di citabilità, con badge "trasversale: N profili ·
+  +X,X indice" sui rilievi che deprimono più profili e intestazione
+  che dichiara il criterio.
+
+- **Profili di citabilità nella GUI** (v2.6.0): select "Mercato di
+  riferimento" nel form (nelle preimpostazioni, validata lato
+  server, propagata ai tre referti scaricabili); nei risultati
+  blocco con barre per profilo (valore sempre testuale, mai solo
+  colore), descrizione di cosa premia ciascun assistente, indice
+  composito, pesi del mercato, nota di onestà e "Top azioni
+  prioritarie" con badge sforzo/quick-win e guadagno stimato per
+  profilo. `citability` e `citability_actions` nel summary di
+  `/api/status`.
 
 - **Storico degli audit** (v2.1.0), per utente su SQLite: sezione
   dedicata con tabella delle esecuzioni (data, sito, punteggio con
@@ -209,6 +312,8 @@ sono nel [README.md](README.md).
 - **Storico JSONL** con delta fra esecuzioni, soglia `--fail-under`
   con codice d'uscita 1 per l'alerting, referti text/JSON, limiti di
   costo (max 15 query, max 5 ricerche per risposta, pausa fra query).
+  Dalla GUI v2.9.0 lo storico è consultabile anche nell'interfaccia
+  (grafico per provider e tabella).
 - **Esecuzione periodica**: unit systemd `deploy/
   seo-rrf-citations.service` + `.timer` (settimanale, hardening,
   chiavi in `/etc/seorrf/citations.env`).
@@ -229,7 +334,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 69 test in ~5 secondi** (`tests/`), senza rete
+- **Suite pytest: 172 test in ~14 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query
@@ -272,7 +377,25 @@ sono nel [README.md](README.md).
 
 ## Limiti noti e accettati (dettaglio in TO-DO)
 
-- Il rispetto dei `Disallow` del robots.txt è **opzionale e spento di
-  default** (`--respect-robots`): la scelta è deliberata per l'audit
-  del proprio sito, ma va ricordata quando si analizzano siti altrui.
-- Nessuna CI.
+- Il bypass dei `Disallow` del robots.txt richiede una dichiarazione:
+  `--own-site` (titolarità) o `--ignore-robots accetto`
+  (responsabilità esplicita). Dalla v1.13.0 il rispetto è il
+  **default**; nella GUI il default resta "sito di mia titolarità"
+  perché coperto dalle condizioni di servizio della registrazione.
+- Il rendering JavaScript è seriale (vincolo dell'API sync di
+  Playwright) e opzionale: senza Playwright/browser i siti
+  client-side restano rilevati ma non analizzati.
+- La stima dello sforzo nel piano di remediation è un classificatore
+  a parole chiave a tre livelli: indicativa, non un preventivo.
+- I profili di citabilità per assistente IA sono euristiche
+  dichiarate (i pesi non derivano da comportamento documentato dai
+  vendor): utili come confronto relativo, non come previsione di
+  citazione — quella la misura `seo_rrf_citations.py`.
+- Il giudizio LLM è **attivo di default** (modalità `auto`): con la
+  chiave nell'ambiente ogni audit fa una richiesta API con costi a
+  carico della chiave; il verdetto è il parere di un modello su un
+  campione, non riproducibile né garanzia di citazione (nota
+  inclusa in ogni referto). Senza chiave l'audit resta offline.
+- Lavorazione multi-macchina: il working tree locale può contenere
+  lavoro non ancora pushato — verificare `git status` e `git fetch`
+  prima di riprendere lo sviluppo da un'altra postazione.

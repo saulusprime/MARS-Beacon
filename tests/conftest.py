@@ -126,6 +126,30 @@ comparire nei risultati dei motori di ricerca pubblici.</p>
 </body></html>
 """
 
+SPA = """<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8">
+<title>Caricamento...</title>
+<script>
+// Applicazione client-side di prova: l'HTML iniziale e' quasi vuoto
+// e tutto il contenuto viene costruito dal JavaScript.
+window.addEventListener('DOMContentLoaded', function () {
+  document.title = 'Drenaggio SPA - guida renderizzata';
+  var h = document.createElement('h1');
+  h.textContent = 'Drenaggio linfatico renderizzato dal browser';
+  var p = document.createElement('p');
+  p.textContent = 'Questo paragrafo viene generato lato client ed ' +
+    'esiste solo dopo il rendering JavaScript: contiene parole ' +
+    'utili sul drenaggio linfatico manuale per il recupero e la ' +
+    'valutazione della pagina nella simulazione.';
+  document.body.appendChild(h);
+  document.body.appendChild(p);
+});
+// Riempitivo per superare la soglia di script dell'euristica
+// contenuto-lato-client: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+// bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+</script></head><body></body></html>
+"""
+
 FANTASMA = """<!DOCTYPE html>
 <html lang="it"><head><meta charset="utf-8">
 <title>Pagina non trovata — Centro Linfa</title></head><body>
@@ -171,6 +195,7 @@ class SiteHandler(BaseHTTPRequestHandler):
             "/riservata/": (RISERVATA, html),
             "/riservata": (RISERVATA, html),
             "/fantasma/": (FANTASMA, html),
+            "/spa/": (SPA, html),
             "/robots.txt": (ROBOTS, "text/plain; charset=utf-8"),
             "/llms.txt": ("# Centro Linfa\n\n- [Il servizio]"
                           "(BASE/servizio-drenaggio/)\n",
@@ -334,3 +359,14 @@ def competitor_site():
     thread.start()
     yield "http://127.0.0.1:%d" % server.server_address[1]
     server.shutdown()
+
+
+@pytest.fixture(autouse=True)
+def niente_chiavi_api(monkeypatch):
+    """Suite sempre offline: il giudizio LLM 'auto' si deve saltare.
+
+    I test che vogliono il giudice impostano chiave e base_url
+    esplicitamente verso il proprio server finto.
+    """
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)

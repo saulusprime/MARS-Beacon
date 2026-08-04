@@ -141,12 +141,111 @@ def test_validazione_concorrenti():
     assert config["competitors"] == []
 
 
-def test_validazione_respect_robots():
+def test_validazione_robots_mode():
+    config, err = gui.validate_config({"url": "x.it"})
+    assert err == "" and config["robots"] == "own", \
+        "default GUI: titolarita' dichiarata nelle condizioni"
     config, err = gui.validate_config(
-        {"url": "x.it", "respect_robots": True})
-    assert err == "" and config["respect_robots"] is True
-    config, _ = gui.validate_config({"url": "x.it"})
-    assert config["respect_robots"] is False
+        {"url": "x.it", "robots": "respect"})
+    assert err == "" and config["robots"] == "respect"
+    config, err = gui.validate_config(
+        {"url": "x.it", "robots": "force"})
+    assert config is None and "responsabilita" in err
+    config, err = gui.validate_config(
+        {"url": "x.it", "robots": "force", "robots_ack": True})
+    assert err == "" and config["robots"] == "force"
+    config, err = gui.validate_config(
+        {"url": "x.it", "robots": "boh"})
+    assert config is None and "robots" in err
+
+
+def test_validazione_market():
+    config, err = gui.validate_config({"url": "x.it"})
+    assert err == "" and config["market"] == "occidentale", \
+        "default GUI allineato al default della CLI"
+    config, err = gui.validate_config(
+        {"url": "x.it", "market": "Orientale"})
+    assert err == "" and config["market"] == "orientale"
+    config, err = gui.validate_config(
+        {"url": "x.it", "market": "lunare"})
+    assert config is None and "market" in err
+
+
+def test_validazione_judge():
+    config, err = gui.validate_config({"url": "x.it"})
+    assert err == "" and config["judge"] == "auto", \
+        "giudizio LLM attivo di default (auto)"
+    config, err = gui.validate_config(
+        {"url": "x.it", "judge": "off"})
+    assert err == "" and config["judge"] == "off"
+    config, err = gui.validate_config(
+        {"url": "x.it", "judge": "boh"})
+    assert config is None and "judge" in err
+    # "on" senza chiave sul server: rifiutato con motivo chiaro.
+    config, err = gui.validate_config(
+        {"url": "x.it", "judge": "on"})
+    assert config is None and "ANTHROPIC_API_KEY" in err
+
+
+# ---------------- storico citazioni IA ----------------
+
+def _storico_citazioni(tmp_path):
+    """Tre esecuzioni per mio.it, una per altro.it, una riga rotta."""
+    def riga(sito, quando, rate_a, rate_p):
+        return json.dumps({
+            "generated_at": quando, "site": sito,
+            "overall_rate": round((rate_a + rate_p) / 2, 1),
+            "providers": {
+                "anthropic": {"answered": 10, "failed": 0,
+                              "site_cited": int(rate_a / 10),
+                              "rate": rate_a,
+                              "competitors_cited": {}},
+                "perplexity": {"answered": 10, "failed": 0,
+                               "site_cited": int(rate_p / 10),
+                               "rate": rate_p,
+                               "competitors_cited": {}},
+            }})
+    path = tmp_path / "citazioni.jsonl"
+    path.write_text("\n".join([
+        riga("mio.it", "2026-07-21T06:00:00+0200", 20.0, 10.0),
+        "{questa riga non e' JSON valido",
+        riga("altro.it", "2026-07-24T06:00:00+0200", 50.0, 40.0),
+        riga("mio.it", "2026-07-28T06:00:00+0200", 30.0, 20.0),
+        riga("mio.it", "2026-08-04T06:00:00+0200", 40.0, 20.0),
+    ]) + "\n", encoding="utf-8")
+    return path
+
+
+def test_api_citazioni_richiede_accesso(gui_base):
+    status, _, _ = _api(gui_base, "/api/citations")
+    assert status == 401
+
+
+def test_api_citazioni_raggruppa_per_sito(gui_base, tmp_path,
+                                          monkeypatch):
+    monkeypatch.setattr(gui, "CITATIONS_HISTORY",
+                        _storico_citazioni(tmp_path))
+    cookie = _register(gui_base)
+    status, body, _ = _api(gui_base, "/api/citations",
+                           cookie=cookie)
+    assert status == 200
+    sites = json.loads(body)["sites"]
+    assert [s["site"] for s in sites] == ["mio.it", "altro.it"]
+    corse = sites[0]["runs"]
+    assert len(corse) == 3, "la riga malformata va ignorata"
+    assert corse[-1]["providers"]["anthropic"]["rate"] == 40.0
+    assert corse[0]["generated_at"].startswith("2026-07-21")
+
+
+def test_api_citazioni_senza_storico(gui_base, tmp_path,
+                                     monkeypatch):
+    monkeypatch.setattr(gui, "CITATIONS_HISTORY",
+                        tmp_path / "inesistente.jsonl")
+    cookie = _register(gui_base)
+    status, body, _ = _api(gui_base, "/api/citations",
+                           cookie=cookie)
+    assert status == 200
+    assert json.loads(body)["sites"] == []
 
 
 # ---------------- registrazione e accesso ----------------
@@ -248,6 +347,16 @@ def test_ciclo_completo_referti_e_gating_profilo(gui_base, site):
     riass = snap["summary"]
     assert riass["pages_clean"] + riass["pages_flagged"] \
         + riass["pages_error"] == riass["pages_total"]
+    cit = riass["citability"]
+    assert cit["market"] == "occidentale"
+    assert len(cit["profiles"]) == 4
+    azioni = riass["citability_actions"]
+    assert azioni, "sito difettoso: azioni prioritarie attese"
+    assert azioni[0]["best_profile"] in cit["market_weights"]
+    assert "index_gain" in snap["remediation"][0], \
+        "piano annotato coi guadagni di citabilita'"
+    assert riass["judge"]["status"] == "skipped", \
+        "senza chiave il giudizio auto si salta, audit offline"
 
     # Registrazione rapida: il download e' negato con codice chiaro.
     status, body, _ = _api(gui_base, "/api/report/html",

@@ -3,3 +3,4 @@
 pytest>=7
 flake8>=6
 anthropic>=0.120
+playwright>=1.40

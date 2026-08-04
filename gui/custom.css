@@ -32,6 +32,44 @@
   min-width: 6.2rem;
 }
 
+/* Badge del piano di remediation: sforzo stimato e quick win. */
+.badge-effort {
+  background-color: var(--lt-mist, #eef6f7);
+  color: var(--lt-teal-700, #0f4a5b);
+  font-size: .72rem;
+}
+
+.badge-quickwin {
+  background-color: #1c6b45;
+  color: #fff;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+/* Rilievo trasversale: deprime piu' profili di citabilita'. */
+.badge-cross {
+  background-color: var(--lt-teal-700, #0f4a5b);
+  color: #fff;
+  font-size: .72rem;
+}
+
+/* "La matematica del problema": definizioni su due colonne. */
+.surface-math {
+  display: grid;
+  grid-template-columns: minmax(11rem, max-content) 1fr;
+  gap: .35rem 1rem;
+}
+
+.surface-math dt {
+  font-weight: 600;
+  color: var(--lt-teal-900, #0c3540);
+}
+
+.surface-math dd {
+  margin: 0;
+}
+
 .badge-sev-critical { background-color: #9e1b1b; }
 .badge-sev-warning  { background-color: var(--lt-orange-700, #a8480f); }
 .badge-sev-ok       { background-color: #1c6b45; }

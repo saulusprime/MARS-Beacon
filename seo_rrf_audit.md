@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.10.0, ~3550
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.18.0, ~4630
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -134,6 +134,172 @@ punteggio complessivo con soglie 40/70 (il widget "trend salute"
 del concept board); **preimpostazioni di configurazione** salvabili
 per cliente/sito in localStorage (salva/carica/elimina).
 
+Novità 1.11.0 (2026-08-04): scansione concorrente con rate limit
+preservato (`--workers`, default 4, max 16, 1 = seriale). Il
+`Fetcher` è thread-safe: throttle che assegna atomicamente gli slot
+di partenza (gli avvii restano distanziati di `--delay` anche fra
+thread), sessione HTTP ed esito d'errore per-thread. Il download
+delle pagine (sito e concorrenti) usa un pool di worker che si
+limita a sovrapporre le attese di rete: a parità di ritmo verso il
+sito, il tempo di scansione si avvicina a max(delay, latenza) per
+pagina invece di delay + latenza. Annullamento funzionante anche coi
+worker in attesa. Nella GUI (v2.2.0): campo "Richieste in parallelo"
+nel form, incluso nelle preimpostazioni.
+
+Novità 1.12.0 (2026-08-04): rendering JavaScript facoltativo
+(`--render off|auto|always`, richiede Playwright; usa il Chromium di
+Playwright o il Chrome/Chromium di sistema come ripiego). In `auto`
+vengono rese solo le pagine che l'euristica classifica come
+client-side; in `always` tutte. I metadati HTTP (stato, redirect,
+tempi, dimensioni) restano quelli della risposta reale: il browser
+sostituisce solo l'estrazione del contenuto (`extract_content`
+separata da `parse_page`). Il rilievo critico "testo scarso e molto
+JavaScript" continua a scattare anche sulle pagine renderizzate
+(`raw_js_heavy`): i crawler IA senza JavaScript non vedono comunque
+il contenuto. Il rendering è seriale (l'API sync di Playwright non è
+thread-safe), rispetta `--delay` e l'annullamento; verifica di
+disponibilità all'avvio (errore d'uso se Playwright/browser
+mancano); rilievi informativi sul numero di pagine rese e avviso su
+quelle non riuscite (analizzate in statico). Nella GUI (v2.3.0):
+select "Rendering JavaScript" nel form, nelle preimpostazioni;
+`render_available` in /api/env.
+
+Novità 1.13.0 (2026-08-04) — CAMBIO DI COMPORTAMENTO: i Disallow del
+robots.txt per l'agente SeoRrfAudit sono ora **rispettati di
+default** (prima erano ignorati). `--own-site` dichiara la
+titolarità del sito e ripristina l'audit completo (i concorrenti di
+--competitor restano sempre protetti); `--ignore-robots accetto`
+ignora i Disallow ovunque con accettazione esplicita di
+responsabilità (valore letterale obbligatorio, registrata come
+rilievo informativo nel referto); `--respect-robots` è deprecato
+(ora è il default) e confligge con le altre due. Nella GUI (v2.4.0):
+select a tre modalità con default "sito di mia titolarità" (coperta
+dalla dichiarazione nelle condizioni di servizio accettate alla
+registrazione) e, per "ignora", checkbox di assunzione di
+responsabilità obbligatoria validata lato server.
+
+Novità 1.14.0 (2026-08-04): colmato il divario col referto consegnato
+a mano. **"La matematica del problema"** in tutti i referti e nella
+GUI: superficie attuale (pagine, chunk, parole medie) contro
+superficie potenziale con proiezione prudente e dichiarata (ogni
+pagina esistente ad almeno ~900 parole, 4 chunk, più una FAQ; nessuna
+pagina nuova) e moltiplicatore dell'effetto sull'RRF. **Stima dello
+sforzo per intervento** nel piano di remediation (minuti/ore/giorni,
+classificatore per parole chiave su titolo e fix) incrociata con la
+priorità: i critici risolvibili in minuti sono marcati **quick win**
+(badge nei referti HTML/GUI, marcatore nel testuale, campi `effort` e
+`quick_win` nel JSON insieme a `surface_math`). GUI v2.5.0.
+
+Novità 1.14.1 (2026-08-04): log di avanzamento pulito con gli
+embedding attivi. Il caricamento del modello contatta l'HF Hub e
+senza token stampava su stderr l'avviso inglese sui rate limit (piu'
+eventuali barre di download), che finiva nel log della GUI: ora
+l'ecosistema Hugging Face viene zittito prima dell'import (variabili
+d'ambiente non gia' impostate dall'utente + logger a livello error).
+L'avviso era innocuo; chi vuole limiti piu' alti puo' esportare
+HF_TOKEN, letto automaticamente dalle librerie.
+
+Novità 1.15.0 (2026-08-04): profili di citabilità per assistente IA
+("lenti per modello", da Features.md). `citability_profiles()` ripesa
+i punteggi di area — più la "profondità editoriale" (parole medie per
+pagina rapportate al target di 900 di `surface_math`) — secondo ciò
+che ciascun assistente plausibilmente premia: Claude
+(semantica/lessicale/tecnica/dati 40/25/20/15), ChatGPT-Perplexity
+(RRF/lessicale/tecnica/semantica 45/25/15/15), Qwen
+(dati/tecnica/semantica/lessicale 40/25/20/15), Kimi
+(profondità/semantica/dati/lessicale 35/30/20/15). Indice composito
+pesato per mercato (`--market occidentale|globale|orientale`, default
+occidentale: chatgpt 50, claude 30, qwen/kimi 10). Le componenti
+senza punteggio vengono escluse rinormalizzando i pesi. Presente nei
+tre referti (chiave JSON `citability`, sezione testuale, tabella
+HTML) sempre accompagnato dalla nota di onestà: stime euristiche
+ricavate dalle metriche dell'audit, non comportamento documentato dai
+vendor. 12 test dedicati con ancoraggi calcolati a mano.
+
+Novità 1.16.0 (2026-08-04): vista dei profili di citabilità.
+`citability_top_actions()` annota le prime voci del piano di
+remediation con il profilo che guadagna di più da ciascun intervento:
+la variazione d'area alla risoluzione del rilievo è esatta rispetto
+al modello di punteggio (peso × (1 − fattore di gravità) / somma dei
+pesi dell'area) e viene proiettata sui pesi rinormalizzati di ogni
+profilo; l'ordinamento coincide con quello del piano. Nei referti:
+blocco "Azioni con maggior guadagno di profilo" nel testo, "Top N
+azioni prioritarie" con badge sforzo/quick-win nell'HTML (dove i
+profili hanno ora anche le barre), chiave `citability_actions` nel
+JSON.
+
+Novità GUI 2.6.0 (2026-08-04): profili di citabilità nella GUI.
+Select "Mercato di riferimento" nel form (occidentale/globale/
+orientale, inclusa nelle preimpostazioni, validata lato server e
+propagata ai tre referti scaricabili); nei risultati il blocco
+"Profili di citabilità per assistente IA" con barre per profilo
+(stesso pattern accessibile dei punteggi per area: valore sempre
+testuale), cosa premia ciascun profilo, indice composito, pesi del
+mercato, nota di onestà e "Top azioni prioritarie" con badge
+sforzo/quick-win e guadagno stimato. Il summary di `/api/status`
+espone `citability` e `citability_actions`. Verifica visiva con
+Chrome reale su un audit end-to-end (form, blocco risultati,
+referto) e lint di accessibilità sull'HTML della GUI.
+
+Novità 1.17.0 (2026-08-04): problemi trasversali nel piano di
+remediation. `build_remediation()` accetta ora anche pages/scores/
+market: quando li riceve (sempre, nei tre referti e nella GUI)
+annota ogni intervento con i guadagni per profilo di citabilità
+(refactoring in `_citability_gains`), il guadagno sull'indice
+composito (`index_gain`), i profili colpiti con almeno
+`CROSS_GAIN_MIN`=1.0 punti (`profiles_hit`) e il flag `cross`
+(≥2 profili = trasversale). A parità di gravità l'ordinamento
+promuove il maggior guadagno sull'indice del mercato scelto: i
+problemi trasversali salgono in testa perché sommano guadagni su
+più profili, ma un rilievo a profilo singolo con guadagno maggiore
+li supera — l'ordine misura la resa complessiva, il badge la
+trasversalità. Senza dati di citabilità il comportamento resta
+gravità+peso (retrocompatibile, test invariati).
+`citability_top_actions()` ora è la testa del piano annotato:
+stesse priorità per costruzione. Nei referti: riga "Trasversale:
+deprime N profili (+X.X sull'indice)" nel testo, badge nel piano
+HTML; GUI 2.7.0: badge "trasversale: N profili · +X,X indice" e
+intestazione del piano aggiornata. Verifica visiva su audit reale.
+
+Novità 1.18.0 (2026-08-04): giudizio LLM sulla citabilità ("LLM as
+judge"), **attivo di default** in modalità `auto` per decisione di
+progetto: parte da solo se l'SDK `anthropic` e la chiave
+`ANTHROPIC_API_KEY` sono presenti, altrimenti viene saltato con
+motivo dichiarato nel referto — l'audit resta interamente offline.
+`run_judge()` è un passo separato dopo `run_audit()` (che non
+contatta mai l'API): campiona il primo passaggio fuso di ogni query
+(deduplicato, max 5), una sola richiesta all'API Anthropic (SDK
+ufficiale, `claude-opus-5`, fallback server-side come nel monitor
+citazioni, `ANTHROPIC_BASE_URL` per i test), risposta solo-JSON con
+punteggio 0–100 e motivazione per passaggio. `--judge auto|on|off`
+(`on` pretende la chiave: errore d'uso senza). Errori API, refusal
+e JSON malformato non fermano mai il referto (status `error` con
+motivo). Nei referti: sezione dedicata con media, **scarto
+giudice-euristica** rispetto all'indice composito (la "taratura"
+delle stime) e nota di onestà. GUI 2.8.0: select nel form (auto
+default; "obbligatorio" validato lato server contro la
+disponibilità), disponibilità esposta da `/api/env`, blocco
+risultati con tabella dei verdetti. 10 test dedicati con server
+API finto (`tests/test_judge.py`) e fixture autouse in conftest
+che rimuove le chiavi dall'ambiente: la suite resta offline per
+costruzione.
+
+Novità GUI 2.9.0 (2026-08-04): citazioni IA nel tempo. La GUI legge
+lo storico JSONL del monitor citazioni (`GET /api/citations`,
+accesso richiesto; percorso configurabile con
+`--citations-history`, default `citazioni.jsonl` accanto agli
+script, nel deploy `/var/lib/seorrf/citazioni.jsonl`) e lo mostra
+in una sezione dedicata: sintesi con tendenza per provider (delta
+rispetto all'esecuzione precedente), grafico SVG multilinea del
+tasso di citazione (una linea per provider più il complessivo,
+tratteggi diversi ed etichette di fine linea — mai solo colore) e
+tabella accessibile con tutti i valori; selettore del sito quando
+lo storico ne contiene più d'uno. Il parser
+(`read_citations_history`) raggruppa per sito, ignora le righe
+malformate e non rompe mai la GUI se il file manca. 3 test
+dedicati; verifica visiva con Chrome reale su uno storico di
+esempio.
+
 ## Uso
 
 ```
@@ -152,10 +318,16 @@ le query sono generate dai bigrammi tematici del sito), `--embeddings MODELLO`
 `--rrf-k` (default 60), `--delay`, `--max-body MB` (default 10; tetto al corpo
 di ogni risposta, da dimensionare sulla RAM della macchina),
 `--retries N` (default 2; ritenta errori di rete e HTTP 429/5xx con backoff
-esponenziale), `--respect-robots` (rispetta i Disallow del robots.txt per
-l'agente dello strumento; predefinito spento), `--competitor URL`
-(ripetibile, max 3; confronto competitivo con share of voice),
-`--format text|json|html`, `--output`, `--quiet`, `--version`.
+esponenziale), `--workers N` (default 4, max 16; scansione concorrente senza
+cambiare il ritmo verso il sito), `--render off|auto|always` (rendering
+JavaScript con Playwright/Chrome), `--own-site` / `--ignore-robots accetto`
+(il rispetto dei Disallow è il default dalla 1.13.0), `--user-agent UA`,
+`--competitor URL` (ripetibile, max 3; confronto competitivo con share of
+voice), `--market occidentale|globale|orientale` (pesi dell'indice di
+citabilità composito), `--judge auto|on|off` (giudizio LLM sui passaggi
+migliori via API Anthropic; `auto`, il default, parte solo con
+ANTHROPIC_API_KEY presente), `--format text|json|html`, `--output`,
+`--quiet`, `--version`.
 
 Codici di uscita: `0` nessuna criticità, `1` almeno una criticità, `2` errore
 d'uso, `130` interruzione.

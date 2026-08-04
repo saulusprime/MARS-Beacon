@@ -302,6 +302,79 @@
             </div>
           </div>
 
+          <div class="row">
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-render" class="active">Rendering
+                  JavaScript</label>
+                <select class="form-select" id="f-render"
+                        name="render" aria-describedby="h-render">
+                  <option value="off" selected>Spento</option>
+                  <option value="auto">Auto (solo pagine
+                    client-side)</option>
+                  <option value="always">Tutte le pagine</option>
+                </select>
+                <small id="h-render" class="form-text">
+                  Analizza il DOM renderizzato in un browser
+                  headless. Richiede Playwright sul server.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-workers" class="active">Richieste in
+                  parallelo</label>
+                <input type="number" class="form-control" id="f-workers"
+                       name="workers" value="4" min="1" max="16"
+                       step="1" inputmode="numeric"
+                       aria-describedby="h-workers">
+                <small id="h-workers" class="form-text">
+                  Da 1 a 16 (predefinito 4). Il ritmo verso il sito
+                  non cambia: resta governato dalla pausa fra
+                  richieste.
+                </small>
+                <div class="invalid-feedback" id="e-workers"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-market" class="active">Mercato di
+                  riferimento</label>
+                <select class="form-select" id="f-market"
+                        name="market" aria-describedby="h-market">
+                  <option value="occidentale" selected>Occidentale
+                  </option>
+                  <option value="globale">Globale</option>
+                  <option value="orientale">Orientale</option>
+                </select>
+                <small id="h-market" class="form-text">
+                  Pesa l'indice composito dei profili di
+                  citabilità: occidentale privilegia
+                  ChatGPT/Perplexity e Claude, orientale Qwen e
+                  Kimi.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-judge" class="active">Giudizio LLM
+                  sulla citabilità</label>
+                <select class="form-select" id="f-judge"
+                        name="judge" aria-describedby="h-judge">
+                  <option value="auto" selected>Auto: se la chiave
+                    è presente</option>
+                  <option value="on">Obbligatorio</option>
+                  <option value="off">Spento</option>
+                </select>
+                <small id="h-judge" class="form-text">
+                  Un modello (Claude) valuta i passaggi migliori
+                  con una sola richiesta API. Richiede
+                  ANTHROPIC_API_KEY sul server.
+                </small>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="f-competitors" class="active">Siti concorrenti
               (facoltativi)</label>
@@ -317,18 +390,40 @@
             <div class="invalid-feedback" id="e-competitors"></div>
           </div>
 
-          <div class="form-check">
-            <input type="checkbox" id="f-respect-robots"
-                   aria-describedby="h-respect-robots">
-            <label for="f-respect-robots">Rispetta i Disallow del
-              robots.txt</label>
+          <div class="form-group">
+            <label for="f-robots" class="active">Robots.txt del sito
+              auditato</label>
+            <select class="form-select" id="f-robots" name="robots"
+                    aria-describedby="h-robots">
+              <option value="own" selected>Sito di mia titolarità:
+                analizza tutto</option>
+              <option value="respect">Rispetta i Disallow</option>
+              <option value="force">Ignora i Disallow (me ne assumo
+                la responsabilità)</option>
+            </select>
+            <small id="h-robots" class="form-text">
+              La titolarità dei siti auditati è dichiarata nelle
+              condizioni di servizio accettate alla registrazione.
+              Con "Rispetta" gli URL vietati all'agente SeoRrfAudit
+              non vengono scaricati e sono elencati nel referto. I
+              concorrenti sono sempre protetti, salvo "Ignora".
+            </small>
           </div>
-          <small id="h-respect-robots" class="form-text d-block mb-2">
-            Se attivo, gli URL vietati all'agente SeoRrfAudit dal
-            robots.txt non vengono scaricati e sono elencati nel
-            referto. Se spento (predefinito) l'audit li analizza
-            comunque: utile quando il sito è tuo.
-          </small>
+
+          <div id="robots-ack-box" hidden>
+            <div class="form-check">
+              <input type="checkbox" id="f-robots-ack"
+                     aria-describedby="h-robots-ack">
+              <label for="f-robots-ack">Dichiaro di assumermi la
+                responsabilità della scansione oltre i Disallow del
+                robots.txt</label>
+            </div>
+            <small id="h-robots-ack" class="form-text d-block mb-2">
+              Richiesto per procedere quando si ignorano i Disallow
+              su siti non propri.
+            </small>
+            <div class="invalid-feedback" id="e-robots-ack"></div>
+          </div>
         </fieldset>
 
         <fieldset class="mb-4">
@@ -480,12 +575,58 @@
       </p>
       <div id="scores" class="mb-4"></div>
 
+      <div id="citability-block" hidden>
+        <h3 class="h5">Profili di citabilità per assistente IA</h3>
+        <p class="small text-muted mb-2" id="citability-intro"></p>
+        <div id="citability-bars" class="mb-3"></div>
+        <div id="citability-actions-box" hidden>
+          <h4 class="h6">Top azioni prioritarie</h4>
+          <p class="small text-muted mb-2">
+            Le prime voci del piano di remediation con il profilo
+            che ne guadagna di più (stima in punti profilo, stessa
+            natura euristica).
+          </p>
+          <ol id="citability-actions" class="mb-4"></ol>
+        </div>
+      </div>
+
+      <div id="judge-block" hidden>
+        <h3 class="h5">Giudizio LLM sulla citabilità</h3>
+        <p class="small text-muted mb-2" id="judge-intro"></p>
+        <div class="table-responsive mb-4" tabindex="0" role="group"
+             aria-label="Tabella del giudizio LLM, area scorrevole"
+             id="judge-table-box">
+          <table class="table table-striped align-middle"
+                 id="judge-table">
+            <caption class="small" id="judge-note"></caption>
+            <thead>
+              <tr>
+                <th scope="col">Query</th>
+                <th scope="col">Punteggio</th>
+                <th scope="col">Motivazione</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
       <h3 class="h5">Rilievi</h3>
       <p class="small text-muted mb-2">
         Ogni rilievo indica gravità, dettaglio e, dove utile, la
         correzione suggerita.
       </p>
       <div class="accordion mb-4" id="findings-acc"></div>
+
+      <div id="surface-math-block" hidden>
+        <h3 class="h5">La matematica del problema</h3>
+        <p class="small text-muted mb-2">
+          L'RRF premia chi compare in più liste con più passaggi
+          pertinenti: il numero di chunk indicizzabili è il vero
+          moltiplicatore.
+        </p>
+        <dl class="surface-math mb-4" id="surface-math-list"></dl>
+      </div>
 
       <div id="remediation-block" hidden>
         <h3 class="h5">Piano di remediation</h3>
@@ -580,6 +721,54 @@
               <th scope="col">Avvertenze</th>
             </tr>
           </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ================= Citazioni IA ================= -->
+    <div class="accordion-item" id="citations-section" hidden>
+      <h2 class="accordion-header" id="citations-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="citations-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-citations" aria-expanded="false"
+                aria-controls="sec-citations">
+          Citazioni IA nel tempo
+        </button>
+      </h2>
+      <div id="sec-citations" class="accordion-collapse collapse"
+           aria-labelledby="citations-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted mb-2">
+        Storico del monitoraggio delle citazioni reali
+        (seo_rrf_citations.py): quante risposte degli assistenti IA
+        citano il sito fra le fonti, esecuzione dopo esecuzione.
+        Una linea per provider, più il tasso complessivo.
+      </p>
+
+      <div class="form-group" id="cit-site-box" hidden>
+        <label for="f-cit-site" class="active">Sito
+          monitorato</label>
+        <select class="form-select" id="f-cit-site"></select>
+      </div>
+
+      <p class="small mb-2" id="cit-trend-summary"></p>
+      <div id="cit-chart" class="mb-3"></div>
+
+      <div class="table-responsive" tabindex="0" role="group"
+           aria-label="Tabella dello storico citazioni, area
+                       scorrevole">
+        <table class="table table-striped align-middle"
+               id="cit-table">
+          <caption class="small">
+            Tasso di citazione: risposte che citano il sito fra le
+            fonti sul totale delle risposte ottenute, per provider.
+          </caption>
+          <thead></thead>
           <tbody></tbody>
         </table>
       </div>

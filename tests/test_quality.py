@@ -289,6 +289,80 @@ def test_build_remediation_ordina_per_gravita_e_peso():
     assert plan[0]["example"] == "snippet"
 
 
+def test_quiet_huggingface(monkeypatch):
+    import logging as pylog
+    monkeypatch.delenv("HF_HUB_DISABLE_PROGRESS_BARS", raising=False)
+    monkeypatch.setenv("TRANSFORMERS_VERBOSITY", "debug")
+    sra._quiet_huggingface()
+    import os
+    assert os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] == "1"
+    assert os.environ["TRANSFORMERS_VERBOSITY"] == "debug", \
+        "le scelte esplicite dell'utente non vanno toccate"
+    assert pylog.getLogger("huggingface_hub").level == pylog.ERROR
+
+
+def test_stima_sforzo_per_intervento():
+    minuti = sra.Finding(sra.AREA_TECH, sra.SEV_CRITICAL,
+                         "1 pagina/e segnaposto indicizzabili",
+                         fix="Cancellala o imposta noindex.")
+    giorni = sra.Finding(sra.AREA_TECH, sra.SEV_CRITICAL,
+                         "2 pagina/e con testo scarso e molto "
+                         "JavaScript",
+                         fix="Attiva rendering server-side.")
+    ore = sra.Finding(sra.AREA_SD, sra.SEV_WARNING,
+                      "JSON-LD senza entita' principale",
+                      fix="Aggiungi Organization.")
+    assert sra.estimate_effort(minuti) == sra.EFFORT_MINUTES
+    assert sra.estimate_effort(giorni) == sra.EFFORT_DAYS
+    assert sra.estimate_effort(ore) == sra.EFFORT_HOURS
+
+
+def test_remediation_quick_win():
+    findings = [
+        sra.Finding(sra.AREA_TECH, sra.SEV_CRITICAL,
+                    "1 pagina/e segnaposto indicizzabili",
+                    weight=2.0),
+        sra.Finding(sra.AREA_SEM, sra.SEV_CRITICAL,
+                    "Poche pagine indicizzabili", weight=3.0),
+        sra.Finding(sra.AREA_SD, sra.SEV_WARNING,
+                    "Nessun titolo descrittivo title", weight=1.0),
+    ]
+    plan = sra.build_remediation(findings)
+    per_titolo = {i["title"]: i for i in plan}
+    segnaposto = per_titolo["1 pagina/e segnaposto indicizzabili"]
+    assert segnaposto["effort"] == sra.EFFORT_MINUTES
+    assert segnaposto["quick_win"] is True
+    assert per_titolo["Poche pagine indicizzabili"]["quick_win"] \
+        is False, "critico ma da giorni: non e' un quick win"
+    assert per_titolo["Nessun titolo descrittivo title"][
+        "quick_win"] is False, "minuti ma solo avvertenza"
+
+
+def test_surface_math():
+    ricca = sra.Page(url="https://x.it/", status=200)
+    ricca.word_count = 900
+    ricca.chunks = [sra.Chunk("https://x.it/", "H", "t", i)
+                    for i in range(6)]
+    povera = sra.Page(url="https://x.it/p", status=200)
+    povera.word_count = 100
+    povera.chunks = [sra.Chunk("https://x.it/p", "H", "t", 0)]
+    rotta = sra.Page(url="https://x.it/err", error="fallita")
+
+    math = sra.surface_math([ricca, povera, rotta])
+    assert math["pages"] == 2
+    assert math["chunks_now"] == 7
+    assert math["words_avg"] == 500
+    # ricca: max(6,4)+1 = 7; povera: max(1,4)+1 = 5
+    assert math["chunks_potential"] == 12
+    assert math["multiplier"] == round(12 / 7, 1)
+
+    vuota = sra.Page(url="https://x.it/v", status=200)
+    vuota.word_count = 0
+    math0 = sra.surface_math([vuota])
+    assert math0["chunks_now"] == 0 and math0["multiplier"] is None
+    assert sra.surface_math([rotta]) is None
+
+
 def test_rilievi_critici_portano_esempi():
     """I rilievi piu' comuni devono avere un esempio di fix."""
     page = sra.Page(url="https://x.it/pagina", status=200,

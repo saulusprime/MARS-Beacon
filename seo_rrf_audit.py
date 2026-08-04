@@ -20,6 +20,11 @@ e misura il *consenso*, cioe' quante volte lo stesso chunk compare in
 alto in entrambe le liste. E' esattamente la logica con cui i motori
 di ricerca ibridi e le pipeline RAG selezionano i passaggi da citare.
 
+Dai punteggi di area deriva i **profili di citabilita'** per
+assistente IA (Claude, ChatGPT/Perplexity, Qwen, Kimi) con indice
+composito pesato per mercato (--market): stime euristiche
+dichiarate, non comportamento documentato dai vendor.
+
 Riferimenti (fonti aperte e ufficiali):
   - Cormack, Clarke, Buettcher (2009), "Reciprocal Rank Fusion
     outperforms Condorcet and individual Rank Learning Methods",
@@ -60,6 +65,7 @@ Licenza: MIT.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import gzip
 import hashlib
 import html
@@ -67,6 +73,7 @@ import importlib.util
 import io
 import json
 import math
+import logging
 import os
 import re
 import sys
@@ -91,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.10.0"
+__version__ = "1.18.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -124,6 +131,41 @@ DEFAULT_MAX_BODY_MB = 10
 # 404/403 e simili NON sono qui: sono segnali diagnostici dell'audit.
 RETRY_STATUS: Tuple[int, ...] = (429, 500, 502, 503, 504)
 DEFAULT_RETRIES = 2
+
+# Richieste in parallelo durante la scansione delle pagine. Il rate
+# limit non cambia: il throttle distanzia gli AVVII delle richieste
+# di --delay anche fra thread; i worker sovrappongono solo le attese
+# di rete. Configurabile con --workers (1 = seriale).
+DEFAULT_WORKERS = 4
+MAX_WORKERS = 16
+
+# Politica sul robots.txt del sito auditato. Predefinito: i Disallow
+# rivolti al nostro agente vengono RISPETTATI. "own" dichiara il sito
+# di propria titolarita' (audit completo; i concorrenti restano
+# protetti); "force" ignora i Disallow ovunque e richiede
+# l'accettazione esplicita di responsabilita' (--ignore-robots accetto).
+ROBOTS_RESPECT = "respect"
+ROBOTS_OWN = "own"
+ROBOTS_FORCE = "force"
+ROBOTS_MODES = (ROBOTS_RESPECT, ROBOTS_OWN, ROBOTS_FORCE)
+IGNORE_ROBOTS_ACK = "accetto"
+
+# Rendering JavaScript (facoltativo, richiede Playwright).
+# off = mai; auto = solo pagine con contenuto reso lato client;
+# always = tutte le pagine analizzabili.
+RENDER_OFF = "off"
+RENDER_AUTO = "auto"
+RENDER_ALWAYS = "always"
+RENDER_MODES = (RENDER_OFF, RENDER_AUTO, RENDER_ALWAYS)
+RENDER_SETTLE_MS = 2500
+# Browser di sistema tentati se Playwright non ha un Chromium proprio.
+CHROME_PATHS = (
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/snap/bin/chromium",
+)
 RETRY_BACKOFF_S = 0.5   # attese: 0.5s, 1s, 2s... con tetto sotto
 RETRY_MAX_WAIT_S = 8.0
 
@@ -183,6 +225,76 @@ AREA_LEX = "Lessicale (BM25)"
 AREA_SEM = "Semantica (vettoriale)"
 AREA_SD = "Dati strutturati"
 AREA_RRF = "Simulazione RRF"
+
+# Profili euristici di citabilita' per assistente IA ("lenti per
+# modello"). ATTENZIONE: le preferenze attribuite a ciascun
+# assistente sono euristiche dichiarate, NON comportamento
+# documentato dai vendor; i punteggi sono stime comparative ricavate
+# dalle metriche dell'audit. Ogni profilo ripesa i punteggi di area
+# (piu' la profondita' editoriale media) secondo cio' che
+# plausibilmente conta di piu' per quel tipo di motore generativo.
+CITABILITY_DEPTH = "Profondita' editoriale"
+DEPTH_TARGET_WORDS = 900  # stesso target di surface_math (4 chunk)
+
+CITABILITY_PROFILES = (
+    ("claude", "Claude (Anthropic)",
+     "contenuto estraibile, strutturato e autoconsistente",
+     {AREA_SEM: 0.40, AREA_LEX: 0.25, AREA_TECH: 0.20,
+      AREA_SD: 0.15}),
+    ("chatgpt", "ChatGPT / Perplexity",
+     "consenso fra piu' indici (RRF) e segnali lessicali",
+     {AREA_RRF: 0.45, AREA_LEX: 0.25, AREA_TECH: 0.15,
+      AREA_SEM: 0.15}),
+    ("qwen", "Qwen (Alibaba)",
+     "markup semantico e dati strutturati",
+     {AREA_SD: 0.40, AREA_TECH: 0.25, AREA_SEM: 0.20,
+      AREA_LEX: 0.15}),
+    ("kimi", "Kimi (Moonshot AI)",
+     "profondita' editoriale e completezza dell'argomento",
+     {CITABILITY_DEPTH: 0.35, AREA_SEM: 0.30, AREA_SD: 0.20,
+      AREA_LEX: 0.15}),
+)
+
+# Pesi dei profili nell'indice composito, per mercato di riferimento.
+MARKET_WEIGHTS = {
+    "occidentale": {"claude": 0.30, "chatgpt": 0.50,
+                    "qwen": 0.10, "kimi": 0.10},
+    "globale": {"claude": 0.25, "chatgpt": 0.25,
+                "qwen": 0.25, "kimi": 0.25},
+    "orientale": {"claude": 0.10, "chatgpt": 0.20,
+                  "qwen": 0.35, "kimi": 0.35},
+}
+DEFAULT_MARKET = "occidentale"
+
+CITABILITY_NOTE = (
+    "Stime euristiche ricavate dalle metriche di questo audit: le "
+    "preferenze attribuite a ciascun assistente non sono "
+    "comportamento documentato dai vendor.")
+
+# Sotto questo guadagno (punti profilo) un profilo non conta come
+# "colpito" da un rilievo; un rilievo e' trasversale se colpisce
+# almeno due profili.
+CROSS_GAIN_MIN = 1.0
+
+# Giudizio LLM sulla citabilita' dei passaggi migliori ("LLM as
+# judge"). Attivo di default in modalita' "auto": parte da solo se
+# l'SDK anthropic e la chiave ANTHROPIC_API_KEY sono presenti,
+# altrimenti viene saltato e l'audit resta interamente offline.
+# Una sola richiesta API per audit (campione di JUDGE_MAX_CHUNKS
+# passaggi), con i costi a carico della chiave configurata.
+JUDGE_AUTO = "auto"
+JUDGE_ON = "on"
+JUDGE_OFF = "off"
+JUDGE_MODES = (JUDGE_AUTO, JUDGE_ON, JUDGE_OFF)
+DEFAULT_JUDGE = JUDGE_AUTO
+JUDGE_MODEL = "claude-opus-5"
+JUDGE_MAX_CHUNKS = 5
+JUDGE_CHUNK_CHARS = 1200
+JUDGE_MAX_TOKENS = 1000
+JUDGE_NOTE = (
+    "Parere di un modello su un campione dei passaggi migliori: "
+    "utile per tarare le stime euristiche, ma non riproducibile "
+    "ne' garanzia di citazione.")
 
 # Stopword italiane e inglesi. Lista minima e volutamente conservativa.
 STOPWORDS: Set[str] = set("""
@@ -435,20 +547,77 @@ class Finding:
         return asdict(self)
 
 
-def build_remediation(
-        findings: Sequence["Finding"]) -> List[Dict[str, object]]:
-    """Piano d'azione: critici e avvertenze per gravita' e peso.
+EFFORT_MINUTES = "minuti"
+EFFORT_HOURS = "ore"
+EFFORT_DAYS = "giorni"
 
-    L'ordinamento (gravita', poi peso decrescente) riflette il
-    contributo del rilievo al punteggio: si parte da cio' che rende
-    di piu'.
+# Classificazione dello sforzo per intervento: prima i lavori di
+# contenuto/architettura (giorni), poi le correzioni di configurazione
+# e meta (minuti); il resto (markup, redirect, media) vale ore.
+_EFFORT_DAYS_RE = re.compile(
+    r"testo scarso|superficie|poche pagine|nessuna pagina|chunk"
+    r"|consenso|share of voice|query senza|vinte interamente"
+    r"|contenut|faq|orfan|profondit|vocabolario|autoconsist"
+    r"|molto javascript|heading in forma|definizion|esemp",
+    re.IGNORECASE)
+_EFFORT_MINUTES_RE = re.compile(
+    r"robots\.txt|sitemap|llms\.txt|noindex|canonical|title"
+    r"|descript|segnaposto|senza attributo lang|hreflang|\balt\b"
+    r"|contenuto identico|crawler ia bloccat|slug",
+    re.IGNORECASE)
+
+
+def estimate_effort(finding: "Finding") -> str:
+    """Stima a tre livelli dello sforzo per correggere il rilievo."""
+    text = "%s %s" % (finding.title, finding.fix)
+    if _EFFORT_DAYS_RE.search(text):
+        return EFFORT_DAYS
+    if _EFFORT_MINUTES_RE.search(text):
+        return EFFORT_MINUTES
+    return EFFORT_HOURS
+
+
+def build_remediation(
+        findings: Sequence["Finding"],
+        pages: Optional[Sequence["Page"]] = None,
+        scores: Optional[Dict[str, Optional[float]]] = None,
+        market: str = DEFAULT_MARKET) -> List[Dict[str, object]]:
+    """Piano d'azione: critici e avvertenze ordinati per resa.
+
+    Senza dati di citabilita' (pages/scores omessi) l'ordine e'
+    gravita', poi peso decrescente: il contributo del rilievo al
+    punteggio. Con pages e scores ogni intervento viene annotato con
+    i guadagni per profilo di citabilita' (_citability_gains) e, a
+    parita' di gravita', vengono promossi i rilievi col maggior
+    guadagno sull'indice composito del mercato scelto: i problemi
+    **trasversali**, che deprimono piu' profili insieme, salgono in
+    testa. Ogni intervento porta la stima dello sforzo
+    (minuti/ore/giorni); i critici da minuti sono "quick win".
     """
     order = {SEV_CRITICAL: 0, SEV_WARNING: 1}
-    todo = sorted(
-        (f for f in findings if f.severity in order),
-        key=lambda f: (order[f.severity], -f.weight))
-    return [
-        {
+    cit = (citability_profiles(pages, scores, market)
+           if pages is not None and scores is not None else None)
+    todo = [f for f in findings if f.severity in order]
+
+    notes: Dict[int, Dict[str, object]] = {}
+    if cit:
+        totals: Dict[str, float] = {}
+        for f in findings:
+            if f.severity in _SEVERITY_FACTOR:
+                totals[f.area] = totals.get(f.area, 0.0) + f.weight
+        for f in todo:
+            notes[id(f)] = _citability_gains(f, totals, cit)
+        todo.sort(key=lambda f: (
+            order[f.severity],
+            -float(notes[id(f)]["index_gain"]),
+            -f.weight))
+    else:
+        todo.sort(key=lambda f: (order[f.severity], -f.weight))
+
+    plan: List[Dict[str, object]] = []
+    for pos, f in enumerate(todo, 1):
+        effort = estimate_effort(f)
+        item: Dict[str, object] = {
             "priority": pos,
             "severity": f.severity,
             "area": f.area,
@@ -456,9 +625,42 @@ def build_remediation(
             "fix": f.fix,
             "example": f.example,
             "url": f.url,
+            "effort": effort,
+            "quick_win": (effort == EFFORT_MINUTES
+                          and f.severity == SEV_CRITICAL),
         }
-        for pos, f in enumerate(todo, 1)
-    ]
+        if cit:
+            item.update(notes[id(f)])
+        plan.append(item)
+    return plan
+
+
+def surface_math(pages: Sequence[Page]) -> Optional[Dict[str, object]]:
+    """La "matematica del problema": superficie attuale vs potenziale.
+
+    Il potenziale e' una proiezione prudente a parita' di pagine:
+    ogni pagina analizzabile portata ad almeno ~900 parole (4 chunk
+    da ~220) piu' una sezione FAQ (1 chunk). Il moltiplicatore dice
+    quante occasioni in piu' di comparire nelle liste RRF esistono
+    gia' nel sito, senza nemmeno creare pagine nuove.
+    """
+    good = [p for p in pages if p.ok]
+    if not good:
+        return None
+    chunks_now = sum(len(p.chunks) for p in good)
+    potential = sum(max(len(p.chunks), 4) + 1 for p in good)
+    words_avg = sum(p.word_count for p in good) // len(good)
+    return {
+        "pages": len(good),
+        "chunks_now": chunks_now,
+        "words_avg": words_avg,
+        "chunks_potential": potential,
+        "multiplier": (round(potential / chunks_now, 1)
+                       if chunks_now else None),
+        "assumption": "ogni pagina esistente portata ad almeno ~900 "
+                      "parole (4 chunk) piu' una FAQ; nessuna pagina "
+                      "nuova",
+    }
 
 
 @dataclass
@@ -510,6 +712,8 @@ class Page:
     text: str = ""
     word_count: int = 0
     script_bytes: int = 0
+    rendered: bool = False
+    raw_js_heavy: bool = False
     images: int = 0
     images_with_alt: int = 0
     internal_links: int = 0
@@ -542,20 +746,41 @@ class Fetcher:
                  backoff: float = RETRY_BACKOFF_S,
                  user_agent: str = USER_AGENT,
                  stop_event: Optional[threading.Event] = None) -> None:
-        self.session = requests.Session()
-        self.session.headers.update({
+        self._headers = {
             "User-Agent": user_agent or USER_AGENT,
             "Accept-Language": "it,en;q=0.8",
-        })
+        }
         self.delay = delay
         self.timeout = timeout
         self.verbose = verbose
         self.max_bytes = max(1, int(max_bytes))
         self.retries = max(0, int(retries))
         self.backoff = max(0.0, backoff)
-        self.last_error = ""
-        self._last = 0.0
         self.stop_event = stop_event
+        # Stato per il fetch concorrente: sessione HTTP ed esito
+        # dell'ultima richiesta sono per-thread; il throttle assegna
+        # gli slot di partenza in modo atomico.
+        self._local = threading.local()
+        self._lock = threading.Lock()
+        self._next_slot = 0.0
+
+    @property
+    def last_error(self) -> str:
+        """Esito dell'ultima richiesta DEL THREAD chiamante."""
+        return getattr(self._local, "last_error", "")
+
+    @last_error.setter
+    def last_error(self, value: str) -> None:
+        self._local.last_error = value
+
+    def _session(self) -> requests.Session:
+        """Una sessione HTTP per thread (requests non e' thread-safe)."""
+        sess = getattr(self._local, "session", None)
+        if sess is None:
+            sess = requests.Session()
+            sess.headers.update(self._headers)
+            self._local.session = sess
+        return sess
 
     def _check_stop(self) -> None:
         if self.stop_event is not None and self.stop_event.is_set():
@@ -570,10 +795,14 @@ class Fetcher:
             time.sleep(seconds)
 
     def _throttle(self) -> None:
-        wait = self.delay - (time.time() - self._last)
+        """Riserva atomicamente il prossimo slot di partenza."""
+        with self._lock:
+            now = time.time()
+            start = max(now, self._next_slot)
+            self._next_slot = start + self.delay
+        wait = start - now
         if wait > 0:
             self._wait(wait)
-        self._last = time.time()
 
     def get(self, url: str) -> Optional[requests.Response]:
         """Esegue una GET con retry esponenziale sui transitori.
@@ -631,7 +860,7 @@ class Fetcher:
         if self.verbose:
             print("  GET %s" % url, file=sys.stderr)
         try:
-            resp = self.session.get(
+            resp = self._session().get(
                 url, timeout=self.timeout, allow_redirects=True,
                 stream=True)
         except requests.RequestException as exc:
@@ -889,6 +1118,191 @@ def crawl_links(base: str, fetcher: Fetcher, max_pages: int,
     return out
 
 
+def fetch_pages(fetcher: Fetcher, urls: Sequence[str],
+                workers: int = 1,
+                stop_event: Optional["threading.Event"] = None
+                ) -> List[Page]:
+    """Scarica e classifica gli URL, nell'ordine dato.
+
+    Con ``workers`` > 1 le richieste avvengono in parallelo, ma il
+    rate limit non cambia: il throttle del Fetcher distanzia gli avvii
+    di ``delay`` anche fra thread — la concorrenza sovrappone solo le
+    attese di rete. L'annullamento (``stop_event``) interrompe anche i
+    worker in attesa.
+    """
+    def one(url: str) -> Page:
+        resp = fetcher.get(url)
+        if resp is None:
+            return Page(url=url,
+                        error=fetcher.last_error or "richiesta fallita")
+        ctype = resp.headers.get("Content-Type", "")
+        if "html" not in ctype:
+            return Page(url=url, status=resp.status_code,
+                        error="non HTML (%s)" % ctype)
+        return parse_page(url, resp)
+
+    if workers <= 1 or len(urls) <= 1:
+        pages: List[Page] = []
+        for url in urls:
+            if stop_event is not None and stop_event.is_set():
+                raise AuditCancelled()
+            pages.append(one(url))
+        return pages
+
+    results: List[Optional[Page]] = [None] * len(urls)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(one, url): i
+                   for i, url in enumerate(urls)}
+        try:
+            for future in as_completed(futures):
+                results[futures[future]] = future.result()
+        except AuditCancelled:
+            for future in futures:
+                future.cancel()
+            raise
+    return [page for page in results if page is not None]
+
+
+# --------------------------------------------------------------------
+# Rendering JavaScript (facoltativo, via Playwright)
+# --------------------------------------------------------------------
+
+def is_js_heavy(page: Page) -> bool:
+    """Contenuto probabilmente reso lato client (poco testo, molto
+    JavaScript nell'HTML iniziale)."""
+    return (page.html_bytes > 0
+            and page.word_count < 120
+            and page.script_bytes > page.html_bytes * 0.4)
+
+
+class PageRenderer:
+    """Rende le pagine in un browser headless tramite Playwright.
+
+    Usa il Chromium gestito da Playwright se installato
+    (``playwright install chromium``); altrimenti ripiega sul
+    Chrome/Chromium di sistema. L'API sync di Playwright non e'
+    thread-safe: il rendering avviene sempre in una passata seriale,
+    dopo il fetch (eventualmente parallelo).
+    """
+
+    def __init__(self, user_agent: str = USER_AGENT,
+                 timeout: int = 20, verbose: bool = True) -> None:
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise RuntimeError(
+                "il rendering JavaScript richiede Playwright: "
+                "pip install playwright (poi 'playwright install "
+                "chromium', oppure un Chrome/Chromium di sistema)")
+        self.verbose = verbose
+        self.timeout_ms = int(timeout * 1000)
+        self._pw = sync_playwright().start()
+        browser = None
+        try:
+            browser = self._pw.chromium.launch()
+        except Exception:
+            for path in CHROME_PATHS:
+                if not os.path.exists(path):
+                    continue
+                try:
+                    browser = self._pw.chromium.launch(
+                        executable_path=path, args=["--no-sandbox"])
+                    break
+                except Exception:
+                    continue
+        if browser is None:
+            self._pw.stop()
+            raise RuntimeError(
+                "nessun browser disponibile per il rendering: esegui "
+                "'playwright install chromium' o installa "
+                "Chrome/Chromium di sistema")
+        self._browser = browser
+        self._context = browser.new_context(user_agent=user_agent)
+
+    def render(self, url: str) -> Optional[str]:
+        """DOM renderizzato della pagina, o None se non riuscito."""
+        try:
+            page = self._context.new_page()
+            try:
+                page.goto(url, timeout=self.timeout_ms,
+                          wait_until="load")
+                try:
+                    page.wait_for_load_state(
+                        "networkidle", timeout=RENDER_SETTLE_MS)
+                except Exception:
+                    pass  # rete mai quieta (polling): il DOM c'e'
+                return page.content()
+            finally:
+                page.close()
+        except Exception as exc:
+            if self.verbose:
+                print("  ! rendering fallito per %s: %s"
+                      % (url, str(exc).splitlines()[0][:120]),
+                      file=sys.stderr)
+            return None
+
+    def close(self) -> None:
+        for closer in (self._context.close, self._browser.close,
+                       self._pw.stop):
+            try:
+                closer()
+            except Exception:
+                pass
+
+
+def apply_rendering(pages: List[Page], mode: str,
+                    user_agent: str = USER_AGENT,
+                    delay: float = 0.5, timeout: int = 20,
+                    verbose: bool = True,
+                    stop_event: Optional["threading.Event"] = None
+                    ) -> Tuple[List[Page], int, int]:
+    """Sostituisce il contenuto delle pagine col DOM renderizzato.
+
+    I metadati HTTP (stato, redirect, tempi, dimensioni) restano
+    quelli della risposta reale; ``raw_js_heavy`` conserva l'esito
+    dell'euristica sul sorgente statico, cosi' il rilievo sui
+    contenuti invisibili ai crawler senza JavaScript scatta comunque.
+    Restituisce (pagine, renderizzate, fallite).
+    """
+    targets = [i for i, p in enumerate(pages)
+               if p.ok and (mode == RENDER_ALWAYS or is_js_heavy(p))]
+    if mode == RENDER_OFF or not targets:
+        return pages, 0, 0
+
+    renderer = PageRenderer(user_agent=user_agent, timeout=timeout,
+                            verbose=verbose)
+    rendered = failed = 0
+    try:
+        for pos, index in enumerate(targets):
+            if stop_event is not None and stop_event.is_set():
+                raise AuditCancelled()
+            old = pages[index]
+            if verbose:
+                print("  RENDER %s" % old.url, file=sys.stderr)
+            html = renderer.render(old.url)
+            if html is None:
+                failed += 1
+            else:
+                fresh = Page(url=old.url, status=old.status,
+                             final_url=old.final_url,
+                             redirects=old.redirects,
+                             elapsed=old.elapsed,
+                             html_bytes=old.html_bytes)
+                extract_content(fresh, html)
+                fresh.rendered = True
+                fresh.raw_js_heavy = is_js_heavy(old)
+                pages[index] = fresh
+                rendered += 1
+            if delay and pos + 1 < len(targets):
+                if stop_event is not None:
+                    stop_event.wait(delay)
+                else:
+                    time.sleep(delay)
+    finally:
+        renderer.close()
+    return pages, rendered, failed
+
+
 # --------------------------------------------------------------------
 # Parsing della pagina
 # --------------------------------------------------------------------
@@ -911,7 +1325,19 @@ def parse_page(url: str, resp: requests.Response) -> Page:
                 final_url=resp.url, redirects=len(resp.history),
                 elapsed=resp.elapsed.total_seconds(),
                 html_bytes=len(resp.content))
-    soup = BeautifulSoup(resp.text, "lxml")
+    extract_content(page, resp.text)
+    return page
+
+
+def extract_content(page: Page, raw_html: str) -> None:
+    """Popola i campi di contenuto della pagina dal sorgente HTML.
+
+    Separata da ``parse_page`` perche' usata anche dal rendering
+    JavaScript: i metadati HTTP restano quelli della risposta reale,
+    il contenuto puo' venire dal DOM renderizzato dal browser.
+    """
+    url = page.url
+    soup = BeautifulSoup(raw_html, "lxml")
 
     page.script_bytes = sum(
         len(s.get_text() or "") for s in soup.find_all("script"))
@@ -987,9 +1413,8 @@ def parse_page(url: str, resp: requests.Response) -> Page:
         elif target:
             page.external_links += 1
 
-    page.jsonld_types, page.jsonld_raw = extract_jsonld(resp.text)
+    page.jsonld_types, page.jsonld_raw = extract_jsonld(raw_html)
     page.chunks = build_chunks(page)
-    return page
 
 
 def extract_jsonld(raw_html: str) -> Tuple[List[str], List[dict]]:
@@ -1112,6 +1537,26 @@ class BM25Index:
         return scores
 
 
+def _quiet_huggingface() -> None:
+    """Zittisce il rumore dell'ecosistema Hugging Face nel log.
+
+    Il caricamento del modello di embedding contatta l'HF Hub e senza
+    token stampa su stderr avvisi in inglese sui rate limit (piu' le
+    barre di avanzamento dei download): rumore puro nel log di
+    avanzamento che la GUI mostra al cliente. L'avviso e' innocuo —
+    il modello resta in cache locale dopo il primo download — e chi
+    vuole limiti piu' alti puo' esportare HF_TOKEN, che le librerie
+    leggono da sole. Le variabili gia' impostate dall'utente non
+    vengono toccate.
+    """
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("HF_HUB_VERBOSITY", "error")
+    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+    for name in ("huggingface_hub", "transformers",
+                 "sentence_transformers"):
+        logging.getLogger(name).setLevel(logging.ERROR)
+
+
 def embeddings_available() -> bool:
     """True se sentence-transformers e numpy sono importabili."""
     return (
@@ -1157,6 +1602,7 @@ class VectorIndex:
             self._build_tfidf()
 
     def _load_model(self, model_name: str) -> None:
+        _quiet_huggingface()
         try:
             from sentence_transformers import SentenceTransformer
             import numpy as np
@@ -1585,19 +2031,21 @@ def audit_technical(pages: List[Page], base: str,
             fix="Imposta <html lang=\"it\">: aiuta la selezione del "
                 "modello linguistico in fase di analisi."))
 
-    js_heavy = [
-        p for p in good
-        if p.html_bytes > 0
-        and p.word_count < 120
-        and p.script_bytes > p.html_bytes * 0.4
-    ]
+    js_heavy = [p for p in good
+                if p.raw_js_heavy or is_js_heavy(p)]
     if js_heavy:
+        rendered_any = any(p.rendered for p in js_heavy)
+        detail = ("Il contenuto potrebbe essere reso lato client e "
+                  "non essere visto dai crawler.")
+        if rendered_any:
+            detail = ("Il contenuto e' stato analizzato col "
+                      "rendering JavaScript, ma i crawler che non "
+                      "eseguono JavaScript (la maggior parte di "
+                      "quelli IA) continuano a non vederlo.")
         out.append(Finding(
             AREA_TECH, SEV_CRITICAL,
             "%d pagina/e con testo scarso e molto JavaScript"
-            % len(js_heavy),
-            "Il contenuto potrebbe essere reso lato client e non "
-            "essere visto dai crawler.",
+            % len(js_heavy), detail,
             "Attiva rendering server-side o pre-rendering.",
             weight=2.0))
     elif good:
@@ -2507,7 +2955,8 @@ class ShareResult:
 
 
 def crawl_corpus(base: str, fetcher: Fetcher, max_pages: int,
-                 respect_robots: bool = False) -> List[Page]:
+                 respect_robots: bool = False,
+                 workers: int = 1) -> List[Page]:
     """Scansione leggera di un sito terzo: pagine e chunk, nessun
     rilievo. Usata per i concorrenti del confronto competitivo."""
     robots = RobotsAudit(base, fetcher)
@@ -2518,14 +2967,10 @@ def crawl_corpus(base: str, fetcher: Fetcher, max_pages: int,
         urls.insert(0, base)
     if respect_robots:
         urls = [u for u in urls if robots.allowed(u)]
-    pages: List[Page] = []
-    for url in urls[:max_pages]:
-        resp = fetcher.get(url)
-        if resp is None:
-            continue
-        if "html" not in resp.headers.get("Content-Type", ""):
-            continue
-        pages.append(parse_page(url, resp))
+    pages = [p for p in fetch_pages(fetcher, urls[:max_pages],
+                                    workers=workers,
+                                    stop_event=fetcher.stop_event)
+             if not p.error]
     pages, _ = dedupe_pages(pages)
     return pages
 
@@ -2676,13 +3121,283 @@ def overall_score(scores: Dict[str, Optional[float]]) -> float:
     return round(num / den, 1) if den else 0.0
 
 
+def citability_profiles(
+        pages: Sequence[Page],
+        scores: Dict[str, Optional[float]],
+        market: str = DEFAULT_MARKET) -> Optional[Dict[str, object]]:
+    """Profili euristici di citabilita' per assistente IA.
+
+    Ogni profilo e' la media dei punteggi di area ripesata secondo
+    cio' che quel tipo di assistente plausibilmente premia (vedi
+    CITABILITY_PROFILES); la "profondita' editoriale" deriva dalle
+    parole medie per pagina rapportate a DEPTH_TARGET_WORDS.
+    L'indice composito ripesa i profili secondo il mercato scelto
+    (MARKET_WEIGHTS). Le componenti senza punteggio sono escluse
+    rinormalizzando i pesi; se nessun profilo e' calcolabile
+    restituisce None.
+    """
+    if market not in MARKET_WEIGHTS:
+        raise ValueError("Mercato sconosciuto: %s" % market)
+
+    components: Dict[str, Optional[float]] = dict(scores)
+    math_data = surface_math(pages)
+    components[CITABILITY_DEPTH] = (
+        min(100.0, round(100.0 * float(math_data["words_avg"])
+                         / DEPTH_TARGET_WORDS, 1))
+        if math_data else None)
+
+    profiles: List[Dict[str, object]] = []
+    for key, label, focus, weights in CITABILITY_PROFILES:
+        usable = {c: w for c, w in weights.items()
+                  if components.get(c) is not None}
+        den = sum(usable.values())
+        score = (round(sum(w * components[c]
+                           for c, w in usable.items()) / den, 1)
+                 if den else None)
+        profiles.append({
+            "key": key, "label": label, "focus": focus,
+            "score": score, "weights": dict(weights),
+            "components": {c: components[c] for c in usable},
+        })
+
+    scored = [p for p in profiles if p["score"] is not None]
+    if not scored:
+        return None
+
+    mkt = MARKET_WEIGHTS[market]
+    den = sum(mkt[str(p["key"])] for p in scored)
+    index = (round(sum(mkt[str(p["key"])] * float(p["score"])
+                       for p in scored) / den, 1)
+             if den else None)
+    return {
+        "market": market,
+        "market_weights": dict(mkt),
+        "depth_target_words": DEPTH_TARGET_WORDS,
+        "profiles": profiles,
+        "index": index,
+        "note": CITABILITY_NOTE,
+    }
+
+
+def _citability_gains(f: "Finding", totals: Dict[str, float],
+                      cit: Dict[str, object]) -> Dict[str, object]:
+    """Guadagni stimati se il rilievo fosse risolto.
+
+    La variazione dell'area e' esatta rispetto al modello di
+    punteggio (peso x (1 - fattore di gravita') / somma dei pesi
+    dell'area, in centesimi); il guadagno di un profilo e' quella
+    variazione per il peso rinormalizzato che il profilo assegna
+    all'area; il guadagno sull'indice composito usa i pesi del
+    mercato. "profiles_hit" elenca i profili con guadagno di almeno
+    CROSS_GAIN_MIN punti; con due o piu' il rilievo e' trasversale.
+    """
+    total = totals.get(f.area, 0.0)
+    delta = (100.0 * f.weight
+             * (1.0 - _SEVERITY_FACTOR[f.severity]) / total
+             if total else 0.0)
+    gains: Dict[str, float] = {}
+    best_key, best_label, best_gain = "", "", 0.0
+    for prof in cit["profiles"]:
+        if prof["score"] is None:
+            continue
+        weights: Dict[str, float] = dict(prof["weights"])
+        den = sum(weights[c] for c in dict(prof["components"]))
+        share = weights.get(f.area, 0.0) / den if den else 0.0
+        gain = round(delta * share, 1)
+        gains[str(prof["key"])] = gain
+        if gain > best_gain:
+            best_key = str(prof["key"])
+            best_label = str(prof["label"])
+            best_gain = gain
+    mkt: Dict[str, float] = dict(cit["market_weights"])
+    hit = [key for key, gain in gains.items()
+           if gain >= CROSS_GAIN_MIN]
+    return {
+        "gains": gains,
+        "best_profile": best_key,
+        "best_label": best_label,
+        "best_gain": best_gain,
+        "index_gain": round(sum(mkt.get(key, 0.0) * gain
+                                for key, gain in gains.items()), 1),
+        "profiles_hit": hit,
+        "cross": len(hit) >= 2,
+    }
+
+
+def citability_top_actions(
+        findings: Sequence["Finding"],
+        pages: Sequence[Page],
+        scores: Dict[str, Optional[float]],
+        market: str = DEFAULT_MARKET,
+        top: int = 3) -> List[Dict[str, object]]:
+    """Le prime azioni del piano annotato con i guadagni di profilo.
+
+    E' la testa di build_remediation() chiamata con i dati di
+    citabilita': stesse priorita', stesse annotazioni. Vuota se i
+    profili non sono calcolabili.
+    """
+    if citability_profiles(pages, scores, market) is None:
+        return []
+    return build_remediation(findings, pages, scores, market)[:top]
+
+
+def judge_unavailable() -> Optional[str]:
+    """None se il giudizio LLM puo' funzionare, altrimenti il motivo.
+
+    Stessa infrastruttura del monitor citazioni: SDK ufficiale
+    anthropic e chiave solo dalla variabile d'ambiente
+    ANTHROPIC_API_KEY (mai da riga di comando).
+    """
+    if importlib.util.find_spec("anthropic") is None:
+        return "SDK anthropic non installato (pip install anthropic)"
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return "variabile d'ambiente ANTHROPIC_API_KEY assente"
+    return None
+
+
+def _judge_sample(results: Sequence[QueryResult],
+                  pages: Sequence[Page]) -> List[Tuple[str, Chunk]]:
+    """Campione da giudicare: primo passaggio fuso di ogni query.
+
+    I passaggi sono deduplicati (lo stesso chunk puo' vincere piu'
+    query) e limitati a JUDGE_MAX_CHUNKS per contenere i costi.
+    """
+    by_label = {c.label: c for p in pages if p.ok for c in p.chunks}
+    sample: List[Tuple[str, Chunk]] = []
+    seen: Set[str] = set()
+    for res in results:
+        if not res.fused_top:
+            continue
+        label = res.fused_top[0][0]
+        chunk = by_label.get(label)
+        if chunk is None or label in seen:
+            continue
+        seen.add(label)
+        sample.append((res.query, chunk))
+        if len(sample) >= JUDGE_MAX_CHUNKS:
+            break
+    return sample
+
+
+def _judge_prompt(sample: Sequence[Tuple[str, "Chunk"]]) -> str:
+    """Prompt unico per l'intero campione, risposta solo JSON."""
+    parts = [
+        "Sei un valutatore di citabilita' per assistenti IA con "
+        "ricerca web. Per ogni voce giudica quanto il PASSAGGIO e' "
+        "adatto a essere citato da un assistente che risponde alla "
+        "QUERY: risposta diretta, autonoma e verificabile. Rispondi "
+        "SOLO con un array JSON, un oggetto per voce, nel formato "
+        "[{\"id\": 1, \"score\": 0-100, \"reason\": \"max 15 "
+        "parole in italiano\"}]. Nessun altro testo.",
+    ]
+    for pos, (query, chunk) in enumerate(sample, 1):
+        parts.append(
+            "Voce %d\nQUERY: %s\nPASSAGGIO (sezione \"%s\"):\n%s"
+            % (pos, query, chunk.heading or "senza heading",
+               chunk.text[:JUDGE_CHUNK_CHARS]))
+    return "\n\n".join(parts)
+
+
+def run_judge(results: Sequence[QueryResult],
+              pages: Sequence[Page],
+              mode: str = DEFAULT_JUDGE,
+              verbose: bool = False,
+              model: str = JUDGE_MODEL) -> Optional[Dict[str, object]]:
+    """Giudizio LLM sulla citabilita' dei passaggi migliori.
+
+    Passo separato dopo run_audit(): l'audit in se' non contatta
+    mai l'API. Restituisce None con mode=off; altrimenti un dict
+    con status "ok" (verdetti e media), "skipped" (motivo) o
+    "error" (motivo). Gli errori API non interrompono mai il
+    referto. Una sola richiesta per audit.
+    """
+    if mode == JUDGE_OFF:
+        return None
+    reason = judge_unavailable()
+    if reason:
+        if verbose:
+            print("Giudizio LLM saltato: %s" % reason,
+                  file=sys.stderr)
+        return {"status": "skipped", "reason": reason}
+    sample = _judge_sample(results, pages)
+    if not sample:
+        return {"status": "skipped",
+                "reason": "nessun passaggio recuperato dalla "
+                          "simulazione RRF da giudicare"}
+    if verbose:
+        print("Giudizio LLM su %d passaggi (%s)..."
+              % (len(sample), model), file=sys.stderr)
+
+    import anthropic
+    kwargs: Dict[str, object] = {}
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
+    if base_url:
+        kwargs["base_url"] = base_url
+    client = anthropic.Anthropic(**kwargs)
+    try:
+        resp = client.beta.messages.create(
+            model=model,
+            max_tokens=JUDGE_MAX_TOKENS,
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            messages=[{"role": "user",
+                       "content": _judge_prompt(sample)}],
+        )
+    except anthropic.APIError as exc:
+        return {"status": "error",
+                "reason": "errore API Anthropic: %s" % exc}
+    if getattr(resp, "stop_reason", "") == "refusal":
+        return {"status": "error",
+                "reason": "richiesta declinata dai classificatori "
+                          "di sicurezza"}
+
+    text = "".join(getattr(b, "text", "") or ""
+                   for b in getattr(resp, "content", []) or [])
+    start, end = text.find("["), text.rfind("]")
+    try:
+        raw = json.loads(text[start:end + 1])
+        if not isinstance(raw, list):
+            raise ValueError("atteso un array JSON")
+        verdicts: List[Dict[str, object]] = []
+        for item in raw:
+            pos = int(item["id"])
+            if not 1 <= pos <= len(sample):
+                continue
+            query, chunk = sample[pos - 1]
+            score = min(100.0, max(0.0, float(item["score"])))
+            verdicts.append({
+                "query": query,
+                "label": chunk.label,
+                "score": round(score, 1),
+                "reason": str(item.get("reason", "")).strip(),
+            })
+        if not verdicts:
+            raise ValueError("nessun verdetto riconosciuto")
+    except (ValueError, KeyError, TypeError,
+            json.JSONDecodeError) as exc:
+        return {"status": "error",
+                "reason": "risposta del modello non interpretabile "
+                          "(%s)" % exc}
+    average = round(sum(float(v["score"]) for v in verdicts)
+                    / len(verdicts), 1)
+    return {
+        "status": "ok",
+        "model": getattr(resp, "model", model) or model,
+        "sampled": len(verdicts),
+        "average": average,
+        "verdicts": verdicts,
+        "note": JUDGE_NOTE,
+    }
+
+
 def render_text(base: str, pages: List[Page],
                 findings: List[Finding],
                 scores: Dict[str, Optional[float]],
                 results: List[QueryResult], mode: str,
                 k: int = 60,
-                competitive: Optional[Dict[str, object]] = None
-                ) -> str:
+                competitive: Optional[Dict[str, object]] = None,
+                market: str = DEFAULT_MARKET,
+                judge: Optional[Dict[str, object]] = None) -> str:
     """Referto testuale per la console."""
     marks = {SEV_CRITICAL: "[X]", SEV_WARNING: "[!]",
              SEV_OK: "[v]", SEV_INFO: "[i]"}
@@ -2705,6 +3420,62 @@ def render_text(base: str, pages: List[Page],
                                         overall_score(scores)))
     lines.append("")
 
+    cit = citability_profiles(pages, scores, market)
+    if cit:
+        lines.append("PROFILI DI CITABILITA' PER ASSISTENTE IA")
+        for prof in cit["profiles"]:
+            if prof["score"] is None:
+                continue
+            bar = "#" * int(prof["score"] / 5)
+            lines.append("  %-24s %5.1f/100  %s"
+                         % (prof["label"], prof["score"], bar))
+        if cit["index"] is not None:
+            lines.append("  %-24s %5.1f/100" % ("INDICE COMPOSITO",
+                                                cit["index"]))
+        lines.append("  Pesi (mercato %s): %s"
+                     % (cit["market"],
+                        ", ".join("%s %d%%" % (key, round(100 * w))
+                                  for key, w
+                                  in cit["market_weights"].items())))
+        actions = citability_top_actions(findings, pages, scores,
+                                         market)
+        if actions:
+            lines.append("  Azioni con maggior guadagno di "
+                         "profilo:")
+            for act in actions:
+                gain = (" -> %s (+%.1f punti profilo)"
+                        % (act["best_label"], act["best_gain"])
+                        if act["best_profile"] else "")
+                lines.append("   %d. [sforzo: %s] %s%s"
+                             % (act["priority"], act["effort"],
+                                act["title"], gain))
+        lines.append("  Nota: %s" % cit["note"])
+        lines.append("")
+
+    if judge:
+        lines.append("GIUDIZIO LLM SULLA CITABILITA'")
+        if judge.get("status") == "ok":
+            lines.append("  Modello: %s · passaggi valutati: %d · "
+                         "media: %.1f/100"
+                         % (judge["model"], judge["sampled"],
+                            judge["average"]))
+            if cit and cit["index"] is not None:
+                lines.append("  Indice euristico: %.1f — scarto "
+                             "giudice-euristica: %+.1f"
+                             % (cit["index"],
+                                float(str(judge["average"]))
+                                - float(str(cit["index"]))))
+            for v in judge["verdicts"]:
+                lines.append("  %5.1f/100  %s"
+                             % (v["score"], v["query"]))
+                if v["reason"]:
+                    lines.append("             %s" % v["reason"])
+            lines.append("  Nota: %s" % judge["note"])
+        else:
+            lines.append("  Non eseguito: %s"
+                         % judge.get("reason", ""))
+        lines.append("")
+
     for area in (AREA_TECH, AREA_LEX, AREA_SEM, AREA_SD, AREA_RRF):
         subset = [f for f in findings if f.area == area]
         if not subset:
@@ -2723,18 +3494,52 @@ def render_text(base: str, pages: List[Page],
                 lines.append("    -> Fix: %s" % finding.fix)
         lines.append("")
 
-    plan = build_remediation(findings)
-    if plan:
+    math = surface_math(pages)
+    if math:
         lines.append("-" * 70)
-        lines.append("PIANO DI REMEDIATION  ·  %d interventi, per "
-                     "gravita' e peso" % len(plan))
+        lines.append("LA MATEMATICA DEL PROBLEMA")
+        lines.append("-" * 70)
+        lines.append("  Superficie attuale   : %d pagine, %d chunk "
+                     "(~%d parole/pagina)"
+                     % (math["pages"], math["chunks_now"],
+                        math["words_avg"]))
+        lines.append("  Superficie potenziale: ~%d chunk (%s)"
+                     % (math["chunks_potential"], math["assumption"]))
+        if math["multiplier"] is not None:
+            lines.append("  Effetto sull'RRF     : ~%.1fx occasioni "
+                         "di comparire nelle liste fuse"
+                         % math["multiplier"])
+        else:
+            lines.append("  Effetto sull'RRF     : da 0 addendi a "
+                         "~%d occasioni di comparire nelle liste"
+                         % math["chunks_potential"])
+        lines.append("")
+
+    plan = build_remediation(findings, pages, scores, market)
+    if plan:
+        quick = sum(1 for i in plan if i["quick_win"])
+        criterio = ("gravita' e guadagno di citabilita'"
+                    if "index_gain" in plan[0] else
+                    "gravita' e peso")
+        lines.append("-" * 70)
+        lines.append("PIANO DI REMEDIATION  ·  %d interventi per "
+                     "%s%s"
+                     % (len(plan), criterio,
+                        " · %d quick win" % quick if quick else ""))
         lines.append("-" * 70)
         for item in plan:
             tag = ("CRITICO" if item["severity"] == SEV_CRITICAL
                    else "AVVISO")
-            lines.append("%2d. [%s · %s] %s"
+            marker = "  ** QUICK WIN" if item["quick_win"] else ""
+            lines.append("%2d. [%s · %s · sforzo: %s] %s%s"
                          % (item["priority"], tag, item["area"],
-                            item["title"]))
+                            item["effort"], item["title"], marker))
+            if item.get("cross"):
+                lines.append("    Trasversale: deprime %d profili "
+                             "di citabilita' (risolto vale +%.1f "
+                             "sull'indice)"
+                             % (len(list(item["profiles_hit"])),
+                                item["index_gain"]))
             if item["fix"]:
                 lines.append("    Fix: %s" % item["fix"])
             if item["example"]:
@@ -2903,8 +3708,9 @@ def render_html(base: str, pages: List[Page],
                 scores: Dict[str, Optional[float]],
                 results: List[QueryResult], mode: str,
                 k: int = 60,
-                competitive: Optional[Dict[str, object]] = None
-                ) -> str:
+                competitive: Optional[Dict[str, object]] = None,
+                market: str = DEFAULT_MARKET,
+                judge: Optional[Dict[str, object]] = None) -> str:
     """Referto HTML autonomo, leggibile in chiaro e in scuro."""
     esc = html.escape
     colors = {SEV_CRITICAL: "var(--bad)", SEV_WARNING: "var(--warn)",
@@ -2953,6 +3759,105 @@ def render_html(base: str, pages: List[Page],
         % (hue, total, total, hue))
     parts.append("</div>")
 
+    cit = citability_profiles(pages, scores, market)
+    if cit:
+        pesi = ", ".join("%s %d%%" % (key, round(100 * w))
+                         for key, w in cit["market_weights"].items())
+        parts.append(
+            "<section><h2>Profili di citabilita' per assistente IA"
+            "</h2><p class=\"meta\">%s Mercato di riferimento: "
+            "<b>%s</b> (pesi: %s).</p>"
+            "<table class=\"citprof\"><thead><tr><th>Assistente"
+            "</th><th>Cosa premia</th><th>Punteggio</th></tr>"
+            "</thead><tbody>"
+            % (esc(cit["note"]), esc(cit["market"]), esc(pesi)))
+        for prof in cit["profiles"]:
+            if prof["score"] is None:
+                continue
+            val = float(prof["score"])
+            hue = "var(--good)" if val >= 70 else (
+                "var(--warn)" if val >= 40 else "var(--bad)")
+            parts.append(
+                "<tr><td><b>%s</b></td><td>%s</td>"
+                "<td style=\"color:%s\"><b>%.1f</b>/100"
+                "<div class=\"bar\"><div class=\"fill\" style=\""
+                "width:%.0f%%;background:%s\"></div></div>"
+                "</td></tr>"
+                % (esc(str(prof["label"])), esc(str(prof["focus"])),
+                   hue, val, val, hue))
+        if cit["index"] is not None:
+            val = float(cit["index"])
+            hue = "var(--good)" if val >= 70 else (
+                "var(--warn)" if val >= 40 else "var(--bad)")
+            parts.append(
+                "<tr><th>Indice composito (mercato %s)</th>"
+                "<td>&mdash;</td><td style=\"color:%s\">"
+                "<b>%.1f</b>/100<div class=\"bar\">"
+                "<div class=\"fill\" style=\"width:%.0f%%;"
+                "background:%s\"></div></div></td></tr>"
+                % (esc(cit["market"]), hue, val, val, hue))
+        parts.append("</tbody></table>")
+        actions = citability_top_actions(findings, pages, scores,
+                                         market)
+        if actions:
+            parts.append(
+                "<h3>Top %d azioni prioritarie</h3>"
+                "<p class=\"meta\">Le prime voci del piano di "
+                "remediation con il profilo che ne guadagna di "
+                "piu' (stima in punti profilo, stessa natura "
+                "euristica).</p><ol class=\"cit-actions\">"
+                % len(actions))
+            for act in actions:
+                badges = ("<span class=\"eff\">sforzo: %s</span>"
+                          % esc(str(act["effort"])))
+                if act["quick_win"]:
+                    badges += "<span class=\"qw\">quick win</span>"
+                gain = ""
+                if act["best_profile"]:
+                    gain = (" &mdash; guadagna di piu': <b>%s</b> "
+                            "(+%.1f punti profilo)"
+                            % (esc(str(act["best_label"])),
+                               act["best_gain"]))
+                parts.append("<li>%s %s%s</li>"
+                             % (esc(str(act["title"])), badges,
+                                gain))
+            parts.append("</ol>")
+        parts.append("</section>")
+
+    if judge:
+        parts.append("<section><h2>Giudizio LLM sulla "
+                     "citabilita'</h2>")
+        if judge.get("status") == "ok":
+            confronto = ""
+            if cit and cit["index"] is not None:
+                confronto = (" Indice euristico: %.1f — scarto "
+                             "giudice-euristica: %+.1f."
+                             % (cit["index"],
+                                float(str(judge["average"]))
+                                - float(str(cit["index"]))))
+            parts.append(
+                "<p class=\"meta\">Modello <code>%s</code> su %d "
+                "passaggio/i · media <b>%.1f</b>/100.%s %s</p>"
+                "<table><thead><tr><th>Query</th><th>Punteggio"
+                "</th><th>Motivazione</th></tr></thead><tbody>"
+                % (esc(str(judge["model"])), judge["sampled"],
+                   judge["average"], esc(confronto),
+                   esc(str(judge["note"]))))
+            for v in judge["verdicts"]:
+                val = float(str(v["score"]))
+                hue = "var(--good)" if val >= 70 else (
+                    "var(--warn)" if val >= 40 else "var(--bad)")
+                parts.append(
+                    "<tr><td>%s</td><td style=\"color:%s\">"
+                    "<b>%.1f</b>/100</td><td>%s</td></tr>"
+                    % (esc(str(v["query"])), hue, val,
+                       esc(str(v["reason"]))))
+            parts.append("</tbody></table>")
+        else:
+            parts.append("<p class=\"meta\">Non eseguito: %s</p>"
+                         % esc(str(judge.get("reason", ""))))
+        parts.append("</section>")
+
     order = {SEV_CRITICAL: 0, SEV_WARNING: 1, SEV_INFO: 2, SEV_OK: 3}
     for area in (AREA_TECH, AREA_LEX, AREA_SEM, AREA_SD, AREA_RRF):
         subset = sorted((f for f in findings if f.area == area),
@@ -2975,21 +3880,63 @@ def render_html(base: str, pages: List[Page],
             parts.append("</div></div>")
         parts.append("</section>")
 
-    plan = build_remediation(findings)
+    math = surface_math(pages)
+    if math:
+        effetto = ("~%.1fx occasioni di comparire nelle liste fuse"
+                   % math["multiplier"]
+                   if math["multiplier"] is not None else
+                   "da 0 addendi a ~%d occasioni di comparire "
+                   "nelle liste" % math["chunks_potential"])
+        parts.append(
+            "<section><h2>La matematica del problema</h2>"
+            "<p class=\"meta\">L'RRF premia chi compare in piu' "
+            "liste con piu' passaggi pertinenti: il numero di chunk "
+            "indicizzabili e' il vero moltiplicatore.</p>"
+            "<table><tbody>"
+            "<tr><th>Superficie attuale</th><td>%d pagine, %d chunk "
+            "(~%d parole/pagina)</td></tr>"
+            "<tr><th>Superficie potenziale</th><td>~%d chunk "
+            "(%s)</td></tr>"
+            "<tr><th>Effetto sull'RRF</th><td>%s</td></tr>"
+            "</tbody></table></section>"
+            % (math["pages"], math["chunks_now"], math["words_avg"],
+               math["chunks_potential"], esc(str(math["assumption"])),
+               esc(effetto)))
+
+    plan = build_remediation(findings, pages, scores, market)
     if plan:
+        quick = sum(1 for i in plan if i["quick_win"])
+        criterio = (
+            "gravita' e guadagno di citabilita': in testa i "
+            "problemi trasversali, che deprimono piu' profili "
+            "insieme"
+            if "index_gain" in plan[0] else
+            "gravita' e peso: si parte da cio' che rende di piu' "
+            "sul punteggio")
         parts.append(
             "<section><h2>Piano di remediation</h2>"
-            "<p class=\"meta\">%d interventi ordinati per gravita' "
-            "e peso: si parte da cio' che rende di piu' sul "
-            "punteggio.</p>" % len(plan))
+            "<p class=\"meta\">%d interventi ordinati per %s. "
+            "Lo sforzo stimato (minuti/ore/giorni) "
+            "individua i quick win%s.</p>"
+            % (len(plan), criterio,
+               " — qui sono %d" % quick if quick else ""))
         for item in plan:
             sev = str(item["severity"])
+            badges = ("<span class=\"eff\">sforzo: %s</span>"
+                      % esc(str(item["effort"])))
+            if item["quick_win"]:
+                badges += "<span class=\"qw\">quick win</span>"
+            if item.get("cross"):
+                badges += ("<span class=\"crossb\">trasversale: "
+                           "%d profili · +%.1f indice</span>"
+                           % (len(list(item["profiles_hit"])),
+                              item["index_gain"]))
             parts.append(
                 "<div class=\"find\"><span class=\"ico\" style=\""
                 "background:%s\">%s</span><div class=\"txt\">"
-                "<b>%d. %s</b>"
+                "<b>%d. %s</b> %s"
                 % (colors[sev], marks[sev], item["priority"],
-                   esc(str(item["title"]))))
+                   esc(str(item["title"])), badges))
             if item["fix"]:
                 parts.append("<span class=\"d\">%s</span>"
                              % esc(str(item["fix"])))
@@ -3167,6 +4114,18 @@ pre.ex{font-family:Menlo,Consolas,monospace;font-size:.78rem;
 background:var(--accent-soft);border-radius:8px;padding:10px 12px;
 margin:6px 0 2px;overflow-x:auto;white-space:pre-wrap;
 word-break:break-word}
+.eff,.qw{display:inline-block;font-size:.68rem;font-weight:700;
+padding:1px 8px;border-radius:999px;margin-left:6px;
+vertical-align:2px}
+.eff{background:var(--accent-soft);color:var(--accent)}
+.citprof .bar{min-width:110px;margin-top:4px}
+.crossb{display:inline-block;font-size:.68rem;font-weight:700;
+border-radius:4px;padding:1px 7px;margin-left:6px;
+background:var(--accent);color:#fff}
+.cit-actions{margin:6px 0 0 18px;padding:0}
+.cit-actions li{margin:.4rem 0}
+.qw{background:var(--good);color:#fff;text-transform:uppercase;
+letter-spacing:.03em}
 footer{color:var(--muted);font-size:.78rem;padding:0 4px}
 footer a{color:var(--accent)}
 footer .brand{color:var(--accent);font-weight:700;font-size:.88rem;
@@ -3179,8 +4138,9 @@ def render_json(base: str, pages: List[Page],
                 scores: Dict[str, Optional[float]],
                 results: List[QueryResult], mode: str,
                 k: int = 60,
-                competitive: Optional[Dict[str, object]] = None
-                ) -> str:
+                competitive: Optional[Dict[str, object]] = None,
+                market: str = DEFAULT_MARKET,
+                judge: Optional[Dict[str, object]] = None) -> str:
     """Referto JSON, adatto a essere versionato o messo in pipeline."""
     payload = {
         "tool": "seo_rrf_audit.py",
@@ -3190,6 +4150,10 @@ def render_json(base: str, pages: List[Page],
         "vector_retriever": mode,
         "rrf": {"k": k, "formula": "score(d)=sum 1/(k+rank_i(d))"},
         "scores": {**scores, "overall": overall_score(scores)},
+        "citability": citability_profiles(pages, scores, market),
+        "citability_actions": citability_top_actions(
+            findings, pages, scores, market),
+        "judge": judge,
         "pages": [
             {
                 "url": p.url,
@@ -3199,6 +4163,7 @@ def render_json(base: str, pages: List[Page],
                 "title": p.title,
                 "description": p.description,
                 "word_count": p.word_count,
+                "rendered": p.rendered,
                 "headings": len(p.headings),
                 "chunks": len(p.chunks),
                 "jsonld_types": p.jsonld_types,
@@ -3206,7 +4171,9 @@ def render_json(base: str, pages: List[Page],
             for p in pages
         ],
         "findings": [f.as_dict() for f in findings],
-        "remediation": build_remediation(findings),
+        "surface_math": surface_math(pages),
+        "remediation": build_remediation(findings, pages, scores,
+                                         market),
         "rrf_simulation": [asdict(r) for r in results],
         "competitive": competitive,
     }
@@ -3253,10 +4220,12 @@ def run_audit(base: str, max_pages: int, queries: List[str],
               model_name: str, delay: float, k: int,
               verbose: bool,
               max_body_mb: float = DEFAULT_MAX_BODY_MB,
-              respect_robots: bool = False,
+              robots_mode: str = ROBOTS_RESPECT,
               retries: int = DEFAULT_RETRIES,
               competitors: Optional[List[str]] = None,
               user_agent: str = USER_AGENT,
+              workers: int = DEFAULT_WORKERS,
+              render: str = RENDER_OFF,
               stop_event: Optional[threading.Event] = None) -> Tuple[
                   List[Page], List[Finding],
                   Dict[str, Optional[float]], List[QueryResult], str,
@@ -3279,6 +4248,11 @@ def run_audit(base: str, max_pages: int, queries: List[str],
               "per il proxy char-tfidf)" % model_name,
               file=sys.stderr)
 
+    if render != RENDER_OFF:
+        # Verifica subito che Playwright e un browser ci siano:
+        # meglio fallire prima della scansione che a meta' audit.
+        PageRenderer(user_agent=user_agent, verbose=False).close()
+
     fetcher = Fetcher(delay=delay, verbose=verbose,
                       max_bytes=int(max_body_mb * 1048576),
                       retries=retries, user_agent=user_agent,
@@ -3289,13 +4263,31 @@ def run_audit(base: str, max_pages: int, queries: List[str],
     robots = RobotsAudit(base, fetcher)
     findings: List[Finding] = robots.run()
 
+    respect_main = robots_mode == ROBOTS_RESPECT
+    respect_comp = robots_mode != ROBOTS_FORCE
+    if robots_mode == ROBOTS_OWN:
+        findings.append(Finding(
+            AREA_TECH, SEV_INFO,
+            "Sito dichiarato di propria titolarita'",
+            "I Disallow del robots.txt non vengono applicati al "
+            "sito auditato (--own-site); restano applicati agli "
+            "eventuali concorrenti."))
+    elif robots_mode == ROBOTS_FORCE:
+        findings.append(Finding(
+            AREA_TECH, SEV_INFO,
+            "Disallow del robots.txt ignorati su richiesta esplicita",
+            "Scansione oltre i Disallow attivata con --ignore-robots "
+            "%s: la responsabilita' della scansione e' stata assunta "
+            "esplicitamente dall'utente."
+            % IGNORE_ROBOTS_ACK))
+
     if verbose:
         print("[2/5] scoperta URL", file=sys.stderr)
     urls, from_sitemap = discover_urls(base, robots, fetcher,
-                                       max_pages, respect_robots)
+                                       max_pages, respect_main)
     if norm_url(base) not in {norm_url(u) for u in urls}:
         urls.insert(0, base)
-    if respect_robots:
+    if respect_main:
         excluded = [u for u in urls if not robots.allowed(u)]
         urls = [u for u in urls if robots.allowed(u)]
         if excluded:
@@ -3303,29 +4295,42 @@ def run_audit(base: str, max_pages: int, queries: List[str],
                 AREA_TECH, SEV_INFO,
                 "%d URL esclusi per rispetto del robots.txt"
                 % len(excluded),
-                "Con --respect-robots gli URL vietati all'agente %s "
-                "non vengono scaricati: %s."
+                "I Disallow rivolti all'agente %s vengono rispettati "
+                "(comportamento predefinito): %s. Usa --own-site se "
+                "il sito e' tuo."
                 % (USER_AGENT_TOKEN,
                    ", ".join(sorted(excluded)[:5]))))
     urls = urls[:max_pages]
 
     if verbose:
-        print("[3/5] scansione di %d pagine" % len(urls), file=sys.stderr)
-    pages: List[Page] = []
-    for url in urls:
-        check_stop()
-        resp = fetcher.get(url)
-        if resp is None:
-            pages.append(Page(
-                url=url,
-                error=fetcher.last_error or "richiesta fallita"))
-            continue
-        ctype = resp.headers.get("Content-Type", "")
-        if "html" not in ctype:
-            pages.append(Page(url=url, status=resp.status_code,
-                              error="non HTML (%s)" % ctype))
-            continue
-        pages.append(parse_page(url, resp))
+        print("[3/5] scansione di %d pagine (%d in parallelo)"
+              % (len(urls), max(1, workers)), file=sys.stderr)
+    pages = fetch_pages(fetcher, urls, workers=workers,
+                        stop_event=stop_event)
+
+    if render != RENDER_OFF:
+        if verbose:
+            print("[3b/5] rendering JavaScript (%s)" % render,
+                  file=sys.stderr)
+        pages, n_rendered, n_failed = apply_rendering(
+            pages, render, user_agent=user_agent, delay=delay,
+            verbose=verbose, stop_event=stop_event)
+        if n_rendered:
+            findings.append(Finding(
+                AREA_TECH, SEV_INFO,
+                "%d pagina/e analizzate col rendering JavaScript"
+                % n_rendered,
+                "Modalita' --render %s: il contenuto proviene dal "
+                "DOM renderizzato in un browser headless; stato "
+                "HTTP, redirect e tempi restano quelli della "
+                "risposta originale." % render))
+        if n_failed:
+            findings.append(Finding(
+                AREA_TECH, SEV_WARNING,
+                "Rendering non riuscito per %d pagina/e" % n_failed,
+                "Per queste pagine e' stato analizzato l'HTML "
+                "statico.",
+                "Riprova, o aumenta il timeout se il sito e' lento."))
 
     pages, duplicates = dedupe_pages(pages)
     if duplicates:
@@ -3372,7 +4377,7 @@ def run_audit(base: str, max_pages: int, queries: List[str],
                 print("  scansione concorrente %s" % host,
                       file=sys.stderr)
             cpages = crawl_corpus(comp, fetcher, max_pages,
-                                  respect_robots)
+                                  respect_comp, workers=workers)
             corpora[host] = [c for p in cpages if p.ok
                              for c in p.chunks]
         own_chunks = [c for p in pages if p.ok for c in p.chunks]
@@ -3435,6 +4440,43 @@ def build_parser() -> argparse.ArgumentParser:
                              "stessi limiti e confrontato sulle "
                              "stesse query per misurare la share of "
                              "voice nelle liste fuse")
+    parser.add_argument("--market", choices=tuple(MARKET_WEIGHTS),
+                        default=DEFAULT_MARKET,
+                        help="mercato di riferimento per l'indice "
+                             "composito dei profili di citabilita' "
+                             "per assistente IA: 'occidentale' pesa "
+                             "di piu' ChatGPT/Perplexity e Claude, "
+                             "'orientale' Qwen e Kimi, 'globale' "
+                             "pesa tutti allo stesso modo "
+                             "(default %s)" % DEFAULT_MARKET)
+    parser.add_argument("--judge", choices=JUDGE_MODES,
+                        default=DEFAULT_JUDGE,
+                        help="giudizio LLM sulla citabilita' dei "
+                             "passaggi migliori tramite l'API "
+                             "Anthropic (SDK ufficiale, chiave solo "
+                             "da ANTHROPIC_API_KEY): 'auto' "
+                             "(default) lo esegue se la chiave e' "
+                             "presente, 'on' lo pretende (errore "
+                             "senza chiave), 'off' lo disattiva. "
+                             "Una sola richiesta API per audit, "
+                             "con costi a carico della chiave")
+    parser.add_argument("--render", choices=RENDER_MODES,
+                        default=RENDER_OFF,
+                        help="rendering JavaScript con browser "
+                             "headless (richiede Playwright): 'auto' "
+                             "rende solo le pagine con contenuto "
+                             "lato client, 'always' tutte; il "
+                             "rendering e' seriale e rispetta "
+                             "--delay fra le pagine (default off)")
+    parser.add_argument("--workers", type=int,
+                        default=DEFAULT_WORKERS, metavar="N",
+                        help="richieste in parallelo durante la "
+                             "scansione, da 1 a %d (default %d; 1 = "
+                             "seriale). Il ritmo verso il sito non "
+                             "cambia: gli avvii restano distanziati "
+                             "di --delay, i worker sovrappongono "
+                             "solo le attese di rete"
+                             % (MAX_WORKERS, DEFAULT_WORKERS))
     parser.add_argument("--retries", type=int,
                         default=DEFAULT_RETRIES, metavar="N",
                         help="tentativi aggiuntivi con backoff "
@@ -3448,12 +4490,27 @@ def build_parser() -> argparse.ArgumentParser:
                              "richiesta; il predefinito identifica lo "
                              "strumento e rimanda alla pagina del "
                              "progetto (%s)" % USER_AGENT)
+    parser.add_argument("--own-site", action="store_true",
+                        help="dichiara che il sito auditato e' di "
+                             "tua titolarita' (o sei autorizzato): "
+                             "i Disallow del robots.txt non vengono "
+                             "applicati al sito; restano applicati "
+                             "ai concorrenti di --competitor")
+    parser.add_argument("--ignore-robots", metavar="ACCETTO",
+                        default=None,
+                        help="ignora i Disallow del robots.txt anche "
+                             "su siti non tuoi (concorrenti "
+                             "compresi). Richiede l'accettazione "
+                             "esplicita di responsabilita': passa il "
+                             "valore letterale '%s'"
+                             % IGNORE_ROBOTS_ACK)
     parser.add_argument("--respect-robots", action="store_true",
-                        help="rispetta i Disallow del robots.txt per "
-                             "l'agente %s: gli URL vietati non "
-                             "vengono scaricati (predefinito: scarica "
-                             "comunque, trattandosi di un audit del "
-                             "proprio sito)" % USER_AGENT_TOKEN)
+                        help="deprecato: il rispetto dei Disallow "
+                             "per l'agente %s e' ora il comportamento "
+                             "predefinito; il flag resta accettato "
+                             "per compatibilita' e non puo' essere "
+                             "combinato con --own-site o "
+                             "--ignore-robots" % USER_AGENT_TOKEN)
     parser.add_argument("--quiet", action="store_true",
                         help="non stampa l'avanzamento")
     parser.add_argument("--version", action="version",
@@ -3482,6 +4539,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("--max-body deve essere maggiore di zero.",
               file=sys.stderr)
         return 2
+    if not 1 <= args.workers <= MAX_WORKERS:
+        print("--workers deve essere fra 1 e %d." % MAX_WORKERS,
+              file=sys.stderr)
+        return 2
+
+    if args.ignore_robots is not None:
+        if args.respect_robots or args.own_site:
+            print("--ignore-robots non e' combinabile con "
+                  "--respect-robots o --own-site.", file=sys.stderr)
+            return 2
+        if args.ignore_robots.strip().lower() != IGNORE_ROBOTS_ACK:
+            print("Per ignorare i Disallow serve l'accettazione "
+                  "esplicita di responsabilita': --ignore-robots %s"
+                  % IGNORE_ROBOTS_ACK, file=sys.stderr)
+            return 2
+        robots_mode = ROBOTS_FORCE
+    elif args.own_site:
+        if args.respect_robots:
+            print("--own-site non e' combinabile con "
+                  "--respect-robots.", file=sys.stderr)
+            return 2
+        robots_mode = ROBOTS_OWN
+    else:
+        robots_mode = ROBOTS_RESPECT
+    if args.judge == JUDGE_ON:
+        judge_reason = judge_unavailable()
+        if judge_reason:
+            print("--judge on richiede il giudizio LLM: %s"
+                  % judge_reason, file=sys.stderr)
+            return 2
     ram = available_ram_mb()
     if ram is not None and args.max_body > ram * 0.1:
         print("Avviso: --max-body %.0f MB e' alto per questa "
@@ -3507,19 +4594,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 model_name=args.embeddings, delay=args.delay,
                 k=args.rrf_k, verbose=not args.quiet,
                 max_body_mb=args.max_body,
-                respect_robots=args.respect_robots,
+                robots_mode=robots_mode,
                 retries=max(0, args.retries),
                 competitors=competitors,
-                user_agent=args.user_agent)
+                user_agent=args.user_agent,
+                workers=args.workers,
+                render=args.render)
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     except KeyboardInterrupt:
         print("\nInterrotto dall'utente.", file=sys.stderr)
         return 130
+
+    judge_data = run_judge(results, pages, args.judge,
+                           verbose=not args.quiet)
 
     renderers = {"text": render_text, "json": render_json,
                  "html": render_html}
     report = renderers[args.format](
         base, pages, findings, scores, results, mode, args.rrf_k,
-        competitive)
+        competitive, market=args.market, judge=judge_data)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as handle:

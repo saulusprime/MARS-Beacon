@@ -14,6 +14,8 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
     GET  /api/me            stato della sessione e profilo
     POST /api/profile       completamento profilo (azienda, telefono)
     GET  /api/history       storico degli audit dell'utente
+    GET  /api/citations     storico del monitoraggio citazioni IA
+                            (JSONL di seo_rrf_citations.py)
     GET  /api/events        avanzamento push (Server-Sent Events)
     POST /api/audit         avvia un check (richiede accesso; uno
                             per utente ogni ora)
@@ -43,6 +45,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import importlib.util
 import hashlib
 import hmac
 import json
@@ -59,12 +62,19 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.1.0"
+__version__ = "2.9.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
 # Utenti e sessioni su SQLite accanto allo script (nel .gitignore).
 DB_PATH = Path(__file__).resolve().parent / "seo_rrf_gui.db"
+
+# Storico del monitor citazioni (una riga JSON per esecuzione,
+# scritto da seo_rrf_citations.py --history). Il default e' il file
+# accanto agli script; sovrascrivibile con --citations-history, ad
+# esempio /var/lib/seorrf/citazioni.jsonl nel deploy systemd.
+CITATIONS_HISTORY = Path(__file__).resolve().parent \
+    / "citazioni.jsonl"
 SESSION_TTL_S = 7 * 24 * 3600
 CHECK_INTERVAL_S = 3600  # un check per utente ogni ora
 SESSION_COOKIE = "seo_rrf_session"
@@ -365,6 +375,7 @@ class Job:
         """Esegue l'audit (nel thread di lavoro) e salva i referti."""
         cfg = self.config
         buf = LineBuffer(self.log, self.lock)
+        judge_mode = str(cfg.get("judge", sra.DEFAULT_JUDGE))
         try:
             with contextlib.redirect_stderr(buf):
                 (pages, findings, scores, results, mode,
@@ -377,10 +388,14 @@ class Job:
                     k=int(cfg["rrf_k"]),
                     verbose=True,
                     max_body_mb=float(cfg["max_body"]),
-                    respect_robots=bool(cfg["respect_robots"]),
+                    robots_mode=str(cfg["robots"]),
                     retries=int(cfg["retries"]),
+                    workers=int(cfg["workers"]),
+                    render=str(cfg["render"]),
                     competitors=list(cfg["competitors"]),
                     stop_event=self.stop_event)
+                judge = sra.run_judge(results, pages, judge_mode,
+                                      verbose=True)
             buf.flush()
         except sra.AuditCancelled:
             buf.flush()
@@ -399,13 +414,17 @@ class Job:
 
         k = int(cfg["rrf_k"])
         base = str(cfg["url"])
+        market = str(cfg.get("market", sra.DEFAULT_MARKET))
         reports = {
             "html": sra.render_html(base, pages, findings, scores,
-                                    results, mode, k, competitive),
+                                    results, mode, k, competitive,
+                                    market=market, judge=judge),
             "json": sra.render_json(base, pages, findings, scores,
-                                    results, mode, k, competitive),
+                                    results, mode, k, competitive,
+                                    market=market, judge=judge),
             "text": sra.render_text(base, pages, findings, scores,
-                                    results, mode, k, competitive),
+                                    results, mode, k, competitive,
+                                    market=market, judge=judge),
         }
         severities = [f.severity for f in findings]
         clean, flagged, broken = sra.page_status_counts(pages,
@@ -422,6 +441,12 @@ class Job:
             "pages_flagged": flagged,
             "pages_error": broken,
             "chunks": sum(len(p.chunks) for p in pages if p.ok),
+            "surface_math": sra.surface_math(pages),
+            "citability": sra.citability_profiles(pages, scores,
+                                                  market),
+            "citability_actions": sra.citability_top_actions(
+                findings, pages, scores, market),
+            "judge": judge,
             "critical": severities.count(sra.SEV_CRITICAL),
             "warning": severities.count(sra.SEV_WARNING),
             "info": severities.count(sra.SEV_INFO),
@@ -433,7 +458,8 @@ class Job:
             self.reports = reports
             self.summary = summary
             self.findings = [f.as_dict() for f in findings]
-            self.remediation = sra.build_remediation(findings)
+            self.remediation = sra.build_remediation(
+                findings, pages, scores, market)
             self.rrf = [sra.asdict(r) for r in results]
             self.competitive = competitive
             self.state = "done"
@@ -444,6 +470,44 @@ class Job:
 
 
 JOB = Job()
+
+
+def read_citations_history(path: str) -> List[Dict[str, object]]:
+    """Storico del monitor citazioni raggruppato per sito.
+
+    Legge il JSONL scritto da seo_rrf_citations.py (una riga per
+    esecuzione: generated_at, site, overall_rate, providers) e
+    restituisce [{"site": host, "runs": [...]}] nell'ordine di
+    prima apparizione, con al massimo le ultime 50 esecuzioni per
+    sito. Righe malformate e file assente vengono ignorati: lo
+    storico e' un di piu', non deve mai rompere la GUI.
+    """
+    sites: Dict[str, List[Dict[str, object]]] = {}
+    order: List[str] = []
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                site = str(row.get("site", ""))
+                if not site or not isinstance(
+                        row.get("providers"), dict):
+                    continue
+                if site not in sites:
+                    sites[site] = []
+                    order.append(site)
+                sites[site].append(row)
+    except OSError:
+        pass
+    return [{"site": site, "runs": sites[site][-50:]}
+            for site in order]
 
 
 def validate_config(raw: Dict[str, object]) -> Tuple[
@@ -468,9 +532,39 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
     delay = number("delay", 0.5, 0, 10)
     max_body = number("max_body", sra.DEFAULT_MAX_BODY_MB, 1, 10240)
     retries = number("retries", sra.DEFAULT_RETRIES, 0, 10)
+    workers = number("workers", sra.DEFAULT_WORKERS, 1,
+                     sra.MAX_WORKERS)
+    render = str(raw.get("render", sra.RENDER_OFF)).strip().lower()
+    if render not in sra.RENDER_MODES:
+        return None, "Valore non valido per 'render'."
+
+    market = str(raw.get("market",
+                         sra.DEFAULT_MARKET)).strip().lower()
+    if market not in sra.MARKET_WEIGHTS:
+        return None, "Valore non valido per 'market'."
+
+    judge = str(raw.get("judge", sra.DEFAULT_JUDGE)).strip().lower()
+    if judge not in sra.JUDGE_MODES:
+        return None, "Valore non valido per 'judge'."
+    if judge == sra.JUDGE_ON:
+        judge_reason = sra.judge_unavailable()
+        if judge_reason:
+            return None, ("Giudizio LLM obbligatorio ma non "
+                          "disponibile sul server: %s."
+                          % judge_reason)
+
+    # Predefinito "own": la registrazione include la dichiarazione di
+    # titolarita' dei siti auditati (condizioni di servizio).
+    robots = str(raw.get("robots", sra.ROBOTS_OWN)).strip().lower()
+    if robots not in sra.ROBOTS_MODES:
+        return None, "Valore non valido per 'robots'."
+    if robots == sra.ROBOTS_FORCE \
+            and raw.get("robots_ack") is not True:
+        return None, ("Per ignorare i Disallow serve la conferma "
+                      "esplicita di assunzione di responsabilita'.")
     checks = (("max_pages", max_pages), ("rrf_k", rrf_k),
               ("delay", delay), ("max_body", max_body),
-              ("retries", retries))
+              ("retries", retries), ("workers", workers))
     for name, value in checks:
         if value is None:
             return None, "Valore non valido per '%s'." % name
@@ -495,9 +589,13 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
         "delay": delay,
         "max_body": max_body,
         "retries": int(retries),
+        "workers": int(workers),
+        "render": render,
+        "robots": robots,
+        "market": market,
+        "judge": judge,
         "queries": queries,
         "embeddings": str(raw.get("embeddings", "")).strip(),
-        "respect_robots": bool(raw.get("respect_robots", False)),
         "competitors": competitors,
     }, ""
 
@@ -618,6 +716,12 @@ class Handler(BaseHTTPRequestHandler):
                 "available_ram_mb": ram,
                 "suggested_max_body_mb": suggested,
                 "embeddings_available": sra.embeddings_available(),
+                "render_available":
+                    importlib.util.find_spec("playwright")
+                    is not None,
+                "judge_available":
+                    sra.judge_unavailable() is None,
+                "judge_reason": sra.judge_unavailable() or "",
                 "default_embeddings_model":
                     sra.DEFAULT_EMBEDDINGS_MODEL,
             })
@@ -640,6 +744,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send_json(200, {
                 "runs": get_store().history(int(user["id"]))})
+        elif path == "/api/citations":
+            if self._session_user() is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+                return
+            self._send_json(200, {
+                "sites": read_citations_history(
+                    str(CITATIONS_HISTORY))})
         elif path == "/api/events":
             if self._session_user() is None:
                 self._send_json(401, {"error": "accesso richiesto"})
@@ -806,6 +917,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Punto di ingresso da riga di comando."""
+    global CITATIONS_HISTORY
     parser = argparse.ArgumentParser(
         prog="seo_rrf_gui.py",
         description="Interfaccia web locale per seo_rrf_audit.py.")
@@ -816,9 +928,18 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="porta di ascolto (default 8765)")
     parser.add_argument("--no-browser", action="store_true",
                         help="non aprire il browser all'avvio")
+    parser.add_argument("--citations-history", metavar="FILE",
+                        default=str(CITATIONS_HISTORY),
+                        help="storico JSONL del monitoraggio "
+                             "citazioni da mostrare nella GUI "
+                             "(default %s; nel deploy systemd "
+                             "tipicamente /var/lib/seorrf/"
+                             "citazioni.jsonl)" % CITATIONS_HISTORY)
     parser.add_argument("--version", action="version",
                         version="%(prog)s " + __version__)
     args = parser.parse_args(argv)
+
+    CITATIONS_HISTORY = Path(args.citations_history)
 
     if not GUI_DIR.is_dir():
         print("Cartella 'gui/' non trovata accanto allo script.",

@@ -1,6 +1,6 @@
 # TO-DO — sviluppi e idee di miglioramento
 
-Elenco di ciò che **resta da fare** (codice alla v1.7.0). Quanto già
+Elenco di ciò che **resta da fare** (codice alla v1.18.0). Quanto già
 realizzato è documentato in [AS-IS.md](AS-IS.md): le voci completate
 vengono spostate lì, non spuntate qui. Le voci marcate
 **[bug/rischio]** sono comportamenti osservati nel codice; il resto
@@ -8,15 +8,6 @@ sono proposte.
 
 ## P1 — Robustezza del crawling
 
-- [ ] Valutare se rendere `--respect-robots` il comportamento predefinito
-      quando l'host auditato non coincide con un dominio "proprio"
-      dichiarato (oggi è opt-in, pensato per l'audit del proprio sito).
-- [ ] Fetch concorrente con limite per host (`asyncio` + `httpx` o thread
-      pool) mantenendo il rate limit: con `--max-pages 40` e delay 0.5s
-      l'esecuzione è oggi interamente seriale.
-- [ ] Opzione di **rendering JavaScript** (Playwright) per auditare davvero i
-      siti client-side: oggi il contenuto solo-JS viene rilevato ma non
-      analizzato.
 
 ## P1 — Qualità dell'analisi
 
@@ -27,6 +18,81 @@ sono proposte.
       `noarchive`/`nocache` che governano Bing Chat/Copilot e il
       training Microsoft.
 
+Nuovi controlli tratti da Features.md (concept "Citability Index"
+analizzato e distillato qui il 2026-08-04; il documento originale
+non è nel repo) — tutti offline, per pagina, da innestare nelle
+aree esistenti:
+
+- [ ] **Estraibilità diretta**: quota di paragrafi di 20–120 parole
+      che aprono con una risposta esplicita ("X è…", "Sì/No, …",
+      "In sintesi…") — estende le regex di definizioni già presenti
+      nell'area semantica.
+- [ ] **Densità informativa**: rilevare il "filler" di marketing
+      ("leader di mercato", "scopri di più", "contattaci per…") e
+      segnalare le pagine in cui satura il testo utile.
+- [ ] **Titoli clickbait**: pattern sensazionalistici in title e
+      H1–H3 ("non crederai…", "il segreto di…", esclamazioni
+      multiple) — engagement bait che deprime la citabilità.
+- [ ] **Ciclo di vita dell'argomento**: verificare negli heading la
+      copertura di definizione, storia, casi d'uso, limiti, FAQ e
+      prospettive (oggi controlliamo solo FAQ, definizioni ed
+      esempi).
+- [ ] **Riferimenti bibliografici**: sezione fonti/bibliografia,
+      link esterni a fonti primarie, citazioni `[1]` / (Autore,
+      anno) — completa i segnali E-E-A-T esistenti.
+- [ ] **Freschezza dei contenuti**: oggi verifichiamo solo la
+      *presenza* di published/modified; valutarne l'età (contenuto
+      datato senza aggiornamenti → avvertenza).
+- [ ] **HTML semantico**: uso di `<article>`/`<section>`/
+      `<details>`/`<figure>`, rapporto div/elementi ("divitis") —
+      i chunker dei motori generativi segmentano su questi tag.
+- [ ] **Meta di base non ancora auditati**: charset, viewport e
+      completezza **Open Graph** (i meta `og:*` sono già estratti in
+      `page.og` ma mai valutati).
+- [ ] **Varietà degli anchor interni**: oltre alle anchor generiche
+      già segnalate, misurare la varietà del profilo (rapporto testi
+      unici/totali).
+
+## P2 — Citabilità multi-modello (da Features.md)
+
+L'idea portante di Features.md: oltre al punteggio per area, esporre
+**profili di citabilità per assistente IA**. Attenzione: le
+associazioni modello→backend del documento (Claude→Brave,
+Kimi→Baidu, …) sono speculative e non verificate — le lenti vanno
+presentate nel referto come euristiche dichiarate, non come
+comportamento documentato dei vendor.
+
+Le **lenti per modello** sono realizzate nella v1.15.0 (quattro
+profili + indice composito con `--market`, nei tre referti), la
+**vista** nella v1.16.0/GUI v2.6.0 (select del mercato nel form,
+barre per profilo e top azioni prioritarie con guadagno stimato) e
+i **problemi trasversali** nella v1.17.0/GUI v2.7.0 (piano di
+remediation annotato e ordinato per guadagno di citabilità, badge
+sui rilievi che deprimono più profili — vedi AS-IS) e il **giudizio
+LLM** nella v1.18.0/GUI v2.8.0 (`--judge`, **attivo di default** in
+`auto` per decisione di progetto del 2026-08-04: parte da solo con
+la chiave presente, senza chiave l'audit resta offline); quando i
+nuovi controlli del P1 qui sopra saranno implementati, andranno
+innestati come componenti dei profili (estraibilità/densità →
+Claude, ciclo di vita/riferimenti → Kimi, HTML semantico → Qwen).
+
+- [ ] **Ancora di realtà facoltativa**: verifica del posizionamento
+      sulle query dell'audit via un'API di ricerca esterna (es.
+      Brave Search API) per confrontare la simulazione RRF con un
+      ranking reale; complementare all'import GSC già in P2 —
+      Simulazione RRF.
+
+Scartato consapevolmente da Features.md (per non rivalutarlo): lo
+stack SaaS (FastAPI/Celery/Redis/RabbitMQ/pgvector/AWS) è
+incompatibile con la filosofia locale/offline a dipendenze minime;
+la simulazione di User-Agent altrui (Bravebot, Baiduspider…) e i
+pool di proxy anti-bot contraddicono l'UA trasparente e il rispetto
+del robots di default (v1.13); le API a pagamento Ahrefs/Semrush; il
+cross-check fattuale su Wikipedia/Wikidata (oneroso, online, in
+parte coperto dal futuro LLM-as-judge); i Core Web Vitals
+(territorio di Lighthouse); business model, pricing e KPI (materiale
+commerciale, non di sviluppo — il white-label è già in P2 — GUI).
+
 ## P2 — Simulazione RRF più realistica
 
 - [ ] Query reali da **Google Search Console** (import CSV/API) al posto dei
@@ -35,17 +101,9 @@ sono proposte.
       chunking configurabile (`--chunk-words`).
 - [ ] Provider **OpenAI** nel monitoraggio citazioni (Responses API con
       web_search) accanto ad anthropic e perplexity.
-- [ ] Integrare il monitoraggio citazioni nella GUI (grafico dello
-      storico JSONL, tendenza per provider).
 
 ## P2 — Output e reportistica
 
-- [ ] **Colmare il divario fra referto generato e referto consegnato**:
-      dalla v1.9.0 il piano d'azione per priorità (gravità × peso, con
-      esempi di fix) è generato automaticamente; del referto curato a mano
-      ([audit_miaweb_rrf.html](audit_miaweb_rrf.html)) mancano ancora la
-      tabella "matematica del problema" e una stima dello sforzo per
-      intervento da incrociare con la priorità.
 - [ ] Renderer **Markdown** (comodo per issue/PR) ed export **CSV** dei
       rilievi.
 - [ ] **Storico e delta**: salvare il JSON di ogni esecuzione e riportare le
@@ -84,13 +142,18 @@ realizzati nella v1.5.0, vedi AS-IS):
 
 - [ ] Top rilievi ordinati per impatto con pallino di severità
       (`findings`), come vista trasversale alle aree — pattern:
-      Top Issues di Ahrefs/Semrush (oggi i rilievi sono ordinati per
-      gravità solo dentro ogni area).
-- [ ] Grafico del tasso di citazione IA nel tempo con pin-evento e linea
-      per provider: lo storico JSONL di `seo_rrf_citations.py` esiste già
-      (si aggancia alla voce "monitoraggio citazioni nella GUI" in P2 —
-      Simulazione RRF) — pattern: Visibility Index di Sistrix, Brand
-      Radar di Ahrefs.
+      Top Issues di Ahrefs/Semrush. Dalla v1.17.0 il piano di
+      remediation è già una vista trans-area ordinata per gravità e
+      guadagno di citabilità (`index_gain` riusabile dal widget);
+      resta la resa compatta da dashboard accanto agli altri widget
+      di sintesi.
+- [ ] **Pin-evento** sul grafico delle citazioni IA ("qui abbiamo
+      pubblicato le FAQ"): il grafico per provider con tendenza è
+      realizzato nella GUI v2.9.0 (sezione "Citazioni IA nel
+      tempo"); restano le annotazioni-evento, che richiedono un
+      posto dove registrarle (es. campo `events` nel JSONL o file a
+      parte) — pattern: Visibility Index di Sistrix, Brand Radar di
+      Ahrefs.
 
 Widget che richiedono lo **storico degli audit** (prerequisito: la voce
 "Storico e delta" in P2 — Output e reportistica; basta un `--history

@@ -27,6 +27,7 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | [seo_rrf_citations.py](seo_rrf_citations.py) | Monitoraggio periodico delle citazioni IA effettive (Claude, Perplexity) con storico e soglie |
 | [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies |
 | [deploy/](deploy/) | Unit systemd per l'esecuzione come servizio automatico sulle macchine dei clienti |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI GitHub Actions: flake8 + pytest multi-Python + audit accessibilità Pa11y |
 | [tests/](tests/) | Suite pytest: unit test del nucleo numerico, fixture site locale, end-to-end CLI e GUI |
 | [AS-IS.md](AS-IS.md) | Stato di fatto: tutto ciò che è già realizzato e verificato |
 | [TO-DO.md](TO-DO.md) | Ciò che resta da fare: bug noti, sviluppi e idee di miglioramento |
@@ -38,6 +39,8 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 ```bash
 pip install -r requirements.txt                 # requests, bs4, lxml
 pip install sentence-transformers numpy         # opzionali: embedding reali
+pip install playwright                          # opzionale: rendering JS
+playwright install chromium                     # (o usa Chrome di sistema)
 ```
 
 > **Nota per macOS Intel (x86_64).** PyTorch per macOS x86 si ferma alla
@@ -47,6 +50,13 @@ pip install sentence-transformers numpy         # opzionali: embedding reali
 > `pip install "torch==2.2.2" "numpy<2" "transformers==4.46.3" "sentence-transformers==3.2.1"`.
 > Con un'installazione incompatibile lo strumento ripiega comunque sul
 > proxy char-TFIDF, dichiarando il motivo nel log.
+
+> **Nota su Hugging Face Hub.** Al primo utilizzo il modello di
+> embedding viene scaricato dall'HF Hub e poi resta in cache locale.
+> Le richieste non autenticate funzionano normalmente (dalla v1.14.1
+> i relativi avvisi e le barre di download non sporcano più il log);
+> se vuoi limiti di velocità più alti esporta `HF_TOKEN` — le
+> librerie lo leggono da sole, lo strumento non lo tocca.
 
 Con `sentence-transformers` installato gli embedding reali si attivano da
 soli (modello multilingue predefinito `paraphrase-multilingual-MiniLM-L12-v2`;
@@ -76,9 +86,13 @@ python3 seo_rrf_audit.py https://esempio.it \
 | `--rrf-k N` | 60 | costante k della formula RRF (propagata a tutti i renderer) |
 | `--delay SEC` | 0.5 | pausa fra le richieste HTTP |
 | `--competitor URL` | — | sito concorrente da confrontare (ripetibile, massimo 3). Ogni concorrente viene scansionato con gli stessi limiti; i corpora vengono fusi negli stessi indici BM25+vettoriale e interrogati con le stesse query (i temi del **tuo** sito): il referto riporta la **share of voice** — quanti dei primi 5 posti fusi appartengono a ciascun sito, con soglie rispetto alla parità — e le query vinte interamente dai concorrenti |
+| `--market occidentale\|globale\|orientale` | occidentale | pesi dei **profili di citabilità per assistente IA** nell'indice composito: `occidentale` privilegia ChatGPT/Perplexity (50%) e Claude (30%), `orientale` Qwen e Kimi (35% ciascuno), `globale` pesa tutti allo stesso modo. I profili sono stime euristiche derivate dai punteggi di area — la nota di onestà è sempre inclusa nel referto |
+| `--judge auto\|on\|off` | auto | **giudizio LLM sulla citabilità**: un modello (Claude, SDK ufficiale Anthropic) valuta i passaggi migliori della simulazione RRF — max 5, una sola richiesta API per audit — con punteggio e motivazione per ciascuno e **scarto rispetto all'indice euristico**. `auto` (default) parte solo se `ANTHROPIC_API_KEY` è nell'ambiente, altrimenti viene saltato con motivo dichiarato nel referto: senza chiave l'audit resta interamente offline. `on` pretende la chiave (errore d'uso senza); `off` disattiva. I costi API sono a carico della chiave configurata |
+| `--render off\|auto\|always` | off | rendering JavaScript in browser headless (richiede Playwright; ripiega sul Chrome/Chromium di sistema). `auto` rende **solo** le pagine che l'euristica classifica come client-side; `always` tutte. Il DOM renderizzato sostituisce l'estrazione del contenuto, ma stato HTTP, redirect e tempi restano quelli della risposta reale, e il rilievo critico sul contenuto invisibile ai crawler senza JS scatta comunque. Rendering seriale, rispetta `--delay` e l'annullamento |
+| `--workers N` | 4 | richieste in parallelo durante la scansione (1–16; `1` = seriale). Il **ritmo verso il sito non cambia**: gli avvii delle richieste restano distanziati di `--delay` anche fra thread — i worker sovrappongono solo le attese di rete, quindi il tempo per pagina tende a `max(delay, latenza)` invece di `delay + latenza` |
 | `--retries N` | 2 | tentativi aggiuntivi con backoff esponenziale (0,5 s → 1 s → 2 s, tetto 8 s) su errori di rete e HTTP 429/500/502/503/504, rispettando l'header `Retry-After`. Gli altri stati (404, 403…) non vengono ritentati: sono segnali diagnostici dell'audit. `0` disattiva |
 | `--user-agent UA` | UA dello strumento | header `User-Agent` inviato con ogni richiesta. Il predefinito identifica lo strumento (`SeoRrfAudit/versione`) e rimanda alla pagina del progetto su GitHub, così chi legge i log del server sa chi è il bot |
-| `--respect-robots` | spento | rispetta i `Disallow` del robots.txt per l'agente `SeoRrfAudit`: gli URL vietati non vengono scaricati (né in scoperta né in crawling) e sono elencati nel referto come rilievo informativo. Spento, l'audit li analizza comunque: è la scelta giusta quando il sito è tuo e vuoi ispezionare tutto |
+| *(robots.txt)* | rispetta | **dalla v1.13.0 i `Disallow` per l'agente `SeoRrfAudit` sono rispettati di default**: gli URL vietati non vengono scaricati e sono elencati nel referto. `--own-site` dichiara il sito di tua titolarità e li analizza comunque (i concorrenti restano protetti); `--ignore-robots accetto` li ignora ovunque, con accettazione **esplicita** di responsabilità (il valore letterale "accetto" è obbligatorio). `--respect-robots` resta accettato ma è deprecato (ora è il default) e non si combina con gli altri due |
 | `--max-body MB` | 10 | tetto al corpo di ogni risposta: lo scarico avviene a blocchi e si interrompe al superamento (o subito, se il `Content-Length` dichiarato eccede). Il corpo resta in RAM durante l'analisi: dimensiona il valore sulla memoria della tua macchina, di norma non oltre un decimo della RAM disponibile — lo script stesso avvisa all'avvio se il valore scelto è alto per la macchina in uso |
 | `--format text\|json\|html` | text | formato del referto |
 | `--output FILE` | stdout | scrive il referto su file |
@@ -131,14 +145,24 @@ Cosa offre:
   grafico dell'andamento del punteggio complessivo con soglie 40/70.
 - **Preimpostazioni**: la configurazione del form si salva con un nome
   (per cliente/sito) in localStorage e si ricarica in un click.
+- **Citazioni IA nel tempo**: la GUI legge lo storico JSONL del
+  monitoraggio citazioni (`--citations-history`, default
+  `citazioni.jsonl` accanto agli script) e mostra la tendenza per
+  provider (delta fra esecuzioni), il grafico multilinea del tasso di
+  citazione (una linea per provider più il complessivo) e la tabella
+  con tutti i valori — il ciclo si chiude: audita, correggi, misura le
+  citazioni reali.
 - **Risultati nella pagina**: punteggi per area con barre e valori
-  testuali, rilievi in una fisarmonica per area con gravità espressa da
-  testo + simbolo (mai solo colore), tabella del consenso RRF per
-  query, **piano di remediation** con esempi di fix pronti da copiare,
-  **confronto competitivo** (barre della share of voice per sito
-  e tabella per query, quando si indicano concorrenti) e scarico dei
-  referti HTML / JSON / testo (il referto HTML si apre in una nuova
-  scheda).
+  testuali, **profili di citabilità per assistente IA** (barre per
+  profilo, indice composito col mercato scelto nel form e "top
+  azioni prioritarie" con il profilo che guadagna di più da ogni
+  intervento), rilievi in una fisarmonica per area con gravità
+  espressa da testo + simbolo (mai solo colore), tabella del
+  consenso RRF per query, **piano di remediation** con esempi di fix
+  pronti da copiare, **confronto competitivo** (barre della share of
+  voice per sito e tabella per query, quando si indicano
+  concorrenti) e scarico dei referti HTML / JSON / testo (il referto
+  HTML si apre in una nuova scheda).
 
 Accessibilità (obiettivo WCAG 2.2 AA): audit automatico Pa11y in CI su
 pagine reali (vedi [docs/ACCESSIBILITA.md](docs/ACCESSIBILITA.md), che
@@ -228,8 +252,32 @@ punteggio 0–100; il complessivo è la media pesata (tecnica 1.0, lessicale 1.5
 semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5). I rilievi
 riportano evidenze concrete (URL, query verificate, esempi dei testi
 problematici) e i referti includono un **piano di remediation**: critici e
-avvertenze ordinati per gravità × peso, ciascuno con la correzione e un
-esempio pronto (snippet JSON-LD, righe di robots.txt, testo prima/dopo).
+avvertenze ordinati per gravità e, dalla v1.17.0, per **guadagno di
+citabilità** — a parità di gravità sale in testa ciò che risolleva di più
+l'indice composito, e i problemi **trasversali** (che deprimono più
+profili insieme) sono marcati con un badge dedicato. Ogni intervento porta
+la correzione e un esempio pronto (snippet JSON-LD, righe di robots.txt,
+testo prima/dopo).
+
+Dalla v1.15.0 i referti riportano anche i **profili di citabilità per
+assistente IA** (Claude, ChatGPT/Perplexity, Qwen, Kimi): ogni profilo
+ripesa i punteggi di area — più la profondità editoriale media — secondo
+ciò che quel tipo di motore generativo plausibilmente premia, e l'indice
+composito li aggrega con i pesi del mercato scelto (`--market`). Dalla
+v1.16.0 la sezione include le **top azioni prioritarie**: le prime voci
+del piano di remediation con la stima di quale profilo guadagna di più
+da ciascun intervento (variazione esatta del punteggio d'area proiettata
+sui pesi del profilo). Sono **stime euristiche dichiarate** (le
+preferenze dei vendor non sono documentate): servono a confrontare i
+punti di forza del sito rispetto ai diversi assistenti, non a predire
+citazioni; per la misura reale c'è `seo_rrf_citations.py`.
+
+A tarare le stime ci pensa, dalla v1.18.0, il **giudizio LLM**
+(`--judge`, attivo di default in modalità `auto`): un modello valuta un
+campione dei passaggi vincitori della fusione e il referto riporta i
+verdetti e lo scarto fra la media del giudice e l'indice euristico —
+un parere di modello, dichiarato come tale, non una misura
+riproducibile.
 
 1. **Tecnica** — HTTPS, `robots.txt` e permessi per i 14 crawler IA
    documentati dai vendor (GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot,
@@ -371,20 +419,33 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 42 test, ~3 secondi, nessun accesso alla rete esterna
-flake8            # lint di script, server GUI e test
+pytest            # 172 test, ~14 secondi, nessun accesso alla rete esterna
+flake8            # lint dei tre script e dei test
 ```
 
-La suite (`tests/`) avvia un **sito di prova locale con difetti
-piantati** — GPTBot bloccato nel robots.txt, pagina segnaposto
-WordPress, contenuto duplicato su `/` e `/index.html`, pagina
-`noindex`, risposta oversize da 12 MB — e verifica che l'audit li
-rilevi tutti. I test unitari fissano il nucleo numerico sui valori
-calcolati a mano (idf BM25, saturazione della frequenza, coseno in
-[0,1], addendi RRF con k=60, rango che parte da 1) e coprono
-chunking, deduplica, query automatiche, limite `--max-body`, coerenza
-dei tre renderer con `k` propagato, codici di uscita della CLI e API
-della GUI (CSP, path traversal, validazione, `409`, ciclo completo).
+La suite (`tests/`) avvia **siti di prova locali con difetti
+piantati** — GPTBot bloccato nel robots.txt, sezione vietata al
+nostro agente, pagina segnaposto WordPress, contenuto duplicato,
+`noindex`, soft-404, pagina fantasma, SPA solo-JavaScript, risposta
+oversize da 12 MB, più un sito concorrente — e verifica che l'audit
+li rilevi tutti. I test unitari fissano il nucleo numerico sui valori
+calcolati a mano (idf BM25, saturazione, coseno in [0,1], addendi RRF
+con k=60) e coprono chunking, deduplica, query automatiche, qualità
+Schema.org/E-E-A-T, limite `--max-body`, retry sui transitori,
+scansione concorrente (rate limit preservato fra thread), rendering
+JavaScript (stub + integrazione con browser reale, saltata se
+assente), le tre modalità robots, piano di remediation con sforzo e
+quick win, "matematica del problema", profili di citabilità per
+assistente IA (pesi e ancoraggi calcolati a mano, rinormalizzazione
+con aree mancanti, mercati), coerenza dei tre renderer,
+codici di uscita CLI, API della GUI (account, limite orario, SSE,
+storico, CSP, path traversal, annullamento), giudizio LLM contro un
+server API finto (verdetti, refusal, JSON malformato, salto senza
+chiave — una fixture autouse rimuove le chiavi dall'ambiente, quindi
+la suite è offline per costruzione) e monitoraggio citazioni
+con server API finti (Anthropic e Perplexity). In CI (GitHub
+Actions): flake8 + pytest su più versioni di Python e audit di
+accessibilità Pa11y.
 
 ## Verifiche eseguite prima della consegna
 

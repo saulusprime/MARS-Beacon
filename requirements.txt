@@ -6,5 +6,11 @@ lxml>=4.9
 # Facoltative, per il recupero vettoriale con embedding reali:
 #   pip install sentence-transformers numpy
 
-# Facoltativa, per il monitoraggio citazioni IA (seo_rrf_citations.py):
+# Facoltativa, per il monitoraggio citazioni IA (seo_rrf_citations.py)
+# e per il giudizio LLM sulla citabilita' (attivo di default in
+# modalita' "auto" quando ANTHROPIC_API_KEY e' presente):
 #   pip install anthropic
+
+# Facoltativa, per il rendering JavaScript (--render auto|always):
+#   pip install playwright && playwright install chromium
+#   (in alternativa viene usato il Chrome/Chromium di sistema)

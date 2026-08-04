@@ -62,8 +62,18 @@ def test_renderer_coerenti_e_k_propagato(site):
     assert clean + flagged + broken == len(pages)
     assert broken >= 1, "attesa la pagina oversize fra gli errori"
 
-    # Piano di remediation: nei tre formati, ordinato dai critici.
+    # Matematica del problema: superficie attuale vs potenziale.
+    assert report_json["surface_math"]["chunks_potential"] > 0
+    assert "La matematica del problema" in report_html
+
+    # Piano di remediation: nei tre formati, ordinato dai critici,
+    # con sforzo stimato per intervento.
     assert report_json["remediation"]
+    assert all(i["effort"] in (sra.EFFORT_MINUTES, sra.EFFORT_HOURS,
+                               sra.EFFORT_DAYS)
+               for i in report_json["remediation"])
+    assert any(i["quick_win"] for i in report_json["remediation"]), \
+        "il segnaposto critico del sito fixture e' un quick win"
     assert report_json["remediation"][0]["severity"] == \
         sra.SEV_CRITICAL
     assert "Piano di remediation" in report_html
@@ -79,6 +89,8 @@ def test_renderer_coerenti_e_k_propagato(site):
         site, pages, findings, scores, results, mode, 48)
     assert "AUDIT SEO + RRF" in report_text
     assert "PIANO DI REMEDIATION" in report_text
+    assert "MATEMATICA DEL PROBLEMA" in report_text
+    assert "sforzo:" in report_text
 
 
 def test_robots_allowed_per_il_nostro_agente(site):
@@ -89,18 +101,29 @@ def test_robots_allowed_per_il_nostro_agente(site):
     assert not robots.allowed(site + "/riservata/")
 
 
-def test_default_scansiona_anche_url_vietati(site):
-    pages, _, _, _, _, _ = _audit(site)
-    assert any(p.url.endswith("/riservata/") and p.ok for p in pages)
-
-
-def test_respect_robots_esclude_url_vietati(site):
-    pages, findings, _, _, _, _ = sra.run_audit(
-        base=site, max_pages=10, queries=[], model_name="",
-        delay=0.0, k=60, verbose=False, respect_robots=True)
+def test_default_rispetta_i_disallow(site):
+    pages, findings, _, _, _, _ = _audit(site)
     assert not any("/riservata/" in p.url for p in pages)
     assert any("rispetto del robots.txt" in f.title
                for f in findings)
+
+
+def test_own_site_analizza_tutto(site):
+    pages, findings, _, _, _, _ = sra.run_audit(
+        base=site, max_pages=10, queries=[], model_name="",
+        delay=0.0, k=60, verbose=False,
+        robots_mode=sra.ROBOTS_OWN)
+    assert any(p.url.endswith("/riservata/") and p.ok for p in pages)
+    assert any("propria titolarita'" in f.title for f in findings)
+
+
+def test_force_ignora_disallow_con_responsabilita(site):
+    pages, findings, _, _, _, _ = sra.run_audit(
+        base=site, max_pages=10, queries=[], model_name="",
+        delay=0.0, k=60, verbose=False,
+        robots_mode=sra.ROBOTS_FORCE)
+    assert any(p.url.endswith("/riservata/") and p.ok for p in pages)
+    assert any("richiesta esplicita" in f.title for f in findings)
 
 
 def test_crawl_links_rispetta_robots(site):
@@ -113,12 +136,26 @@ def test_crawl_links_rispetta_robots(site):
     assert not any("/riservata" in u for u in con)
 
 
-def test_parser_accetta_respect_robots():
-    args = sra.build_parser().parse_args(
-        ["https://x.it", "--respect-robots"])
-    assert args.respect_robots
-    args = sra.build_parser().parse_args(["https://x.it"])
-    assert not args.respect_robots
+def test_parser_opzioni_robots():
+    parser = sra.build_parser()
+    assert parser.parse_args(["x.it"]).own_site is False
+    assert parser.parse_args(["x.it", "--own-site"]).own_site
+    assert parser.parse_args(
+        ["x.it", "--ignore-robots", "accetto"]).ignore_robots == \
+        "accetto"
+    # deprecato ma ancora accettato
+    assert parser.parse_args(["x.it", "--respect-robots"]) \
+        .respect_robots
+
+
+def test_cli_robots_conflitti_e_ack(capsys):
+    assert sra.main(["https://x.invalid", "--ignore-robots",
+                     "si"]) == 2, "ack sbagliato"
+    assert sra.main(["https://x.invalid", "--ignore-robots",
+                     "accetto", "--own-site"]) == 2
+    assert sra.main(["https://x.invalid", "--own-site",
+                     "--respect-robots"]) == 2
+    capsys.readouterr()
 
 
 def test_cli_referto_json_e_uscita_uno(site, tmp_path, capsys):

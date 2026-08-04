@@ -25,7 +25,8 @@
   const PRESETS_KEY = "seo_rrf_presets";
   const PRESET_FIELDS = [
     "f-url", "f-max-pages", "f-delay", "f-max-body", "f-retries",
-    "f-competitors", "f-respect-robots", "f-queries",
+    "f-workers", "f-render", "f-market", "f-judge",
+    "f-competitors", "f-robots", "f-robots-ack", "f-queries",
     "f-embeddings", "f-rrf-k",
   ];
 
@@ -34,6 +35,7 @@
     ["f-delay", "e-delay"],
     ["f-max-body", "e-max-body"],
     ["f-retries", "e-retries"],
+    ["f-workers", "e-workers"],
     ["f-rrf-k", "e-rrf-k"],
   ];
 
@@ -59,6 +61,13 @@
   let me = null;
 
   el("audit-form").addEventListener("submit", onSubmit);
+  el("f-robots").addEventListener("change", syncRobotsAck);
+  el("f-cit-site").addEventListener("change", (event) => {
+    const entry = citSites[Number(event.target.value)];
+    if (entry) {
+      renderCitationsSite(entry);
+    }
+  });
   el("cancel-btn").addEventListener("click", cancelAudit);
   el("login-form").addEventListener("submit", onLogin);
   el("register-form").addEventListener("submit", onRegister);
@@ -122,6 +131,7 @@
       setOpen("sec-auth", false);
       setOpen("sec-config", true);
       loadHistory();
+      loadCitations();
     } else {
       el("auth-out").hidden = false;
       el("auth-in").hidden = true;
@@ -129,6 +139,7 @@
       el("progress-section").hidden = true;
       el("results-section").hidden = true;
       el("history-section").hidden = true;
+      el("citations-section").hidden = true;
       setOpen("sec-auth", true);
     }
     updateDownloadGate();
@@ -352,6 +363,236 @@
     box.appendChild(svg);
   }
 
+  /* ---------------- citazioni IA nel tempo ---------------- */
+
+  const CIT_STYLES = [
+    { stroke: "#186078", dash: "" },
+    { stroke: "#7a2e8d", dash: "7,4" },
+    { stroke: "#9c5400", dash: "2,4" },
+  ];
+  let citSites = [];
+
+  function loadCitations() {
+    if (!me) {
+      return;
+    }
+    fetch("api/citations")
+      .then((r) => r.json())
+      .then((data) => renderCitations(data.sites || []))
+      .catch(() => { /* lo storico citazioni non blocca il resto */ });
+  }
+
+  function renderCitations(sites) {
+    const section = el("citations-section");
+    citSites = sites;
+    if (!sites.length) {
+      section.hidden = true;
+      return;
+    }
+    const select = el("f-cit-site");
+    select.textContent = "";
+    sites.forEach((entry, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = entry.site;
+      select.appendChild(option);
+    });
+    el("cit-site-box").hidden = sites.length < 2;
+    renderCitationsSite(sites[0]);
+    section.hidden = false;
+  }
+
+  function citProviders(runs) {
+    const names = [];
+    runs.forEach((run) => {
+      Object.keys(run.providers || {}).forEach((name) => {
+        if (names.indexOf(name) === -1) {
+          names.push(name);
+        }
+      });
+    });
+    return names;
+  }
+
+  function fmtRate(value) {
+    return (value === null || value === undefined)
+      ? "n/d" : value.toFixed(1).replace(".", ",") + "%";
+  }
+
+  function renderCitationsSite(entry) {
+    const runs = entry.runs;
+    const providers = citProviders(runs);
+    renderCitSummary(runs, providers);
+    renderCitChart(entry.site, runs, providers);
+    renderCitTable(runs, providers);
+  }
+
+  function renderCitSummary(runs, providers) {
+    const box = el("cit-trend-summary");
+    box.textContent = "";
+    const last = runs[runs.length - 1];
+    const prev = runs.length > 1 ? runs[runs.length - 2] : null;
+    const parts = [["Complessivo", last.overall_rate,
+                    prev ? prev.overall_rate : null]];
+    providers.forEach((name) => {
+      parts.push([
+        name,
+        (last.providers[name] || {}).rate,
+        prev ? (prev.providers[name] || {}).rate : null,
+      ]);
+    });
+    parts.forEach(([label, now, before], index) => {
+      if (index) {
+        box.appendChild(document.createTextNode(" · "));
+      }
+      const strong = document.createElement("strong");
+      strong.textContent = label + ": ";
+      box.appendChild(strong);
+      box.appendChild(document.createTextNode(fmtRate(now) + " "));
+      const delta = (now === null || now === undefined
+        || before === null || before === undefined)
+        ? null : Math.round((now - before) * 10) / 10;
+      box.appendChild(deltaNode(delta));
+    });
+  }
+
+  function renderCitChart(site, runs, providers) {
+    const box = el("cit-chart");
+    box.textContent = "";
+    if (runs.length < 2) {
+      return;
+    }
+    const width = 620;
+    const x0 = 46;
+    const x1 = 500;
+    const yOf = (value) => 150 - value * 1.3;
+    const xOf = (index) =>
+      x0 + (x1 - x0) * index / (runs.length - 1);
+    const svg = svgNode("svg", {
+      viewBox: "0 0 " + width + " 175",
+      class: "history-trend-svg",
+      role: "img",
+      "aria-label": "Andamento del tasso di citazione IA di " +
+        site + " nelle ultime " + runs.length +
+        " esecuzioni; i valori sono nella tabella seguente",
+    });
+    [[0, "0%"], [50, "50%"], [100, "100%"]].forEach(
+      ([value, label]) => {
+        svg.appendChild(svgNode("line", {
+          x1: x0, x2: x1, y1: yOf(value), y2: yOf(value),
+          stroke: value ? "#e5e5e5" : "#c3c2b7",
+          "stroke-width": 1,
+        }));
+        const text = svgNode("text", {
+          x: x0 - 6, y: yOf(value) + 4, "font-size": 10,
+          "text-anchor": "end", fill: "#6b7f83",
+        });
+        text.textContent = label;
+        svg.appendChild(text);
+      });
+
+    const series = [{
+      name: "complessivo", stroke: "#14272b", dash: "",
+      width: 2.5, values: runs.map((r) => r.overall_rate),
+    }];
+    providers.forEach((name, index) => {
+      const style = CIT_STYLES[index % CIT_STYLES.length];
+      series.push({
+        name: name, stroke: style.stroke, dash: style.dash,
+        width: 2,
+        values: runs.map((r) => (r.providers[name] || {}).rate),
+      });
+    });
+
+    const labels = [];
+    series.forEach((serie) => {
+      const coords = [];
+      let lastValue = null;
+      let lastX = null;
+      serie.values.forEach((value, index) => {
+        if (value === null || value === undefined) {
+          return;
+        }
+        coords.push(xOf(index).toFixed(1) + "," +
+          yOf(value).toFixed(1));
+        lastValue = value;
+        lastX = xOf(index);
+      });
+      if (coords.length < 2) {
+        return;
+      }
+      const attrs = {
+        points: coords.join(" "), fill: "none",
+        stroke: serie.stroke, "stroke-width": serie.width,
+        "stroke-linejoin": "round", "stroke-linecap": "round",
+      };
+      if (serie.dash) {
+        attrs["stroke-dasharray"] = serie.dash;
+      }
+      svg.appendChild(svgNode("polyline", attrs));
+      svg.appendChild(svgNode("circle", {
+        cx: lastX, cy: yOf(lastValue), r: 3.5,
+        fill: serie.stroke,
+      }));
+      labels.push({ y: yOf(lastValue), serie: serie });
+    });
+
+    // Etichette di fine linea (nome + valore): mai solo colore.
+    labels.sort((a, b) => a.y - b.y);
+    let prevY = -100;
+    labels.forEach((item) => {
+      const y = Math.max(item.y, prevY + 13);
+      prevY = y;
+      const text = svgNode("text", {
+        x: x1 + 8, y: y + 4, "font-size": 11,
+        "font-weight": 600, fill: item.serie.stroke,
+      });
+      text.textContent = item.serie.name;
+      svg.appendChild(text);
+    });
+    box.appendChild(svg);
+  }
+
+  function renderCitTable(runs, providers) {
+    const table = el("cit-table");
+    const thead = table.querySelector("thead");
+    const tbody = table.querySelector("tbody");
+    thead.textContent = "";
+    tbody.textContent = "";
+
+    const headRow = document.createElement("tr");
+    ["Data", "Complessivo"].concat(providers).forEach((label) => {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = label;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+
+    runs.slice().reverse().forEach((run) => {
+      const tr = document.createElement("tr");
+      const when = document.createElement("th");
+      when.scope = "row";
+      when.className = "fw-normal";
+      when.textContent = String(run.generated_at || "")
+        .slice(0, 16).replace("T", " ");
+      tr.appendChild(when);
+      const overall = document.createElement("td");
+      overall.textContent = fmtRate(run.overall_rate);
+      tr.appendChild(overall);
+      providers.forEach((name) => {
+        const stats = run.providers[name];
+        const cell = document.createElement("td");
+        cell.textContent = stats
+          ? fmtRate(stats.rate) + " (" + stats.site_cited +
+            " su " + stats.answered + ")"
+          : "n/d";
+        tr.appendChild(cell);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
   /* ---------------- preimpostazioni ---------------- */
 
   function readPresets() {
@@ -423,6 +664,17 @@
     });
     el("announcer").textContent =
       "Preimpostazione \"" + name + "\" caricata.";
+    syncRobotsAck();
+  }
+
+  /* Mostra la conferma di responsabilita' solo quando si sceglie di
+     ignorare i Disallow; cambiando modalita' la spunta si azzera. */
+  function syncRobotsAck() {
+    const force = el("f-robots").value === "force";
+    el("robots-ack-box").hidden = !force;
+    if (!force) {
+      el("f-robots-ack").checked = false;
+    }
   }
 
   function deletePreset() {
@@ -487,6 +739,11 @@
             "consiglia di non superare " + env.suggested_max_body_mb +
             " MB: la RAM disponibile ora è di circa " +
             Math.round(env.available_ram_mb) + " MB.";
+        }
+        if (env.judge_available === false) {
+          el("h-judge").textContent =
+            "Non disponibile sul server: " + env.judge_reason +
+            ". In auto il giudizio viene semplicemente saltato.";
         }
         if (!env.embeddings_available) {
           el("h-embeddings").textContent =
@@ -562,6 +819,14 @@
       firstInvalid = firstInvalid || competitors;
     }
 
+    const robotsAck = el("f-robots-ack");
+    if (el("f-robots").value === "force" && !robotsAck.checked) {
+      markInvalid(robotsAck, "e-robots-ack",
+        "Per ignorare i Disallow devi assumerti esplicitamente " +
+        "la responsabilità della scansione.");
+      firstInvalid = firstInvalid || robotsAck;
+    }
+
     NUMERIC_FIELDS.forEach(([inputId, feedbackId]) => {
       const input = el(inputId);
       if (!input.checkValidity()) {
@@ -585,10 +850,15 @@
       delay: el("f-delay").valueAsNumber,
       max_body: el("f-max-body").valueAsNumber,
       retries: el("f-retries").valueAsNumber,
+      workers: el("f-workers").valueAsNumber,
+      render: el("f-render").value,
+      market: el("f-market").value,
+      judge: el("f-judge").value,
       rrf_k: el("f-rrf-k").valueAsNumber,
       queries: el("f-queries").value,
       embeddings: el("f-embeddings").value.trim(),
-      respect_robots: el("f-respect-robots").checked,
+      robots: el("f-robots").value,
+      robots_ack: el("f-robots-ack").checked,
       competitors: el("f-competitors").value,
     };
   }
@@ -759,7 +1029,11 @@
     renderMeta(snap.summary);
     renderHero(snap.summary);
     renderScores(snap.summary);
+    renderCitability(snap.summary || {});
+    renderJudge((snap.summary || {}).judge,
+      (snap.summary || {}).citability);
     renderFindings(snap.findings || []);
+    renderSurfaceMath((snap.summary || {}).surface_math);
     renderRemediation(snap.remediation || []);
     renderRrf(snap.rrf || []);
     renderCompetitive(snap.competitive);
@@ -1019,6 +1293,156 @@
     });
   }
 
+  function renderCitability(summary) {
+    const block = el("citability-block");
+    const cit = summary.citability;
+    if (!cit || !cit.profiles) {
+      block.hidden = true;
+      return;
+    }
+    const pesi = Object.entries(cit.market_weights || {})
+      .map(([key, w]) => key + " " + Math.round(w * 100) + "%")
+      .join(", ");
+    el("citability-intro").textContent =
+      cit.note + " Mercato di riferimento: " + cit.market +
+      " (pesi: " + pesi + ").";
+
+    const wrap = el("citability-bars");
+    wrap.textContent = "";
+    const rows = cit.profiles
+      .filter((p) => p.score !== null && p.score !== undefined)
+      .map((p) => [p.label, p.focus, p.score, false]);
+    if (cit.index !== null && cit.index !== undefined) {
+      rows.push(["Indice composito", "", cit.index, true]);
+    }
+    rows.forEach(([label, focus, value, isTotal]) => {
+      const row = document.createElement("div");
+      row.className = "score-row" + (isTotal ? " score-overall" : "");
+
+      const name = document.createElement("span");
+      name.className = "score-label";
+      name.appendChild(document.createTextNode(label));
+      if (focus) {
+        const detail = document.createElement("small");
+        detail.className = "d-block text-muted";
+        detail.textContent = focus;
+        name.appendChild(detail);
+      }
+      row.appendChild(name);
+
+      const bar = document.createElement("div");
+      bar.className = "progress";
+      bar.setAttribute("aria-hidden", "true");
+      const fill = document.createElement("div");
+      fill.className = "progress-bar";
+      fill.style.width = value + "%";
+      fill.style.backgroundColor = scoreColor(value);
+      bar.appendChild(fill);
+      row.appendChild(bar);
+
+      const num = document.createElement("span");
+      num.className = "score-value";
+      num.textContent = Math.round(value) + "/100";
+      row.appendChild(num);
+
+      wrap.appendChild(row);
+    });
+
+    renderCitabilityActions(summary.citability_actions || []);
+    block.hidden = false;
+  }
+
+  function renderCitabilityActions(actions) {
+    const box = el("citability-actions-box");
+    const list = el("citability-actions");
+    list.textContent = "";
+    if (!actions.length) {
+      box.hidden = true;
+      return;
+    }
+    actions.forEach((act) => {
+      const item = document.createElement("li");
+      item.className = "mb-1";
+
+      const title = document.createElement("strong");
+      title.textContent = act.title;
+      item.appendChild(title);
+
+      if (act.effort) {
+        const effort = document.createElement("span");
+        effort.className = "badge badge-effort ms-2";
+        effort.textContent = "sforzo: " + act.effort;
+        item.appendChild(effort);
+      }
+      if (act.quick_win) {
+        const win = document.createElement("span");
+        win.className = "badge badge-quickwin ms-2";
+        win.textContent = "quick win";
+        item.appendChild(win);
+      }
+      if (act.best_profile) {
+        const gain = document.createElement("span");
+        gain.className = "d-block small text-muted";
+        gain.textContent = "Guadagna di più: " + act.best_label +
+          " (+" + act.best_gain.toFixed(1).replace(".", ",") +
+          " punti profilo)";
+        item.appendChild(gain);
+      }
+      list.appendChild(item);
+    });
+    box.hidden = false;
+  }
+
+  function renderJudge(judge, cit) {
+    const block = el("judge-block");
+    if (!judge) {
+      block.hidden = true;
+      return;
+    }
+    const intro = el("judge-intro");
+    const tableBox = el("judge-table-box");
+    const tbody = el("judge-table").querySelector("tbody");
+    tbody.textContent = "";
+    if (judge.status !== "ok") {
+      intro.textContent = "Non eseguito: " + (judge.reason || "");
+      tableBox.hidden = true;
+      block.hidden = false;
+      return;
+    }
+    let confronto = "";
+    if (cit && cit.index !== null && cit.index !== undefined) {
+      const scarto = judge.average - cit.index;
+      confronto = " Indice euristico: " +
+        cit.index.toFixed(1).replace(".", ",") +
+        " — scarto giudice-euristica: " +
+        (scarto >= 0 ? "+" : "") +
+        scarto.toFixed(1).replace(".", ",") + ".";
+    }
+    intro.textContent = "Modello " + judge.model + " su " +
+      judge.sampled + " passaggio/i · media " +
+      judge.average.toFixed(1).replace(".", ",") + "/100." +
+      confronto;
+    el("judge-note").textContent = judge.note || "";
+    judge.verdicts.forEach((v) => {
+      const row = document.createElement("tr");
+      const query = document.createElement("td");
+      query.textContent = v.query;
+      row.appendChild(query);
+      const score = document.createElement("td");
+      score.textContent =
+        Math.round(v.score) + "/100";
+      score.style.color = scoreColor(v.score);
+      score.style.fontWeight = "600";
+      row.appendChild(score);
+      const reason = document.createElement("td");
+      reason.textContent = v.reason;
+      row.appendChild(reason);
+      tbody.appendChild(row);
+    });
+    tableBox.hidden = false;
+    block.hidden = false;
+  }
+
   function openArea(index) {
     const body = document.getElementById("acc-c-" + index);
     if (!body) { return; }
@@ -1142,6 +1566,38 @@
     });
   }
 
+  function renderSurfaceMath(math) {
+    const block = el("surface-math-block");
+    const list = el("surface-math-list");
+    list.textContent = "";
+    if (!math) {
+      block.hidden = true;
+      return;
+    }
+    const effetto = math.multiplier !== null
+      ? "circa " + math.multiplier + "× occasioni di comparire " +
+        "nelle liste fuse"
+      : "da 0 addendi a circa " + math.chunks_potential +
+        " occasioni di comparire nelle liste";
+    const righe = [
+      ["Superficie attuale", math.pages + " pagine, " +
+        math.chunks_now + " chunk (~" + math.words_avg +
+        " parole/pagina)"],
+      ["Superficie potenziale", "~" + math.chunks_potential +
+        " chunk (" + math.assumption + ")"],
+      ["Effetto sull'RRF", effetto],
+    ];
+    righe.forEach(([nome, valore]) => {
+      const dt = document.createElement("dt");
+      dt.textContent = nome;
+      const dd = document.createElement("dd");
+      dd.textContent = valore;
+      list.appendChild(dt);
+      list.appendChild(dd);
+    });
+    block.hidden = false;
+  }
+
   function renderRemediation(plan) {
     const block = el("remediation-block");
     const list = el("remediation-list");
@@ -1150,9 +1606,17 @@
       block.hidden = true;
       return;
     }
+    const quickWins = plan.filter((i) => i.quick_win).length;
+    const annotato = plan[0].index_gain !== undefined;
     el("remediation-intro").textContent =
-      plan.length + " interventi ordinati per gravità e peso: si " +
-      "parte da ciò che rende di più sul punteggio.";
+      plan.length + (annotato
+        ? " interventi ordinati per gravità e guadagno di " +
+          "citabilità: in testa i problemi trasversali, che " +
+          "deprimono più profili insieme."
+        : " interventi ordinati per gravità e peso: si parte da " +
+          "ciò che rende di più sul punteggio.") +
+      (quickWins ? " Quick win (critici risolvibili in minuti): " +
+        quickWins + "." : "");
 
     plan.forEach((item) => {
       const box = document.createElement("div");
@@ -1165,6 +1629,26 @@
       title.className = "ms-2";
       title.textContent = item.priority + ". " + item.title;
       head.appendChild(title);
+      if (item.effort) {
+        const effort = document.createElement("span");
+        effort.className = "badge badge-effort ms-2";
+        effort.textContent = "sforzo: " + item.effort;
+        head.appendChild(effort);
+      }
+      if (item.quick_win) {
+        const win = document.createElement("span");
+        win.className = "badge badge-quickwin ms-2";
+        win.textContent = "quick win";
+        head.appendChild(win);
+      }
+      if (item.cross) {
+        const cross = document.createElement("span");
+        cross.className = "badge badge-cross ms-2";
+        cross.textContent = "trasversale: " +
+          item.profiles_hit.length + " profili · +" +
+          item.index_gain.toFixed(1).replace(".", ",") + " indice";
+        head.appendChild(cross);
+      }
       box.appendChild(head);
 
       if (item.fix) {
