@@ -8,16 +8,7 @@ sono proposte.
 
 ## P1 — Robustezza del crawling
 
-
 ## P1 — Qualità dell'analisi
-
-I nove controlli distillati da Features.md (concept "Citability
-Index", 2026-08-04; documento originale non nel repo) sono TUTTI
-realizzati fra la v1.22.0 e la v1.30.0 — estraibilità diretta,
-densità informativa, clickbait, ciclo di vita, riferimenti
-bibliografici, freschezza, HTML semantico, meta di base, varietà
-degli anchor — ciascuno innestato nell'area che alimenta la lente
-di citabilità prevista (vedi AS-IS).
 
 ## P2 — Citabilità multi-modello (da Features.md)
 
@@ -64,8 +55,6 @@ commerciale, non di sviluppo — il white-label è già in P2 — GUI).
 
 - [ ] Query reali da **Google Search Console** (import CSV/API) al posto dei
       soli bigrammi auto-generati.
-- [ ] Parametri esposti: `top_n` (oggi fisso a 5), variante RRF pesata,
-      chunking configurabile (`--chunk-words`).
 - [ ] Provider **OpenAI** nel monitoraggio citazioni (Responses API con
       web_search) accanto ad anthropic e perplexity.
 

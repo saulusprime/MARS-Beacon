@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.30.0, ~5700
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.31.0, ~5790
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -496,6 +496,23 @@ non può prevedere dove porta il link. Avvertenza con i testi
 ambigui come evidenza ed esempio prima/dopo; sotto le 10 coppie
 non si giudica. Nell'area tecnica, accanto alle anchor generiche
 che estende. 5 test nuovi (232 totali).
+
+Novità 1.31.0 (2026-08-04): parametri della simulazione RRF
+esposti. `--top-n` (1–20, default 5: posti fusi per query, governa
+consenso e share of voice — le soglie 20%/45% si adattano perché
+sono percentuali di top_n); `--rrf-weights LES,VET` (**variante
+RRF pesata**: `score(d)=Σ w_i/(k+rank_i)`, "1,1" è l'RRF classico;
+`reciprocal_rank_fusion` accetta ora `weights`, usata anche dallo
+share of voice); `--chunk-words` (80–600, default 220: il taglio
+segue comunque gli heading; i chunk vengono ricostruiti dopo il
+crawl anche per i concorrenti). Il JSON echeggia i parametri nel
+blocco `rrf` (top_n, weights, chunk_words) per la riproducibilità.
+GUI 2.12.0: quattro campi nel fieldset "Recupero e fusione" (posti
+fusi, parole per chunk, pesi delle due liste), validati lato
+server e inclusi nelle preimpostazioni. 5 test nuovi (237 totali)
+con la fusione pesata ancorata a mano (2/61+1/62). Nota di
+architettura: il chunking di default resta in extract_content; con
+un target diverso i chunk si ricostruiscono dai blocchi conservati.
 
 ## Uso
 

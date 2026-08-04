@@ -27,7 +27,8 @@
     "f-url", "f-max-pages", "f-delay", "f-max-body", "f-retries",
     "f-workers", "f-render", "f-market", "f-judge",
     "f-competitors", "f-robots", "f-robots-ack", "f-queries",
-    "f-embeddings", "f-rrf-k",
+    "f-embeddings", "f-rrf-k", "f-top-n", "f-chunk-words",
+    "f-w-lex", "f-w-vec",
   ];
 
   const NUMERIC_FIELDS = [
@@ -37,6 +38,10 @@
     ["f-retries", "e-retries"],
     ["f-workers", "e-workers"],
     ["f-rrf-k", "e-rrf-k"],
+    ["f-top-n", "e-top-n"],
+    ["f-chunk-words", "e-chunk-words"],
+    ["f-w-lex", "e-w-lex"],
+    ["f-w-vec", "e-w-vec"],
   ];
 
   const el = (id) => document.getElementById(id);
@@ -875,6 +880,10 @@
       market: el("f-market").value,
       judge: el("f-judge").value,
       rrf_k: el("f-rrf-k").valueAsNumber,
+      top_n: el("f-top-n").valueAsNumber,
+      chunk_words: el("f-chunk-words").valueAsNumber,
+      w_lex: el("f-w-lex").valueAsNumber,
+      w_vec: el("f-w-vec").valueAsNumber,
       queries: el("f-queries").value,
       embeddings: el("f-embeddings").value.trim(),
       robots: el("f-robots").value,

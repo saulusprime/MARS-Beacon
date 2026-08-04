@@ -171,6 +171,22 @@ def test_validazione_market():
     assert config is None and "market" in err
 
 
+def test_validazione_parametri_rrf():
+    config, err = gui.validate_config({"url": "x.it"})
+    assert err == "" and config["top_n"] == 5
+    assert config["chunk_words"] == 220
+    assert config["rrf_weights"] == (1.0, 1.0)
+    config, err = gui.validate_config(
+        {"url": "x.it", "top_n": 3, "chunk_words": 300,
+         "w_lex": 2, "w_vec": 0.5})
+    assert err == "" and config["rrf_weights"] == (2.0, 0.5)
+    assert config["top_n"] == 3 and config["chunk_words"] == 300
+    config, err = gui.validate_config({"url": "x.it", "top_n": 99})
+    assert config is None and "top_n" in err
+    config, err = gui.validate_config({"url": "x.it", "w_lex": 0})
+    assert config is None and "w_lex" in err
+
+
 def test_validazione_judge():
     config, err = gui.validate_config({"url": "x.it"})
     assert err == "" and config["judge"] == "auto", \

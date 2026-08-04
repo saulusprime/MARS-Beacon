@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.30.0
+## Strumento CLI — `seo_rrf_audit.py` v1.31.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -174,7 +174,11 @@ sono nel [README.md](README.md).
   complete nelle FAQPage.
 - **Simulazione RRF**: chunking per heading (~220 parole), doppio
   indice BM25 (Okapi, k1=1.5, b=0.75) e vettoriale
-  (sentence-transformers con **auto-rilevamento** dalla v1.6.0 —
+  (parametri esposti dalla v1.31.0: `--top-n` per i posti fusi,
+  `--rrf-weights` per la variante pesata `Σ wᵢ/(k+rankᵢ)`,
+  `--chunk-words` per il taglio dei chunk — tutti anche in GUI e
+  echeggiati nel JSON per la riproducibilità;
+  sentence-transformers con **auto-rilevamento** dalla v1.6.0 —
   modello multilingue predefinito se la libreria è installata,
   `--embeddings none` per forzare il proxy — oppure fallback
   char-TFIDF di 4-grammi, sempre dichiarato nel referto), fusione `Σ 1/(k+rank)` con k
@@ -251,7 +255,12 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.11.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.12.0 + `gui/`
+
+- **Parametri RRF nel form** (v2.12.0): posti fusi per query,
+  parole per chunk e pesi delle due liste (variante pesata) nel
+  fieldset "Recupero e fusione", validati lato server e inclusi
+  nelle preimpostazioni.
 
 - **Storico e delta per utente e dominio** (v2.10.0): il referto
   JSON completo di ogni esecuzione è salvato nel database
@@ -431,7 +440,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 232 test in ~16 secondi** (`tests/`), senza rete
+- **Suite pytest: 237 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

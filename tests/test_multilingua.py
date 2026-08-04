@@ -116,3 +116,57 @@ def test_query_auto_nella_lingua_del_sito():
     queries_it = sra.auto_queries(pages_it, limit=3)
     assert queries_it and queries_it[0].startswith("cos'e'"), \
         "senza lang dichiarato il default resta l'italiano"
+
+
+# ---------------- parametri RRF esposti (v1.31.0) ----------------
+
+def test_rrf_pesata_calcolata_a_mano():
+    """Liste [A,B] e [B,A]: alla pari, pesata vince chi domina la
+    lista col peso maggiore. Addendi: w/(k+rank), k=60."""
+    lista1 = [(0, 1.0), (1, 0.9)]   # A primo
+    lista2 = [(1, 1.0), (0, 0.9)]   # B primo
+    classico = sra.reciprocal_rank_fusion([lista1, lista2], k=60)
+    assert classico[0][1] == classico[1][1]  # perfetta parita'
+    pesata = sra.reciprocal_rank_fusion(
+        [lista1, lista2], k=60, weights=(2.0, 1.0))
+    # score(A) = 2/61 + 1/62; score(B) = 2/62 + 1/61
+    assert pesata[0][0] == 0
+    atteso_a = 2.0 / 61 + 1.0 / 62
+    assert abs(pesata[0][1] - atteso_a) < 1e-12
+
+
+def test_top_n_limita_le_liste():
+    pages = [_pagina("it", "Drenaggio linfatico",
+                     ["Drenaggio linfatico gambe",
+                      "Costo drenaggio linfatico"])]
+    pages[0].text = ("Il drenaggio linfatico e' una tecnica. "
+                     * 40)
+    pages[0].chunks = sra.build_chunks(sra.Page(
+        url="https://sito.test/x", status=200,
+        text=pages[0].text,
+        paragraphs=[pages[0].text]))
+    results, _, _ = sra.simulate_rrf(
+        pages, ["drenaggio linfatico"], top_n=2)
+    assert len(results[0].fused_top) <= 2
+    assert len(results[0].lexical_top) <= 2
+
+
+def test_chunk_words_cambia_il_taglio():
+    paragrafi = [("parola " * 30).strip() for _ in range(30)]
+    page = sra.Page(url="https://sito.test/", status=200,
+                    text=" ".join(paragrafi),
+                    paragraphs=paragrafi)
+    fini = sra.build_chunks(page, target_words=100)
+    grossi = sra.build_chunks(page, target_words=450)
+    assert len(fini) > len(grossi) >= 1
+
+
+def test_cli_valida_i_nuovi_parametri():
+    assert sra.main(["https://x.it", "--top-n", "0",
+                     "--quiet"]) == 2
+    assert sra.main(["https://x.it", "--chunk-words", "10",
+                     "--quiet"]) == 2
+    assert sra.main(["https://x.it", "--rrf-weights", "1",
+                     "--quiet"]) == 2
+    assert sra.main(["https://x.it", "--rrf-weights", "0,-1",
+                     "--quiet"]) == 2

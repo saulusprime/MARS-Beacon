@@ -473,6 +473,71 @@
               </div>
             </div>
           </div>
+
+          <div class="row">
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-top-n" class="active">Posti fusi per
+                  query</label>
+                <input type="number" class="form-control"
+                       id="f-top-n" name="top_n" value="5" min="1"
+                       max="20" step="1" inputmode="numeric"
+                       aria-describedby="h-top-n">
+                <small id="h-top-n" class="form-text">
+                  Da 1 a 20 (predefinito 5): governa consenso e
+                  share of voice.
+                </small>
+                <div class="invalid-feedback" id="e-top-n"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-chunk-words" class="active">Parole
+                  per chunk</label>
+                <input type="number" class="form-control"
+                       id="f-chunk-words" name="chunk_words"
+                       value="220" min="80" max="600" step="10"
+                       inputmode="numeric"
+                       aria-describedby="h-chunk-words">
+                <small id="h-chunk-words" class="form-text">
+                  Da 80 a 600 (predefinito 220); il taglio segue
+                  comunque gli heading.
+                </small>
+                <div class="invalid-feedback"
+                     id="e-chunk-words"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-w-lex" class="active">Peso lista
+                  lessicale</label>
+                <input type="number" class="form-control"
+                       id="f-w-lex" name="w_lex" value="1"
+                       min="0.1" max="10" step="0.1"
+                       inputmode="decimal"
+                       aria-describedby="h-w-lex">
+                <small id="h-w-lex" class="form-text">
+                  Variante RRF pesata: 1 e 1 è l'RRF classico.
+                </small>
+                <div class="invalid-feedback" id="e-w-lex"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-w-vec" class="active">Peso lista
+                  vettoriale</label>
+                <input type="number" class="form-control"
+                       id="f-w-vec" name="w_vec" value="1"
+                       min="0.1" max="10" step="0.1"
+                       inputmode="decimal"
+                       aria-describedby="h-w-vec">
+                <small id="h-w-vec" class="form-text">
+                  Da 0,1 a 10 (predefinito 1).
+                </small>
+                <div class="invalid-feedback" id="e-w-vec"></div>
+              </div>
+            </div>
+          </div>
         </fieldset>
 
         <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">

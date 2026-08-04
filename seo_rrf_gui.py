@@ -64,7 +64,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.11.0"
+__version__ = "2.12.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -439,6 +439,11 @@ class Job:
                     workers=int(cfg["workers"]),
                     render=str(cfg["render"]),
                     competitors=list(cfg["competitors"]),
+                    top_n=int(cfg.get("top_n",
+                                      sra.DEFAULT_TOP_N)),
+                    rrf_weights=cfg.get("rrf_weights"),
+                    chunk_words=int(cfg.get(
+                        "chunk_words", sra.DEFAULT_CHUNK_WORDS)),
                     stop_event=self.stop_event)
                 judge = sra.run_judge(results, pages, judge_mode,
                                       verbose=True)
@@ -481,7 +486,19 @@ class Job:
             "json": sra.render_json(base, pages, findings, scores,
                                     results, mode, k, competitive,
                                     market=market, judge=judge,
-                                    delta=delta),
+                                    delta=delta,
+                                    rrf_params={
+                                        "top_n": int(cfg.get(
+                                            "top_n",
+                                            sra.DEFAULT_TOP_N)),
+                                        "weights": list(cfg.get(
+                                            "rrf_weights")
+                                            or (1.0, 1.0)),
+                                        "chunk_words": int(cfg.get(
+                                            "chunk_words",
+                                            sra.DEFAULT_CHUNK_WORDS,
+                                        )),
+                                    }),
             "text": sra.render_text(base, pages, findings, scores,
                                     results, mode, k, competitive,
                                     market=market, judge=judge,
@@ -597,6 +614,12 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
 
     max_pages = number("max_pages", 25, 1, 500)
     rrf_k = number("rrf_k", 60, 1, 1000)
+    top_n = number("top_n", sra.DEFAULT_TOP_N,
+                   sra.TOP_N_MIN, sra.TOP_N_MAX)
+    chunk_words = number("chunk_words", sra.DEFAULT_CHUNK_WORDS,
+                         sra.CHUNK_WORDS_MIN, sra.CHUNK_WORDS_MAX)
+    w_lex = number("w_lex", 1.0, 0.1, 10)
+    w_vec = number("w_vec", 1.0, 0.1, 10)
     delay = number("delay", 0.5, 0, 10)
     max_body = number("max_body", sra.DEFAULT_MAX_BODY_MB, 1, 10240)
     retries = number("retries", sra.DEFAULT_RETRIES, 0, 10)
@@ -632,7 +655,9 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
                       "esplicita di assunzione di responsabilita'.")
     checks = (("max_pages", max_pages), ("rrf_k", rrf_k),
               ("delay", delay), ("max_body", max_body),
-              ("retries", retries), ("workers", workers))
+              ("retries", retries), ("workers", workers),
+              ("top_n", top_n), ("chunk_words", chunk_words),
+              ("w_lex", w_lex), ("w_vec", w_vec))
     for name, value in checks:
         if value is None:
             return None, "Valore non valido per '%s'." % name
@@ -662,6 +687,9 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
         "robots": robots,
         "market": market,
         "judge": judge,
+        "top_n": int(top_n),
+        "chunk_words": int(chunk_words),
+        "rrf_weights": (float(w_lex), float(w_vec)),
         "queries": queries,
         "embeddings": str(raw.get("embeddings", "")).strip(),
         "competitors": competitors,

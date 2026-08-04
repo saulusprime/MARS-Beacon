@@ -99,7 +99,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.30.0"
+__version__ = "1.31.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -139,6 +139,14 @@ DEFAULT_RETRIES = 2
 # di rete. Configurabile con --workers (1 = seriale).
 DEFAULT_WORKERS = 4
 MAX_WORKERS = 16
+
+# Parametri della simulazione RRF esposti dalla v1.31.0: posti fusi
+# considerati per query, pesi della variante RRF pesata (lessicale,
+# vettoriale; 1,1 = RRF classico) e dimensione dei chunk.
+DEFAULT_TOP_N = 5
+TOP_N_MIN, TOP_N_MAX = 1, 20
+DEFAULT_CHUNK_WORDS = 220
+CHUNK_WORDS_MIN, CHUNK_WORDS_MAX = 80, 600
 
 # Politica sul robots.txt del sito auditato. Predefinito: i Disallow
 # rivolti al nostro agente vengono RISPETTATI. "own" dichiara il sito
@@ -1693,7 +1701,9 @@ def extract_jsonld(raw_html: str) -> Tuple[List[str], List[dict]]:
     return sorted(set(types)), blocks
 
 
-def build_chunks(page: Page, target_words: int = 220) -> List[Chunk]:
+def build_chunks(page: Page,
+                 target_words: int = DEFAULT_CHUNK_WORDS
+                 ) -> List[Chunk]:
     """Spezza la pagina in chunk come farebbe un indicizzatore RAG.
 
     Il taglio segue gli heading: e' l'approssimazione piu' vicina al
@@ -1921,18 +1931,23 @@ class VectorIndex:
 
 def reciprocal_rank_fusion(
         rankings: Sequence[Sequence[Tuple[int, float]]],
-        k: int = 60, top_n: int = 10) -> List[Tuple[int, float]]:
+        k: int = 60, top_n: int = 10,
+        weights: Optional[Sequence[float]] = None
+        ) -> List[Tuple[int, float]]:
     """Fonde piu' liste ordinate con la formula RRF.
 
-        score(d) = somma_i 1 / (k + rank_i(d))
+        score(d) = somma_i  w_i / (k + rank_i(d))
 
-    Il rango parte da 1. Ogni lista pesa uguale, come in Elasticsearch.
-    Riferimento: Cormack et al. (2009); Elastic; Microsoft Learn.
+    Il rango parte da 1. Senza ``weights`` ogni lista pesa uguale
+    (w_i = 1, RRF classico come in Elasticsearch); con la variante
+    pesata ogni lista porta il proprio peso. Riferimento: Cormack
+    et al. (2009); Elastic; Microsoft Learn.
     """
     scores: Dict[int, float] = {}
-    for ranking in rankings:
+    for pos, ranking in enumerate(rankings):
+        w = weights[pos] if weights else 1.0
         for rank, (doc_id, _score) in enumerate(ranking, start=1):
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
+            scores[doc_id] = scores.get(doc_id, 0.0) + w / (k + rank)
     fused = sorted(scores.items(), key=lambda x: (-x[1], x[0]))
     return fused[:top_n]
 
@@ -3714,8 +3729,9 @@ def auto_queries(pages: List[Page], limit: int = 12) -> List[str]:
 
 
 def simulate_rrf(pages: List[Page], queries: Sequence[str],
-                 k: int = 60, top_n: int = 5,
-                 model_name: str = "") -> Tuple[
+                 k: int = 60, top_n: int = DEFAULT_TOP_N,
+                 model_name: str = "",
+                 weights: Optional[Sequence[float]] = None) -> Tuple[
                      List[QueryResult], List[Finding], str]:
     """Esegue BM25 + vettoriale e ne fonde i risultati con RRF."""
     chunks = [c for p in pages if p.ok for c in p.chunks]
@@ -3735,7 +3751,8 @@ def simulate_rrf(pages: List[Page], queries: Sequence[str],
     for query in queries:
         lex = bm25.search(query)[:top_n * 4]
         vec = vector.search(query)[:top_n * 4]
-        fused = reciprocal_rank_fusion([lex, vec], k=k, top_n=top_n)
+        fused = reciprocal_rank_fusion([lex, vec], k=k, top_n=top_n,
+                                       weights=weights)
         lex_ids = {i for i, _ in lex[:top_n]}
         vec_ids = {i for i, _ in vec[:top_n]}
         consensus = len(lex_ids & vec_ids)
@@ -3849,7 +3866,9 @@ def crawl_corpus(base: str, fetcher: Fetcher, max_pages: int,
 def simulate_share_of_voice(
         base: str, own_chunks: List[Chunk],
         corpora: Dict[str, List[Chunk]], queries: Sequence[str],
-        k: int = 60, top_n: int = 5, model_name: str = "") -> Tuple[
+        k: int = 60, top_n: int = DEFAULT_TOP_N,
+        model_name: str = "",
+        weights: Optional[Sequence[float]] = None) -> Tuple[
             Optional[Dict[str, object]], List[Finding]]:
     """Fonde il corpus proprio con quelli dei concorrenti e misura
     quanti dei primi ``top_n`` posti fusi appartengono a ciascun sito.
@@ -3892,7 +3911,8 @@ def simulate_share_of_voice(
     for query in queries:
         lex = bm25.search(query)[:top_n * 4]
         vec = vector.search(query)[:top_n * 4]
-        fused = reciprocal_rank_fusion([lex, vec], k=k, top_n=top_n)
+        fused = reciprocal_rank_fusion([lex, vec], k=k, top_n=top_n,
+                                       weights=weights)
         res = ShareResult(query=query)
         for rank, (idx, _score) in enumerate(fused, start=1):
             res.owners.append(owners[idx])
@@ -5178,15 +5198,21 @@ def render_json(base: str, pages: List[Page],
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
                 judge: Optional[Dict[str, object]] = None,
-                delta: Optional[Dict[str, object]] = None) -> str:
+                delta: Optional[Dict[str, object]] = None,
+                rrf_params: Optional[Dict[str, object]] = None
+                ) -> str:
     """Referto JSON, adatto a essere versionato o messo in pipeline."""
+    rrf_obj: Dict[str, object] = {
+        "k": k, "formula": "score(d)=sum w_i/(k+rank_i(d))"}
+    rrf_obj.update(rrf_params or
+                   {"top_n": DEFAULT_TOP_N, "weights": [1.0, 1.0]})
     payload = {
         "tool": "seo_rrf_audit.py",
         "version": __version__,
         "site": base,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "vector_retriever": mode,
-        "rrf": {"k": k, "formula": "score(d)=sum 1/(k+rank_i(d))"},
+        "rrf": rrf_obj,
         "scores": {**scores, "overall": overall_score(scores)},
         "citability": citability_profiles(pages, scores, market),
         "citability_actions": citability_top_actions(
@@ -5265,6 +5291,9 @@ def run_audit(base: str, max_pages: int, queries: List[str],
               user_agent: str = USER_AGENT,
               workers: int = DEFAULT_WORKERS,
               render: str = RENDER_OFF,
+              top_n: int = DEFAULT_TOP_N,
+              rrf_weights: Optional[Sequence[float]] = None,
+              chunk_words: int = DEFAULT_CHUNK_WORDS,
               stop_event: Optional[threading.Event] = None) -> Tuple[
                   List[Page], List[Finding],
                   Dict[str, Optional[float]], List[QueryResult], str,
@@ -5386,6 +5415,13 @@ def run_audit(base: str, max_pages: int, queries: List[str],
                     "e sulla pagina canonica:\n<link rel=\"canonical\""
                     " href=\"https://esempio.it/\">"))
 
+    if chunk_words != DEFAULT_CHUNK_WORDS:
+        # Il chunking di default avviene in extract_content: con un
+        # target diverso si ricostruisce (i blocchi sono conservati).
+        for p in pages:
+            if p.ok:
+                p.chunks = build_chunks(p, target_words=chunk_words)
+
     check_stop()
     if verbose:
         print("[4/5] controlli per area", file=sys.stderr)
@@ -5402,7 +5438,8 @@ def run_audit(base: str, max_pages: int, queries: List[str],
     if not queries:
         queries = auto_queries([p for p in pages if p.ok])
     results, rrf_findings, mode = simulate_rrf(
-        pages, queries, k=k, model_name=model_name)
+        pages, queries, k=k, top_n=top_n, model_name=model_name,
+        weights=rrf_weights)
     findings += rrf_findings
 
     competitive: Optional[Dict[str, object]] = None
@@ -5417,12 +5454,17 @@ def run_audit(base: str, max_pages: int, queries: List[str],
                       file=sys.stderr)
             cpages = crawl_corpus(comp, fetcher, max_pages,
                                   respect_comp, workers=workers)
+            if chunk_words != DEFAULT_CHUNK_WORDS:
+                for p in cpages:
+                    if p.ok:
+                        p.chunks = build_chunks(
+                            p, target_words=chunk_words)
             corpora[host] = [c for p in cpages if p.ok
                              for c in p.chunks]
         own_chunks = [c for p in pages if p.ok for c in p.chunks]
         competitive, comp_findings = simulate_share_of_voice(
-            base, own_chunks, corpora, queries, k=k,
-            model_name=model_name)
+            base, own_chunks, corpora, queries, k=k, top_n=top_n,
+            model_name=model_name, weights=rrf_weights)
         findings += comp_findings
 
     scores = {
@@ -5456,6 +5498,27 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rrf-k", type=int, default=60,
                         help="costante k della formula RRF "
                              "(default 60)")
+    parser.add_argument("--top-n", type=int, dest="top_n",
+                        default=DEFAULT_TOP_N, metavar="N",
+                        help="posti fusi considerati per query "
+                             "(da %d a %d, default %d): governa "
+                             "consenso e share of voice"
+                             % (TOP_N_MIN, TOP_N_MAX,
+                                DEFAULT_TOP_N))
+    parser.add_argument("--rrf-weights", default="1,1",
+                        metavar="LES,VET", dest="rrf_weights",
+                        help="variante RRF pesata: pesi delle due "
+                             "liste (lessicale,vettoriale), due "
+                             "numeri positivi separati da virgola; "
+                             "'1,1' e' l'RRF classico (default)")
+    parser.add_argument("--chunk-words", type=int,
+                        dest="chunk_words",
+                        default=DEFAULT_CHUNK_WORDS, metavar="N",
+                        help="dimensione obiettivo dei chunk in "
+                             "parole (da %d a %d, default %d): il "
+                             "taglio segue comunque gli heading"
+                             % (CHUNK_WORDS_MIN, CHUNK_WORDS_MAX,
+                                DEFAULT_CHUNK_WORDS))
     parser.add_argument("--delay", type=float, default=0.5,
                         help="pausa fra le richieste in secondi")
     parser.add_argument("--max-body", type=float,
@@ -5591,6 +5654,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print("--workers deve essere fra 1 e %d." % MAX_WORKERS,
               file=sys.stderr)
         return 2
+    if not TOP_N_MIN <= args.top_n <= TOP_N_MAX:
+        print("--top-n deve essere fra %d e %d."
+              % (TOP_N_MIN, TOP_N_MAX), file=sys.stderr)
+        return 2
+    if not CHUNK_WORDS_MIN <= args.chunk_words <= CHUNK_WORDS_MAX:
+        print("--chunk-words deve essere fra %d e %d."
+              % (CHUNK_WORDS_MIN, CHUNK_WORDS_MAX),
+              file=sys.stderr)
+        return 2
+    try:
+        parts = str(args.rrf_weights).split(",")
+        if len(parts) != 2:
+            raise ValueError("servono due pesi")
+        rrf_weights = (float(parts[0]), float(parts[1]))
+        if rrf_weights[0] <= 0 or rrf_weights[1] <= 0:
+            raise ValueError("pesi non positivi")
+    except ValueError:
+        print("--rrf-weights vuole due numeri positivi separati "
+              "da virgola, es. 1,1 oppure 1.5,1.", file=sys.stderr)
+        return 2
 
     if args.ignore_robots is not None:
         if args.respect_robots or args.own_site:
@@ -5647,7 +5730,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 competitors=competitors,
                 user_agent=args.user_agent,
                 workers=args.workers,
-                render=args.render)
+                render=args.render,
+                top_n=args.top_n,
+                rrf_weights=rrf_weights,
+                chunk_words=args.chunk_words)
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 2
@@ -5672,10 +5758,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     renderers = {"text": render_text, "json": render_json,
                  "html": render_html}
+    extra: Dict[str, object] = {}
+    if args.format == "json":
+        extra["rrf_params"] = {
+            "top_n": args.top_n,
+            "weights": list(rrf_weights),
+            "chunk_words": args.chunk_words,
+        }
     report = renderers[args.format](
         base, pages, findings, scores, results, mode, args.rrf_k,
         competitive, market=args.market, judge=judge_data,
-        delta=delta)
+        delta=delta, **extra)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as handle:

@@ -84,6 +84,9 @@ python3 seo_rrf_audit.py https://esempio.it \
 | `--queries FILE` | — | una query per riga; se omesso le query sono auto-generate dai bigrammi tematici di heading e title, **nella lingua prevalente del sito** (it/en/fr/de/es dall'attributo `lang`; default italiano) |
 | `--embeddings MODELLO` | auto | modello sentence-transformers per il recupero vettoriale reale. Se omesso e la libreria è installata viene usato il modello multilingue predefinito; `none` forza il proxy char-TFIDF |
 | `--rrf-k N` | 60 | costante k della formula RRF (propagata a tutti i renderer) |
+| `--top-n N` | 5 | posti fusi considerati per query (1–20): governa il consenso e la share of voice |
+| `--rrf-weights LES,VET` | 1,1 | **variante RRF pesata**: pesi delle due liste (lessicale, vettoriale) nella fusione `score(d)=Σ wᵢ/(k+rankᵢ)`; `1,1` è l'RRF classico |
+| `--chunk-words N` | 220 | dimensione obiettivo dei chunk in parole (80–600); il taglio segue comunque gli heading |
 | `--delay SEC` | 0.5 | pausa fra le richieste HTTP |
 | `--competitor URL` | — | sito concorrente da confrontare (ripetibile, massimo 3). Ogni concorrente viene scansionato con gli stessi limiti; i corpora vengono fusi negli stessi indici BM25+vettoriale e interrogati con le stesse query (i temi del **tuo** sito): il referto riporta la **share of voice** — quanti dei primi 5 posti fusi appartengono a ciascun sito, con soglie rispetto alla parità — e le query vinte interamente dai concorrenti |
 | `--market occidentale\|globale\|orientale` | occidentale | pesi dei **profili di citabilità per assistente IA** nell'indice composito: `occidentale` privilegia ChatGPT/Perplexity (50%) e Claude (30%), `orientale` Qwen e Kimi (35% ciascuno), `globale` pesa tutti allo stesso modo. I profili sono stime euristiche derivate dai punteggi di area — la nota di onestà è sempre inclusa nel referto |
@@ -453,7 +456,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 232 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 237 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
