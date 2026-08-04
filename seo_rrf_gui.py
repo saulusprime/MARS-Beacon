@@ -14,6 +14,8 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
     GET  /api/me            stato della sessione e profilo
     POST /api/profile       completamento profilo (azienda, telefono)
     GET  /api/history       storico degli audit dell'utente
+    GET  /api/history/report?id=N  export del referto JSON salvato
+                            (richiede profilo completo)
     GET  /api/citations     storico del monitoraggio citazioni IA
                             (JSONL di seo_rrf_citations.py)
     GET  /api/events        avanzamento push (Server-Sent Events)
@@ -62,7 +64,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.9.0"
+__version__ = "2.10.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -161,7 +163,15 @@ class UserStore:
                 " scores TEXT NOT NULL,"
                 " critical INTEGER NOT NULL,"
                 " warning INTEGER NOT NULL,"
-                " info INTEGER NOT NULL);")
+                " info INTEGER NOT NULL,"
+                " report_json TEXT NOT NULL DEFAULT '');")
+            # Migrazione dei database creati prima della 2.10.0
+            # (multi-macchina: lo schema vecchio esiste davvero).
+            cols = [r["name"] for r in
+                    con.execute("PRAGMA table_info(audits)")]
+            if "report_json" not in cols:
+                con.execute("ALTER TABLE audits ADD COLUMN "
+                            "report_json TEXT NOT NULL DEFAULT ''")
 
     def _connect(self) -> sqlite3.Connection:
         con = sqlite3.connect(self.path)
@@ -262,32 +272,37 @@ class UserStore:
                 "UPDATE users SET last_check_at = 0 WHERE id = ?",
                 (user_id,))
 
-    def add_audit(self, user_id: int,
-                  summary: Dict[str, object]) -> None:
-        """Registra la sintesi di un audit concluso nello storico."""
+    def add_audit(self, user_id: int, summary: Dict[str, object],
+                  report_json: str = "") -> None:
+        """Registra sintesi e referto JSON di un audit concluso."""
         with self.lock, self._connect() as con:
             con.execute(
                 "INSERT INTO audits (user_id, site, created_at, "
-                "overall, scores, critical, warning, info) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "overall, scores, critical, warning, info, "
+                "report_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (user_id, str(summary.get("site", "")), time.time(),
                  float(summary.get("overall") or 0),
                  json.dumps(summary.get("scores") or {},
                             ensure_ascii=False),
                  int(summary.get("critical") or 0),
                  int(summary.get("warning") or 0),
-                 int(summary.get("info") or 0)))
+                 int(summary.get("info") or 0),
+                 report_json))
 
     def history(self, user_id: int,
                 limit: int = 50) -> List[Dict[str, object]]:
         """Storico degli audit dell'utente, dal piu' recente."""
         with self.lock, self._connect() as con:
             rows = con.execute(
-                "SELECT * FROM audits WHERE user_id = ? "
+                "SELECT id, site, created_at, overall, scores, "
+                "critical, warning, info, "
+                "report_json != '' AS has_report "
+                "FROM audits WHERE user_id = ? "
                 "ORDER BY created_at DESC LIMIT ?",
                 (user_id, limit)).fetchall()
         return [
             {
+                "id": row["id"],
                 "site": row["site"],
                 "created_at": row["created_at"],
                 "overall": row["overall"],
@@ -295,9 +310,40 @@ class UserStore:
                 "critical": row["critical"],
                 "warning": row["warning"],
                 "info": row["info"],
+                "has_report": bool(row["has_report"]),
             }
             for row in rows
         ]
+
+    def last_audit_report(self, user_id: int,
+                          site: str) -> Optional[Dict[str, object]]:
+        """Ultimo referto salvato dell'utente per lo stesso sito."""
+        with self.lock, self._connect() as con:
+            row = con.execute(
+                "SELECT created_at, report_json FROM audits "
+                "WHERE user_id = ? AND site = ? "
+                "AND report_json != '' "
+                "ORDER BY created_at DESC LIMIT 1",
+                (user_id, site)).fetchone()
+        if row is None:
+            return None
+        return {"created_at": row["created_at"],
+                "report_json": row["report_json"]}
+
+    def audit_report(self, user_id: int,
+                     audit_id: int) -> Optional[Dict[str, object]]:
+        """Referto salvato per l'export; solo se dell'utente."""
+        with self.lock, self._connect() as con:
+            row = con.execute(
+                "SELECT id, site, created_at, report_json "
+                "FROM audits WHERE id = ? AND user_id = ? "
+                "AND report_json != ''",
+                (audit_id, user_id)).fetchone()
+        if row is None:
+            return None
+        return {"id": row["id"], "site": row["site"],
+                "created_at": row["created_at"],
+                "report_json": row["report_json"]}
 
 
 STORE: Optional[UserStore] = None
@@ -429,6 +475,18 @@ class Job:
         severities = [f.severity for f in findings]
         clean, flagged, broken = sra.page_status_counts(pages,
                                                         findings)
+        delta = None
+        if self.user_id:
+            previous = get_store().last_audit_report(
+                self.user_id, base)
+            if previous:
+                try:
+                    delta = compute_delta(
+                        json.loads(str(previous["report_json"])),
+                        json.loads(reports["json"]),
+                        float(str(previous["created_at"])))
+                except (ValueError, KeyError, TypeError):
+                    delta = None  # referto vecchio illeggibile
         summary = {
             "site": base,
             "overall": sra.overall_score(scores),
@@ -447,13 +505,15 @@ class Job:
             "citability_actions": sra.citability_top_actions(
                 findings, pages, scores, market),
             "judge": judge,
+            "delta": delta,
             "critical": severities.count(sra.SEV_CRITICAL),
             "warning": severities.count(sra.SEV_WARNING),
             "info": severities.count(sra.SEV_INFO),
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
         if self.user_id:
-            get_store().add_audit(self.user_id, summary)
+            get_store().add_audit(self.user_id, summary,
+                                  reports["json"])
         with self.lock:
             self.reports = reports
             self.summary = summary
@@ -470,6 +530,60 @@ class Job:
 
 
 JOB = Job()
+
+
+def _finding_key(finding: Dict[str, object]) -> Tuple[str, str]:
+    """Chiave stabile di un rilievo fra due audit.
+
+    I titoli incorporano conteggi che cambiano a ogni esecuzione
+    ("3 title non ottimizzati" -> "2 title non ottimizzati"): i
+    numeri vengono normalizzati a N perche' e' lo stesso problema
+    che evolve, non un rilievo nuovo.
+    """
+    return (str(finding.get("area", "")),
+            re.sub(r"\d+", "N", str(finding.get("title", ""))))
+
+
+def compute_delta(previous: Dict[str, object],
+                  current: Dict[str, object],
+                  previous_at: float) -> Dict[str, object]:
+    """Variazioni fra due referti JSON dello stesso sito.
+
+    Punteggi: differenza per area (e complessivo) dove entrambe le
+    esecuzioni hanno un valore. Rilievi: confronto dei soli critici
+    e avvertenze per (area, titolo normalizzato): "nuovi" = solo
+    nell'attuale, "risolti" = solo nel precedente. Euristica
+    dichiarata: un rilievo riformulato conta come nuovo + risolto.
+    """
+    def actionable(payload: Dict[str, object]) -> Dict[
+            Tuple[str, str], Dict[str, object]]:
+        out: Dict[Tuple[str, str], Dict[str, object]] = {}
+        for f in payload.get("findings") or []:
+            if f.get("severity") in ("critical", "warning"):
+                out.setdefault(_finding_key(f), f)
+        return out
+
+    prev_scores = previous.get("scores") or {}
+    cur_scores = current.get("scores") or {}
+    scores = {}
+    for area, value in cur_scores.items():
+        before = prev_scores.get(area)
+        if value is not None and before is not None:
+            scores[area] = round(float(value) - float(before), 1)
+
+    prev_f = actionable(previous)
+    cur_f = actionable(current)
+    slim = ("area", "title", "severity")
+    return {
+        "site": current.get("site", ""),
+        "previous_at": previous_at,
+        "previous_generated_at": previous.get("generated_at", ""),
+        "scores": scores,
+        "new": [{k: cur_f[key].get(k, "") for k in slim}
+                for key in sorted(cur_f) if key not in prev_f],
+        "resolved": [{k: prev_f[key].get(k, "") for k in slim}
+                     for key in sorted(prev_f) if key not in cur_f],
+    }
 
 
 def read_citations_history(path: str) -> List[Dict[str, object]]:
@@ -751,6 +865,39 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(200, {
                 "sites": read_citations_history(
                     str(CITATIONS_HISTORY))})
+        elif path == "/api/history/report":
+            user = self._session_user()
+            if user is None:
+                self._send_json(401, {"error": "accesso richiesto"})
+                return
+            if not user["profile_complete"]:
+                self._send_json(403, {
+                    "error": "L'export dei referti richiede la "
+                             "registrazione completa: aggiungi "
+                             "azienda e telefono al profilo.",
+                    "code": "profile_incomplete"})
+                return
+            query = self.path.split("?", 1)[-1] \
+                if "?" in self.path else ""
+            try:
+                audit_id = int(dict(
+                    part.split("=", 1) for part in query.split("&")
+                    if "=" in part).get("id", ""))
+            except (ValueError, TypeError):
+                self._send_json(400, {"error": "id non valido"})
+                return
+            stored = get_store().audit_report(int(user["id"]),
+                                              audit_id)
+            if stored is None:
+                self._send_json(404, {"error": "referto non "
+                                               "trovato"})
+                return
+            download = ""
+            if "download" in query:
+                download = "audit-%d.json" % audit_id
+            self._send(200,
+                       str(stored["report_json"]).encode("utf-8"),
+                       CONTENT_TYPES[".json"], download=download)
         elif path == "/api/events":
             if self._session_user() is None:
                 self._send_json(401, {"error": "accesso richiesto"})

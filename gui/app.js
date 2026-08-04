@@ -293,6 +293,26 @@
       warning.textContent = run.warning;
       tr.appendChild(warning);
 
+      const report = document.createElement("td");
+      if (run.has_report) {
+        const link = document.createElement("a");
+        link.href = "api/history/report?id=" + run.id +
+          "&download=1";
+        link.textContent = "JSON";
+        link.setAttribute("aria-label",
+          "Scarica il referto JSON dell'audit di " + run.site +
+          " del " + when.textContent);
+        if (!me || !me.profile_complete) {
+          link.classList.add("disabled");
+          link.setAttribute("aria-disabled", "true");
+        }
+        report.appendChild(link);
+      } else {
+        report.className = "text-muted";
+        report.textContent = "—";
+      }
+      tr.appendChild(report);
+
       tbody.appendChild(tr);
     });
 
@@ -1028,6 +1048,7 @@
   function showResults(snap) {
     renderMeta(snap.summary);
     renderHero(snap.summary);
+    renderDelta((snap.summary || {}).delta);
     renderScores(snap.summary);
     renderCitability(snap.summary || {});
     renderJudge((snap.summary || {}).judge,
@@ -1245,6 +1266,66 @@
     if (summary.pages_total) {
       hero.appendChild(pagesDonut(summary));
     }
+  }
+
+  function renderDelta(delta) {
+    const block = el("delta-block");
+    if (!delta) {
+      block.hidden = true;
+      return;
+    }
+    const quando = new Date(delta.previous_at * 1000)
+      .toLocaleString("it-IT", {
+        day: "2-digit", month: "2-digit", year: "2-digit",
+        hour: "2-digit", minute: "2-digit",
+      });
+    el("delta-intro").textContent =
+      "Confronto con l'audit del " + quando + " sullo stesso " +
+      "sito: l'audit diventa monitoraggio. I rilievi sono " +
+      "confrontati per tipo (i conteggi nei titoli possono " +
+      "variare).";
+
+    const scores = el("delta-scores");
+    scores.textContent = "";
+    Object.entries(delta.scores || {}).forEach(
+      ([area, value], index) => {
+        if (index) {
+          scores.appendChild(document.createTextNode(" · "));
+        }
+        const label = document.createElement("strong");
+        label.textContent = area + ": ";
+        scores.appendChild(label);
+        scores.appendChild(deltaNode(value));
+      });
+
+    const fill = (listId, titleId, items, titolo, vuoto) => {
+      const list = el(listId);
+      list.textContent = "";
+      el(titleId).textContent = titolo + " (" + items.length + ")";
+      if (!items.length) {
+        const item = document.createElement("li");
+        item.className = "text-muted small";
+        item.textContent = vuoto;
+        list.appendChild(item);
+        return;
+      }
+      items.forEach((f) => {
+        const item = document.createElement("li");
+        item.className = "mb-1";
+        item.appendChild(severityBadge(f.severity));
+        const text = document.createElement("span");
+        text.className = "ms-2";
+        text.textContent = f.title;
+        item.appendChild(text);
+        list.appendChild(item);
+      });
+    };
+    fill("delta-resolved", "delta-resolved-title",
+      delta.resolved || [], "Rilievi risolti",
+      "Nessun rilievo risolto.");
+    fill("delta-new", "delta-new-title", delta.new || [],
+      "Rilievi nuovi", "Nessun rilievo nuovo: bene.");
+    block.hidden = false;
   }
 
   function renderScores(summary) {

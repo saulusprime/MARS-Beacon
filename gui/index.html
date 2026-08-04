@@ -568,6 +568,22 @@
 
       <div id="hero" class="audit-hero border rounded mb-4"></div>
 
+      <div id="delta-block" hidden>
+        <h3 class="h5">Rispetto all'esecuzione precedente</h3>
+        <p class="small text-muted mb-2" id="delta-intro"></p>
+        <p class="mb-2" id="delta-scores"></p>
+        <div class="row">
+          <div class="col-12 col-md-6">
+            <h4 class="h6" id="delta-resolved-title"></h4>
+            <ul class="list-unstyled mb-3" id="delta-resolved"></ul>
+          </div>
+          <div class="col-12 col-md-6">
+            <h4 class="h6" id="delta-new-title"></h4>
+            <ul class="list-unstyled mb-3" id="delta-new"></ul>
+          </div>
+        </div>
+      </div>
+
       <h3 class="h5">Punteggi per area</h3>
       <p class="small text-muted mb-2">
         Soglie del giudizio: buono da 70, da migliorare da 40, critico
@@ -719,6 +735,7 @@
               <th scope="col">Delta</th>
               <th scope="col">Critici</th>
               <th scope="col">Avvertenze</th>
+              <th scope="col">Referto</th>
             </tr>
           </thead>
           <tbody></tbody>

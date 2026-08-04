@@ -187,6 +187,163 @@ def test_validazione_judge():
     assert config is None and "ANTHROPIC_API_KEY" in err
 
 
+# ---------------- storico e delta per utente/dominio ----------------
+
+def _referto(scores, findings):
+    return {"site": "https://mio.it", "scores": scores,
+            "generated_at": "2026-08-04T10:00:00+0200",
+            "findings": findings}
+
+
+def test_compute_delta_punteggi_e_rilievi():
+    prima = _referto(
+        {"Tecnica": 50.0, "Semantica (vettoriale)": 60.0,
+         "overall": 55.0},
+        [{"area": "Tecnica", "severity": "critical",
+          "title": "Sito non in HTTPS"},
+         {"area": "Lessicale (BM25)", "severity": "warning",
+          "title": "5 title non ottimizzati"},
+         {"area": "Tecnica", "severity": "ok",
+          "title": "Canonical presenti"}])
+    dopo = _referto(
+        {"Tecnica": 70.0, "Semantica (vettoriale)": 58.0,
+         "overall": 64.0},
+        [{"area": "Lessicale (BM25)", "severity": "warning",
+          "title": "2 title non ottimizzati"},
+         {"area": "Semantica (vettoriale)", "severity": "warning",
+          "title": "Nessuna sezione FAQ"}])
+    delta = gui.compute_delta(prima, dopo, 1000.0)
+    assert delta["scores"]["Tecnica"] == 20.0
+    assert delta["scores"]["Semantica (vettoriale)"] == -2.0
+    assert delta["scores"]["overall"] == 9.0
+    assert delta["previous_at"] == 1000.0
+    # HTTPS risolto; i title restano (conteggio normalizzato);
+    # la FAQ e' nuova; i rilievi "ok" non contano.
+    assert [f["title"] for f in delta["resolved"]] == \
+        ["Sito non in HTTPS"]
+    assert [f["title"] for f in delta["new"]] == \
+        ["Nessuna sezione FAQ"]
+
+
+def test_store_salva_ed_esporta_il_referto(tmp_path):
+    store = gui.UserStore(tmp_path / "s.db")
+    token, err = store.register("Paola", "p@e.it", "segretissima")
+    assert err == ""
+    uid = int(store.user_by_token(token)["id"])
+    store.add_audit(uid, {"site": "https://mio.it", "overall": 40},
+                    '{"quale": "vecchio"}')
+    store.add_audit(uid, {"site": "https://mio.it", "overall": 50},
+                    '{"quale": "nuovo"}')
+    store.add_audit(uid, {"site": "https://altro.it",
+                          "overall": 60}, "")
+
+    runs = store.history(uid)
+    assert runs[0]["site"] == "https://altro.it"
+    assert runs[0]["has_report"] is False
+    assert runs[1]["has_report"] is True
+
+    ultimo = store.last_audit_report(uid, "https://mio.it")
+    assert json.loads(ultimo["report_json"])["quale"] == "nuovo"
+
+    esport = store.audit_report(uid, int(runs[1]["id"]))
+    assert esport and esport["site"] == "https://mio.it"
+    # Un altro utente non vede i referti altrui.
+    token2, _ = store.register("Rosa", "r@e.it", "segretissima")
+    uid2 = int(store.user_by_token(token2)["id"])
+    assert store.audit_report(uid2, int(runs[1]["id"])) is None
+
+
+def test_migrazione_schema_audits(tmp_path):
+    """Un DB creato prima della 2.10.0 acquisisce report_json."""
+    import sqlite3
+    path = tmp_path / "vecchio.db"
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE audits (id INTEGER PRIMARY KEY, "
+                "user_id INTEGER NOT NULL, site TEXT NOT NULL, "
+                "created_at REAL NOT NULL, overall REAL NOT NULL, "
+                "scores TEXT NOT NULL, critical INTEGER NOT NULL, "
+                "warning INTEGER NOT NULL, info INTEGER NOT NULL)")
+    con.execute("INSERT INTO audits (user_id, site, created_at, "
+                "overall, scores, critical, warning, info) "
+                "VALUES (7, 'https://mio.it', 1.0, 42, '{}', "
+                "1, 2, 3)")
+    con.commit()
+    con.close()
+
+    store = gui.UserStore(path)  # migrazione all'apertura
+    runs = store.history(7)
+    assert runs[0]["overall"] == 42
+    assert runs[0]["has_report"] is False
+    store.add_audit(7, {"site": "https://mio.it", "overall": 50},
+                    '{"v": 2}')
+    assert store.last_audit_report(7, "https://mio.it")
+
+
+def test_export_referto_storico_via_api(gui_base):
+    status, _, _ = _api(gui_base, "/api/history/report?id=1")
+    assert status == 401
+
+    cookie = _register(gui_base, email="rapida@e.it")
+    status, body, _ = _api(gui_base, "/api/history/report?id=1",
+                           cookie=cookie)
+    assert status == 403
+    assert json.loads(body)["code"] == "profile_incomplete"
+
+    cookie = _register(gui_base, email="piena@e.it", completo=True)
+    token = cookie.split("=", 1)[1]
+    store = gui.get_store()
+    uid = int(store.user_by_token(token)["id"])
+    store.add_audit(uid, {"site": "https://mio.it", "overall": 70},
+                    '{"scores": {"overall": 70}}')
+    audit_id = store.history(uid)[0]["id"]
+
+    status, body, headers = _api(
+        gui_base, "/api/history/report?id=%d&download=1" % audit_id,
+        cookie=cookie)
+    assert status == 200
+    assert json.loads(body)["scores"]["overall"] == 70
+    assert "attachment" in headers.get("Content-Disposition", "")
+
+    status, _, _ = _api(gui_base, "/api/history/report?id=99999",
+                        cookie=cookie)
+    assert status == 404
+    status, _, _ = _api(gui_base, "/api/history/report?id=boh",
+                        cookie=cookie)
+    assert status == 400
+
+
+def test_delta_fra_due_audit_stesso_sito(gui_base, site):
+    """Il secondo audit sullo stesso dominio riporta il delta."""
+    cookie = _register(gui_base, email="delta@e.it")
+    token = cookie.split("=", 1)[1]
+    status, _, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 3, "delay": 0.0,
+        "queries": "drenaggio linfatico"}, cookie=cookie)
+    assert status == 202
+    snap = _attendi_stato(gui_base, cookie, ("done", "error"))
+    assert snap["state"] == "done", snap.get("error")
+    assert snap["summary"]["delta"] is None, \
+        "primo audit del dominio: nessun precedente"
+
+    uid = int(gui.get_store().user_by_token(token)["id"])
+    gui.get_store().clear_check(uid)
+    status, _, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 3, "delay": 0.0,
+        "queries": "drenaggio linfatico"}, cookie=cookie)
+    assert status == 202
+    snap = _attendi_stato(gui_base, cookie, ("done", "error"))
+    assert snap["state"] == "done", snap.get("error")
+    delta = snap["summary"]["delta"]
+    assert delta is not None and delta["previous_at"] > 0
+    assert delta["new"] == [] and delta["resolved"] == [], \
+        "stesso sito immutato: nessun rilievo nuovo o risolto"
+    assert all(v == 0 for v in delta["scores"].values())
+    # Entrambe le esecuzioni sono esportabili dallo storico.
+    runs = gui.get_store().history(uid)
+    assert len(runs) == 2
+    assert all(r["has_report"] for r in runs)
+
+
 # ---------------- storico citazioni IA ----------------
 
 def _storico_citazioni(tmp_path):

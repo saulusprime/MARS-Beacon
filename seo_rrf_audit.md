@@ -300,6 +300,27 @@ malformate e non rompe mai la GUI se il file manca. 3 test
 dedicati; verifica visiva con Chrome reale su uno storico di
 esempio.
 
+Novità GUI 2.10.0 (2026-08-04): storico e delta per utente e
+dominio — l'audit diventa monitoraggio. Il referto JSON completo di
+ogni esecuzione viene salvato nel database SQLite (colonna
+`report_json` nella tabella `audits`, con migrazione automatica dei
+DB creati prima) ed è esportabile da `GET /api/history/report?id=N`
+(riservato al proprietario, profilo completo richiesto; link "JSON"
+per riga nella tabella dello storico). A fine audit il server
+confronta il referto con il precedente dello stesso utente e
+dominio (`compute_delta`): differenze dei punteggi per area e
+complessivo, e rilievi **nuovi/risolti** confrontando critici e
+avvertenze per (area, titolo normalizzato — i conteggi nei titoli
+diventano N, così "5 title non ottimizzati" → "2 title non
+ottimizzati" è lo stesso problema che migliora, non un rilievo
+nuovo+risolto; euristica dichiarata nella GUI). Il blocco
+"Rispetto all'esecuzione precedente" nei risultati mostra i delta
+con frecce testuali e le due liste con badge di gravità. 5 test
+dedicati (delta calcolato a mano, migrazione dello schema, export
+con proprietà e gating, doppio audit end-to-end); verifica visiva
+con sito modificato fra le due esecuzioni (FAQ aggiunta → 2 critici
+risolti, semantica +22,7).
+
 ## Uso
 
 ```

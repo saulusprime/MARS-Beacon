@@ -168,7 +168,21 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.9.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.10.0 + `gui/`
+
+- **Storico e delta per utente e dominio** (v2.10.0): il referto
+  JSON completo di ogni esecuzione è salvato nel database
+  (`audits.report_json`, migrazione automatica dei DB precedenti)
+  ed esportabile con `GET /api/history/report?id=N` (solo il
+  proprietario, profilo completo — link "JSON" per riga nello
+  storico). A fine audit il server calcola il **delta rispetto
+  all'esecuzione precedente dello stesso utente e dominio**
+  (`compute_delta`): differenze dei punteggi per area/complessivo e
+  rilievi **nuovi/risolti** (critici e avvertenze confrontati per
+  area + titolo con i conteggi normalizzati; euristica dichiarata).
+  Blocco "Rispetto all'esecuzione precedente" nei risultati con
+  frecce testuali e liste con badge di gravità: l'audit diventa
+  monitoraggio.
 
 - **Citazioni IA nel tempo** (v2.9.0): sezione dedicata che legge
   lo storico JSONL del monitor citazioni (`GET /api/citations`,
@@ -334,7 +348,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 172 test in ~14 secondi** (`tests/`), senza rete
+- **Suite pytest: 177 test in ~15 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

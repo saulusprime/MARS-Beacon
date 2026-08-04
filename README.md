@@ -143,6 +143,13 @@ Cosa offre:
 - **Storico degli audit** per utente: tabella delle esecuzioni con
   delta del punteggio rispetto al run precedente dello stesso sito e
   grafico dell'andamento del punteggio complessivo con soglie 40/70.
+  Il **referto JSON completo di ogni esecuzione è salvato nel
+  database** ed esportabile per riga (`/api/history/report?id=N`,
+  riservato al proprietario con profilo completo); a fine audit i
+  risultati mostrano il blocco **"Rispetto all'esecuzione
+  precedente"**: delta dei punteggi per area e rilievi
+  **nuovi/risolti** rispetto all'ultimo audit dello stesso dominio —
+  l'audit diventa monitoraggio.
 - **Preimpostazioni**: la configurazione del form si salva con un nome
   (per cliente/sito) in localStorage e si ricarica in un click.
 - **Citazioni IA nel tempo**: la GUI legge lo storico JSONL del
@@ -419,7 +426,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 172 test, ~14 secondi, nessun accesso alla rete esterna
+pytest            # 177 test, ~15 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

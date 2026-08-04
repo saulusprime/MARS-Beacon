@@ -106,9 +106,13 @@ commerciale, non di sviluppo — il white-label è già in P2 — GUI).
 
 - [ ] Renderer **Markdown** (comodo per issue/PR) ed export **CSV** dei
       rilievi.
-- [ ] **Storico e delta**: salvare il JSON di ogni esecuzione e riportare le
-      variazioni rispetto alla precedente (punteggi, rilievi nuovi/risolti),
-      per trasformare l'audit in monitoraggio.
+- [ ] **Storico e delta nella CLI**: la versione GUI è realizzata
+      nella v2.10.0 (referto JSON in SQLite per utente/dominio,
+      export, delta con rilievi nuovi/risolti — vedi AS-IS); per gli
+      usi headless resta un `--history FILE` JSONL nella CLI, con il
+      delta riportato nei tre referti (riusare `compute_delta` della
+      GUI, oggi in seo_rrf_gui.py: valutare lo spostamento nel
+      core).
 - [ ] Versionare lo schema del JSON (`"schema_version"`) per compatibilità
       futura.
 - [ ] Referto HTML: CSS di stampa/esport PDF, ancore per rilievo,
@@ -155,17 +159,20 @@ realizzati nella v1.5.0, vedi AS-IS):
       parte) — pattern: Visibility Index di Sistrix, Brand Radar di
       Ahrefs.
 
-Widget che richiedono lo **storico degli audit** (prerequisito: la voce
-"Storico e delta" in P2 — Output e reportistica; basta un `--history
-FILE` che appende una riga JSONL compatta come già fa il monitor
-citazioni):
+Widget che richiedono lo **storico degli audit** (in GUI c'è dalla
+v2.10.0 con referto JSON in database; per la CLI vedi "Storico e
+delta nella CLI" in P2 — Output e reportistica):
 
-- [ ] Delta su punteggi per area e conteggi di severità dentro i
-      risultati (il delta sul punteggio complessivo e il trend con
-      soglie sono realizzati nella sezione Storico della GUI dalla
-      v2.1.0; restano i delta per area e nei referti CLI).
-- [ ] Badge "nuovo"/"risolto" sui rilievi, confronto fra due audit —
-      pattern: Compare Crawls di Semrush, colonne New/Fixed di Ahrefs.
+- [ ] Delta per area anche **nei referti CLI** (nella GUI i delta
+      per area e complessivo sono nel blocco "Rispetto
+      all'esecuzione precedente" dalla v2.10.0; il trend con soglie
+      nello Storico dalla v2.1.0).
+- [ ] Badge "nuovo"/"risolto" **sui singoli rilievi nella
+      fisarmonica** e confronto fra **due audit scelti** dallo
+      storico (oggi il confronto è solo con l'esecuzione
+      precedente; le liste nuovi/risolti sono nei risultati dalla
+      v2.10.0) — pattern: Compare Crawls di Semrush, colonne
+      New/Fixed di Ahrefs.
 
 Mockup interattivo dei nove widget con dati d'esempio (artefatto della
 sessione di analisi, 2026-08-03): board "SEO-RRF · Concept widget
