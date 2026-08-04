@@ -24,3 +24,7 @@ citazioni*.jsonl
 
 # Utenti e sessioni della GUI (dati locali, mai nel repo)
 seo_rrf_gui.db
+
+# Sorgente originale del logo MARS (1,7 MB): nel repo va solo la
+# versione ottimizzata gui/brand/mars-logo.png
+1785858215.png
