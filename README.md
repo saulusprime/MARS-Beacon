@@ -327,7 +327,10 @@ riproducibile.
    linguistici (definizioni, anafore, esempi, FAQ, domande) coprono
    **italiano, inglese, francese, tedesco e spagnolo** (v1.20.0).
 4. **Dati strutturati** — inventario dei tipi JSON-LD, entità principale,
-   FAQPage, BreadcrumbList, WebSite, **validazione delle proprietà
+   FAQPage, BreadcrumbList, WebSite, **HTML semantico** (tag di
+   sezionamento `<article>`/`<section>`/`<figure>` e "divitis": oltre
+   metà degli elementi `<div>` è un'avvertenza — i chunker dei motori
+   generativi segmentano su questi tag), **validazione delle proprietà
    minime** per 23 tipi Schema.org (LocalBusiness, Article, Product,
    VideoObject, ImageObject, Event, Recipe, HowTo, JobPosting, Review…)
    e **controlli di qualità sui valori**: prezzi numerici con valuta
@@ -446,7 +449,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 220 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 224 test, ~16 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

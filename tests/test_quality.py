@@ -797,3 +797,64 @@ def test_freschezza_senza_date_nessun_rilievo():
     assert sra._audit_freshness([page], today=_OGGI) == []
     rotta = _pagina_datata("https://mio.it/", modified="ieri sera")
     assert sra._audit_freshness([rotta], today=_OGGI) == []
+
+
+# ---------------- HTML semantico e divitis ----------------
+
+def _html_semantico():
+    return ("<!DOCTYPE html><html lang=\"it\"><head><title>P"
+            "</title></head><body><main><article>"
+            "<section><h2>Servizio</h2>" + "<p>testo</p>" * 30 +
+            "</section><figure><img src=\"x.jpg\" alt=\"x\">"
+            "<figcaption>Dida</figcaption></figure>"
+            "</article></main></body></html>")
+
+
+def _html_divitis():
+    return ("<!DOCTYPE html><html lang=\"it\"><head><title>P"
+            "</title></head><body>" +
+            "<div><div><p>t</p></div></div>" * 20 +
+            "</body></html>")
+
+
+def test_conteggi_semantici_estratti():
+    page = sra.parse_page(
+        "https://x.it/", _fake_response("https://x.it/",
+                                        _html_semantico()))
+    assert page.semantic_tag_types >= 4  # main, article, section...
+    assert page.element_count > 30
+    page2 = sra.parse_page(
+        "https://x.it/d", _fake_response("https://x.it/d",
+                                         _html_divitis()))
+    assert page2.semantic_tag_types == 0
+    assert page2.div_count == 40
+
+
+def test_html_semantico_ok():
+    page = sra.parse_page(
+        "https://x.it/", _fake_response("https://x.it/",
+                                        _html_semantico()))
+    findings = sra._audit_semantic_html([page])
+    assert [f.severity for f in findings] == [sra.SEV_OK]
+
+
+def test_divitis_e_markup_povero_segnalati():
+    page = sra.parse_page(
+        "https://x.it/d", _fake_response("https://x.it/d",
+                                         _html_divitis()))
+    findings = sra._audit_semantic_html([page])
+    titoli = " | ".join(f.title for f in findings)
+    assert "senza markup semantico" in titoli
+    assert "divitis" in titoli
+    divitis = [f for f in findings if "divitis" in f.title][0]
+    assert "%" in divitis.detail
+
+
+def test_pagine_piccole_fuori_dal_conto():
+    mini = ("<!DOCTYPE html><html lang=\"it\"><head><title>P"
+            "</title></head><body><div><p>poco</p></div>"
+            "</body></html>")
+    page = sra.parse_page(
+        "https://x.it/mini", _fake_response("https://x.it/mini",
+                                            mini))
+    assert sra._audit_semantic_html([page]) == []

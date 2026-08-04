@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.27.0, ~5460
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.28.0, ~5550
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -451,6 +451,23 @@ rilievo: il difetto è già coperto dall'E-E-A-T, e non si punisce
 due volte. Fix con meta `article:modified_time` pronto datato a
 oggi; sforzo "giorni". Il parametro `today` iniettabile rende i
 test deterministici. 5 test nuovi (220 totali).
+
+Novità 1.28.0 (2026-08-04): HTML semantico e "divitis" (da
+Features.md). `extract_content` conta per ogni pagina i tipi di
+tag di sezionamento presenti (`SEMANTIC_TAGS`: article, section,
+main, aside, details, figure…), i `<div>` e gli elementi totali
+(nuovi campi `Page.semantic_tag_types`/`div_count`/
+`element_count` — sul DOM renderizzato quando `--render` è
+attivo). `_audit_semantic_html`, nell'area dati strutturati (il
+focus della lente Qwen recita già "markup semantico e dati
+strutturati"), emette due avvertenze con soglie di prassi
+dichiarate: pagine con meno di 2 tipi di tag semantici (con
+scheletro `<main><article><section>` nel fix) e pagine con più
+della metà degli elementi `<div>` (divitis, con la percentuale
+per URL come evidenza); entrambe a posto → OK. Le pagine sotto i
+30 elementi sono fuori dal conto. Razionale: i chunker dei motori
+generativi segmentano sui tag di sezionamento. 4 test nuovi (224
+totali) su pagine HTML reali passate da parse_page.
 
 ## Uso
 

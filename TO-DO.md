@@ -16,9 +16,6 @@ analizzato e distillato qui il 2026-08-04; il documento originale
 non è nel repo) — tutti offline, per pagina, da innestare nelle
 aree esistenti:
 
-- [ ] **HTML semantico**: uso di `<article>`/`<section>`/
-      `<details>`/`<figure>`, rapporto div/elementi ("divitis") —
-      i chunker dei motori generativi segmentano su questi tag.
 - [ ] **Meta di base non ancora auditati**: charset, viewport e
       completezza **Open Graph** (i meta `og:*` sono già estratti in
       `page.og` ma mai valutati).

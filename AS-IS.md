@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.27.0
+## Strumento CLI — `seo_rrf_audit.py` v1.28.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -69,6 +69,13 @@ sono nel [README.md](README.md).
   insieme — salgono in testa e portano un badge dedicato in
   HTML/GUI; senza dati di citabilità l'ordinamento resta
   gravità+peso.
+- **HTML semantico e divitis** (v1.28.0, da Features.md): conteggio
+  per pagina dei tag di sezionamento e del rapporto `<div>`/
+  elementi (anche sul DOM renderizzato); avvertenze con soglie di
+  prassi — meno di 2 tipi di tag semantici (scheletro
+  `<main><article><section>` nel fix) e più di metà `<div>`
+  (percentuale per URL come evidenza); pagine sotto i 30 elementi
+  escluse. Nell'area dati strutturati (lente Qwen).
 - **Freschezza dei contenuti** (v1.27.0, da Features.md): età
   dell'aggiornamento dichiarato più recente (meta article:*_time e
   date JSON-LD), soglie di prassi a un anno (avvertenza) e due
@@ -411,7 +418,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 220 test in ~16 secondi** (`tests/`), senza rete
+- **Suite pytest: 224 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

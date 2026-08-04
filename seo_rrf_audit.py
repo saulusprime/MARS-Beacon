@@ -99,7 +99,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.27.0"
+__version__ = "1.28.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -531,6 +531,18 @@ LIFECYCLE_HINTS: Dict[str, str] = {
     "prospettive": "Prospettive e tendenze",
 }
 
+# HTML semantico (da Features.md): i chunker dei motori generativi
+# segmentano sui tag di sezionamento; una pagina di soli <div> e'
+# piu' difficile da spezzare in blocchi coerenti. Soglie di prassi
+# in _audit_semantic_html.
+SEMANTIC_TAGS: Tuple[str, ...] = (
+    "article", "section", "main", "aside", "details", "summary",
+    "figure", "figcaption", "header", "footer", "nav",
+)
+DIVITIS_RATIO = 0.5       # oltre meta' <div> = divitis
+SEMANTIC_MIN_TYPES = 2    # tipi di tag semantici attesi per pagina
+SEMANTIC_MIN_ELEMENTS = 30  # sotto, la pagina e' troppo piccola
+
 # Freschezza dei contenuti (da Features.md): eta' dell'ultimo
 # aggiornamento dichiarato. Soglie di prassi a uno e due anni.
 FRESH_WARN_DAYS = 365
@@ -898,6 +910,9 @@ class Page:
     canonical: str = ""
     meta_robots: str = ""
     bingbot_meta: str = ""
+    semantic_tag_types: int = 0
+    div_count: int = 0
+    element_count: int = 0
     generator: str = ""
     author: str = ""
     published: str = ""
@@ -1542,6 +1557,11 @@ def extract_content(page: Page, raw_html: str) -> None:
 
     page.script_bytes = sum(
         len(s.get_text() or "") for s in soup.find_all("script"))
+
+    page.semantic_tag_types = sum(
+        1 for tag in SEMANTIC_TAGS if soup.find(tag) is not None)
+    page.div_count = len(soup.find_all("div"))
+    page.element_count = len(soup.find_all(True))
 
     html_tag = soup.find("html")
     if html_tag:
@@ -3312,12 +3332,78 @@ def audit_eeat(pages: List[Page]) -> List[Finding]:
     return out
 
 
+def _audit_semantic_html(good: Sequence[Page]) -> List[Finding]:
+    """HTML semantico e "divitis" (da Features.md).
+
+    I chunker dei motori generativi segmentano sui tag di
+    sezionamento (article, section, figure...): una pagina di soli
+    <div> e' piu' difficile da spezzare in blocchi coerenti. Due
+    controlli con soglie di prassi dichiarate: almeno
+    SEMANTIC_MIN_TYPES tipi di tag semantici per pagina, e <div>
+    sotto DIVITIS_RATIO degli elementi. Le pagine con meno di
+    SEMANTIC_MIN_ELEMENTS elementi sono fuori dal conto.
+    """
+    eligible = [p for p in good
+                if p.element_count >= SEMANTIC_MIN_ELEMENTS]
+    if not eligible:
+        return []
+    out: List[Finding] = []
+    poveri = [p for p in eligible
+              if p.semantic_tag_types < SEMANTIC_MIN_TYPES]
+    if poveri:
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "%d pagina/e senza markup semantico" % len(poveri),
+            "Meno di %d tipi di tag di sezionamento (article, "
+            "section, main, figure...): i chunker dei motori "
+            "generativi hanno meno appigli per segmentare il "
+            "contenuto in blocchi coerenti. %s"
+            % (SEMANTIC_MIN_TYPES,
+               ", ".join(p.url for p in poveri[:5])),
+            "Racchiudi il contenuto principale in <main> e "
+            "<article>, le sezioni tematiche in <section> con il "
+            "loro heading, immagini e didascalie in <figure>.",
+            example="<main><article>\n  <section>\n    <h2>Cos'e' "
+                    "il servizio</h2>\n    <p>...</p>\n  "
+                    "</section>\n  <figure><img src=\"...\" "
+                    "alt=\"...\">\n    <figcaption>Didascalia"
+                    "</figcaption></figure>\n</article></main>",
+            weight=1.0))
+    divitis = [p for p in eligible
+               if p.div_count / p.element_count > DIVITIS_RATIO]
+    if divitis:
+        out.append(Finding(
+            AREA_SD, SEV_WARNING,
+            "%d pagina/e con eccesso di <div> (divitis)"
+            % len(divitis),
+            "Piu' della meta' degli elementi e' un <div> "
+            "generico: %s."
+            % ", ".join("%s (%d%%)"
+                        % (p.url, round(100 * p.div_count
+                                        / p.element_count))
+                        for p in divitis[:5]),
+            "Sostituisci i <div> strutturali con i tag semantici "
+            "equivalenti: il markup diventa auto-descrittivo.",
+            weight=1.0))
+    if not out:
+        out.append(Finding(
+            AREA_SD, SEV_OK,
+            "Markup semantico in uso",
+            "Tutte le %d pagine analizzabili usano i tag di "
+            "sezionamento e tengono i <div> sotto il %d%% degli "
+            "elementi." % (len(eligible),
+                           round(100 * DIVITIS_RATIO))))
+    return out
+
+
 def audit_structured_data(pages: List[Page]) -> List[Finding]:
     """Presenza e copertura del markup Schema.org."""
     out: List[Finding] = []
     good = [p for p in pages if p.ok]
     if not good:
         return out
+
+    out.extend(_audit_semantic_html(good))
 
     all_types: Counter = Counter()
     for page in good:
