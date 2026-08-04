@@ -487,6 +487,11 @@ sono nel [README.md](README.md).
   (`docs/ACCESSIBILITA.md`): flussi da testare con VoiceOver/NVDA,
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
+  Dalla sessione del 2026-08-04 esiste anche la **verifica
+  strumentale del protocollo** (`tools/verifica_at.py`): i flussi
+  1–7 eseguiti in un Chrome reale con 23 controlli sul contratto
+  ARIA (focus, regioni di stato, etichette, aria-*), ultimo esito
+  23/23 — dichiaratamente non sostitutiva della sessione umana.
 
 - **Suite pytest: 258 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf

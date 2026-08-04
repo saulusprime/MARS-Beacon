@@ -109,8 +109,13 @@ in P1), distribuzione della profondità di crawl.
 ## P2 — Interfaccia grafica (seo_rrf_gui.py)
 
 - [ ] Eseguire (e registrare in docs/ACCESSIBILITA.md) la prima
-      sessione di verifica manuale con screen reader: il protocollo
-      VoiceOver/NVDA è documentato, serve una persona con l'AT attivo.
+      sessione **umana** con screen reader (VoiceOver/NVDA): serve
+      una persona con l'AT attivo — non è automatizzabile né
+      simulabile. La preparazione strumentale è fatta (2026-08-04):
+      `tools/verifica_at.py` esegue i flussi 1–7 del protocollo e
+      verifica il contratto ARIA (23/23 controlli, registrata in
+      docs/ACCESSIBILITA.md §1.1); da rieseguire prima della
+      sessione umana e a ogni modifica di flusso.
 - [ ] Aggiornare la vendorizzazione di Bootstrap Italia con uno script
       dedicato (`update-vendor.sh`) che scarichi e potri i formati legacy.
 - [ ] Incorporare il logo nel referto HTML autonomo (oggi la firma è

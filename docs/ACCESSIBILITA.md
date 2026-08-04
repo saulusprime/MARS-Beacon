@@ -37,6 +37,35 @@ Chromium impacchettato, che su macOS recenti può non avviarsi).
 Ultimo esito locale: **3/3 pagine, 0 errori WCAG 2 AA**
 (2026-08-03, Chrome 139, pa11y-ci 3).
 
+## 1.1 Sessione strumentale del protocollo (albero di accessibilità)
+
+Fra l'audit automatico e la sessione umana c'è una terza gamba:
+[`tools/verifica_at.py`](../tools/verifica_at.py) esegue i **flussi
+1–7 del protocollo** in un Chrome reale (GUI in-process, store
+temporaneo, sito fixture) e verifica il **contratto ARIA** che
+l'albero di accessibilità espone allo screen reader: gestione del
+focus (skip link, avvio, fine audit), annunci delle regioni
+`role="status"` (registrazione, fasi dell'audit), etichette e
+obblighi dei campi, `aria-expanded`/`aria-describedby`,
+`aria-disabled` con nota, gravità come testo, didascalie delle
+tabelle, `aria-label` dei widget. 23 controlli in tutto.
+
+```bash
+<venv>/bin/python tools/verifica_at.py   # richiede Chrome e playwright
+```
+
+**Non sostituisce la sessione umana**: verifica ciò che l'AT
+*riceve*, non come lo *pronuncia* né se l'ordine di lettura è
+comprensibile. Va rieseguita a ogni modifica di flusso, prima
+della sessione umana.
+
+Ultimo esito: **23/23 controlli superati** (2026-08-04, Chrome di
+sistema via Playwright, GUI v2.16.0 / audit v1.37.0). Nessuna
+anomalia del contratto ARIA; tre falsi allarmi iniziali erano
+artefatti dello script (audit troppo rapido per campionare
+l'avanzamento → risolto con `--delay 1.5`; confronto di stringhe
+senza normalizzare gli a-capo; id errato del bottone Annulla).
+
 ## 2. Verifica manuale con screen reader — protocollo
 
 Da eseguire a ogni modifica sostanziale dell'interfaccia (nuove
@@ -93,6 +122,7 @@ una persona con lo screen reader attivo: non è automatizzabile).
 
 | Data | AT + browser | Versioni | Flussi | Esito | Note / anomalie |
 |---|---|---|---|---|---|
+| 2026-08-04 | *(strumentale, non AT)* albero di accessibilità via Chrome+Playwright | GUI 2.16.0, audit 1.37.0 | 1–7 | 23/23 OK | Verifica del contratto ARIA, **non** sostituisce la sessione umana; dettagli in §1.1 |
 | _da compilare_ | VoiceOver + Safari | | 1–7 | | |
 | _da compilare_ | NVDA + Firefox | | 1–7 | | |
 
