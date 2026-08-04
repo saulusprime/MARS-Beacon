@@ -63,8 +63,6 @@ volutamente fuori scope per la filosofia offline.
 
 ## P2 — Output e reportistica
 
-- [ ] Renderer **Markdown** (comodo per issue/PR) ed export **CSV** dei
-      rilievi.
 - [ ] Nel deploy systemd, affiancare al timer delle citazioni un
       timer per l'audit periodico con `--history` (la CLI ha
       storico e delta dalla v1.19.0 — vedi AS-IS): unit di esempio

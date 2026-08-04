@@ -100,7 +100,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.33.0"
+__version__ = "1.34.0"
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
 # storico --history), indipendente dalla versione dello strumento:
@@ -5322,6 +5322,207 @@ def render_json(base: str, pages: List[Page],
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
+def _md_cell(value: object) -> str:
+    """Testo sicuro dentro una cella di tabella Markdown."""
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def render_markdown(base: str, pages: List[Page],
+                    findings: List[Finding],
+                    scores: Dict[str, Optional[float]],
+                    results: List[QueryResult], mode: str,
+                    k: int = 60,
+                    competitive: Optional[Dict[str, object]] = None,
+                    market: str = DEFAULT_MARKET,
+                    judge: Optional[Dict[str, object]] = None,
+                    delta: Optional[Dict[str, object]] = None
+                    ) -> str:
+    """Referto Markdown (GitHub-flavored), per issue e pull request.
+
+    Il piano di remediation e' una task list `- [ ]`: incollato in
+    una issue diventa una checklist spuntabile. Le gravita' sono
+    marcatori testuali, mai solo colore.
+    """
+    marks = {SEV_CRITICAL: "**[CRITICO]**", SEV_WARNING: "[AVVISO]",
+             SEV_OK: "[ok]", SEV_INFO: "[info]"}
+    out: List[str] = []
+    out.append("# Audit SEO + RRF — %s" % base)
+    out.append("")
+    out.append("Pagine analizzate: %d · chunk indicizzati: %d · "
+               "recuperatore vettoriale: `%s`"
+               % (len([p for p in pages if p.ok]),
+                  sum(len(p.chunks) for p in pages if p.ok), mode))
+    out.append("")
+    out.append("## Punteggi")
+    out.append("")
+    out.append("| Area | Punteggio |")
+    out.append("|---|---:|")
+    for area, score in scores.items():
+        if score is not None:
+            out.append("| %s | %.1f/100 |" % (_md_cell(area), score))
+    out.append("| **Complessivo** | **%.1f/100** |"
+               % overall_score(scores))
+    out.append("")
+
+    cit = citability_profiles(pages, scores, market)
+    if cit:
+        out.append("## Profili di citabilita' per assistente IA")
+        out.append("")
+        out.append("| Profilo | Cosa premia | Punteggio |")
+        out.append("|---|---|---:|")
+        for prof in cit["profiles"]:
+            if prof["score"] is not None:
+                out.append("| %s | %s | %.1f/100 |"
+                           % (_md_cell(prof["label"]),
+                              _md_cell(prof["focus"]),
+                              prof["score"]))
+        if cit["index"] is not None:
+            out.append("| **Indice composito (%s)** | | "
+                       "**%.1f/100** |"
+                       % (_md_cell(cit["market"]), cit["index"]))
+        out.append("")
+        out.append("> %s" % cit["note"])
+        out.append("")
+
+    if delta:
+        out.append("## Rispetto all'esecuzione precedente (%s)"
+                   % (delta.get("previous_generated_at") or ""))
+        out.append("")
+        variazioni = " · ".join(
+            "%s **%+.1f**" % (_md_cell(area), value) if value
+            else "%s =" % _md_cell(area)
+            for area, value in dict(delta["scores"]).items())
+        if variazioni:
+            out.append(variazioni)
+            out.append("")
+        for label, items in (("Risolti", delta["resolved"]),
+                             ("Nuovi", delta["new"])):
+            out.append("**%s (%d):**" % (label, len(list(items))))
+            for f in items:
+                out.append("- %s %s"
+                           % (marks.get(str(f["severity"]), ""),
+                              f["title"]))
+            if not items:
+                out.append("- nessuno")
+            out.append("")
+
+    if judge and judge.get("status") == "ok":
+        out.append("## Giudizio LLM sulla citabilita'")
+        out.append("")
+        out.append("Modello `%s` su %d passaggio/i · media "
+                   "**%.1f/100**." % (judge["model"],
+                                      judge["sampled"],
+                                      judge["average"]))
+        out.append("")
+        out.append("| Query | Punteggio | Motivazione |")
+        out.append("|---|---:|---|")
+        for v in judge["verdicts"]:
+            out.append("| %s | %.1f | %s |"
+                       % (_md_cell(v["query"]), v["score"],
+                          _md_cell(v["reason"])))
+        out.append("")
+        out.append("> %s" % judge["note"])
+        out.append("")
+
+    plan = build_remediation(findings, pages, scores, market)
+    if plan:
+        out.append("## Piano di remediation")
+        out.append("")
+        for item in plan:
+            tag = ("CRITICO" if item["severity"] == SEV_CRITICAL
+                   else "AVVISO")
+            extra = ""
+            if item["quick_win"]:
+                extra += " · QUICK WIN"
+            if item.get("cross"):
+                extra += (" · trasversale: %d profili"
+                          % len(list(item["profiles_hit"])))
+            out.append("- [ ] **%d.** %s _(%s · %s · sforzo: "
+                       "%s%s)_"
+                       % (item["priority"], item["title"], tag,
+                          item["area"], item["effort"], extra))
+        out.append("")
+
+    out.append("## Rilievi per area")
+    for area in (AREA_TECH, AREA_LEX, AREA_SEM, AREA_SD, AREA_RRF):
+        subset = [f for f in findings if f.area == area]
+        if not subset:
+            continue
+        out.append("")
+        out.append("### %s" % area)
+        out.append("")
+        order = {SEV_CRITICAL: 0, SEV_WARNING: 1, SEV_INFO: 2,
+                 SEV_OK: 3}
+        for f in sorted(subset, key=lambda x: order[x.severity]):
+            out.append("- %s %s" % (marks[f.severity], f.title))
+            if f.detail:
+                out.append("  %s" % f.detail)
+            if f.fix:
+                out.append("  _Fix: %s_" % f.fix)
+    out.append("")
+
+    if results:
+        out.append("## Simulazione RRF per query")
+        out.append("")
+        out.append("| Query | Consenso | Primo passaggio fuso |")
+        out.append("|---|---:|---|")
+        for res in results:
+            primo = (res.fused_top[0][0] if res.fused_top
+                     else "(nessuno)")
+            out.append("| %s | %d | %s |"
+                       % (_md_cell(res.query), res.consensus,
+                          _md_cell(primo[:70])))
+        out.append("")
+
+    if competitive:
+        out.append("## Share of voice (primi %d posti fusi)"
+                   % competitive["top_n"])
+        out.append("")
+        out.append("| Sito | Quota |")
+        out.append("|---|---:|")
+        share = competitive["share"]
+        for host in competitive["sites"]:
+            marker = " ← tuo sito" if host == competitive["main"] \
+                else ""
+            out.append("| %s%s | %.1f%% |"
+                       % (_md_cell(host), marker, share[host]))
+        out.append("")
+
+    return "\n".join(out)
+
+
+def render_csv(base: str, pages: List[Page],
+               findings: List[Finding],
+               scores: Dict[str, Optional[float]],
+               results: List[QueryResult], mode: str,
+               k: int = 60,
+               competitive: Optional[Dict[str, object]] = None,
+               market: str = DEFAULT_MARKET,
+               judge: Optional[Dict[str, object]] = None,
+               delta: Optional[Dict[str, object]] = None) -> str:
+    """Export CSV dei rilievi, una riga per rilievo.
+
+    Pensato per Excel/Sheets: delimitatore ';' e BOM UTF-8 in
+    testa, cosi' l'apertura diretta preserva accenti e colonne.
+    Sforzo e quick win sono valorizzati solo per i rilievi
+    azionabili (critici e avvertenze).
+    """
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\n")
+    writer.writerow(["sito", "area", "gravita", "peso", "titolo",
+                     "dettaglio", "correzione", "url", "sforzo",
+                     "quick_win"])
+    for f in findings:
+        actionable = f.severity in (SEV_CRITICAL, SEV_WARNING)
+        effort = estimate_effort(f) if actionable else ""
+        quick = ("si" if f.severity == SEV_CRITICAL
+                 and effort == EFFORT_MINUTES else "")
+        writer.writerow([base, f.area, f.severity, f.weight,
+                         f.title, f.detail, f.fix, f.url, effort,
+                         quick])
+    return "\ufeff" + buffer.getvalue()
+
+
 # --------------------------------------------------------------------
 # Orchestrazione
 # --------------------------------------------------------------------
@@ -5615,8 +5816,15 @@ def build_parser() -> argparse.ArgumentParser:
                              "della tua macchina, di norma non oltre "
                              "un decimo della RAM disponibile"
                              % DEFAULT_MAX_BODY_MB)
-    parser.add_argument("--format", choices=("text", "json", "html"),
-                        default="text", help="formato del referto")
+    parser.add_argument("--format",
+                        choices=("text", "json", "html", "md",
+                                 "csv"),
+                        default="text",
+                        help="formato del referto: text, json, "
+                             "html autonomo, md (Markdown per "
+                             "issue/PR, piano come task list) o "
+                             "csv (rilievi per Excel/Sheets, "
+                             "';' e BOM)")
     parser.add_argument("--output", metavar="FILE",
                         help="scrive il referto su file")
     parser.add_argument("--competitor", metavar="URL",
@@ -5861,7 +6069,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 delta = None  # riga precedente illeggibile
 
     renderers = {"text": render_text, "json": render_json,
-                 "html": render_html}
+                 "html": render_html, "md": render_markdown,
+                 "csv": render_csv}
     extra: Dict[str, object] = {}
     if args.format == "json":
         extra["rrf_params"] = {

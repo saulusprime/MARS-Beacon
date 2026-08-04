@@ -125,3 +125,68 @@ def test_schema_version_nel_referto_e_nello_storico():
 
     riga = sra.history_payload("https://mio.it", [], scores)
     assert riga["schema_version"] == sra.JSON_SCHEMA_VERSION
+
+
+# ---------------- renderer Markdown e CSV ----------------
+
+def _dati_render():
+    pages = [sra.Page(url="https://mio.it/", status=200,
+                      text="x", word_count=300)]
+    scores = {sra.AREA_TECH: 70.0, sra.AREA_LEX: 60.0,
+              sra.AREA_SEM: 50.0, sra.AREA_SD: 40.0,
+              sra.AREA_RRF: 30.0}
+    findings = [
+        sra.Finding(sra.AREA_TECH, sra.SEV_CRITICAL,
+                    "Sito non in HTTPS",
+                    "Dettaglio con | pipe;e punto e virgola",
+                    "Attiva il TLS", url="https://mio.it/"),
+        sra.Finding(sra.AREA_LEX, sra.SEV_OK, "Title a posto"),
+    ]
+    return pages, scores, findings
+
+
+def test_render_markdown_struttura():
+    pages, scores, findings = _dati_render()
+    md = sra.render_markdown("https://mio.it", pages, findings,
+                             scores, [], "char-tfidf")
+    assert md.startswith("# Audit SEO + RRF — https://mio.it")
+    assert "| Area | Punteggio |" in md
+    assert "- [ ] **1.** Sito non in HTTPS" in md, \
+        "il piano e' una task list spuntabile"
+    assert "**[CRITICO]** Sito non in HTTPS" in md
+    assert "[ok] Title a posto" in md
+    assert "Profili di citabilita'" in md
+
+
+def test_render_csv_rilievi():
+    import csv as _csv
+    import io as _io
+    pages, scores, findings = _dati_render()
+    out = sra.render_csv("https://mio.it", pages, findings,
+                         scores, [], "char-tfidf")
+    assert out.startswith("﻿"), "BOM per Excel"
+    rows = list(_csv.reader(_io.StringIO(out.lstrip("﻿")),
+                            delimiter=";"))
+    assert rows[0][:4] == ["sito", "area", "gravita", "peso"]
+    assert len(rows) == 3  # intestazione + 2 rilievi
+    critico = rows[1]
+    assert critico[2] == "critical"
+    assert critico[4] == "Sito non in HTTPS"
+    assert "| pipe;e punto e virgola" in critico[5], \
+        "quoting corretto di ; e |"
+    assert critico[8] == "ore" and critico[9] == "", \
+        "quick win solo per i critici da minuti"
+    ok = rows[2]
+    assert ok[8] == "" and ok[9] == "", \
+        "sforzo solo per i rilievi azionabili"
+
+
+def test_cli_formato_md(site, tmp_path):
+    out = tmp_path / "referto.md"
+    rc = sra.main([site, "--max-pages", "2", "--delay", "0",
+                   "--format", "md", "--output", str(out),
+                   "--quiet"])
+    assert rc == 1
+    testo = out.read_text(encoding="utf-8")
+    assert testo.startswith("# Audit SEO + RRF")
+    assert "- [ ] **1.**" in testo

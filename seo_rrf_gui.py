@@ -64,7 +64,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.12.0"
+__version__ = "2.13.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -503,6 +503,14 @@ class Job:
                                     results, mode, k, competitive,
                                     market=market, judge=judge,
                                     delta=delta),
+            "md": sra.render_markdown(base, pages, findings,
+                                      scores, results, mode, k,
+                                      competitive, market=market,
+                                      judge=judge, delta=delta),
+            "csv": sra.render_csv(base, pages, findings, scores,
+                                  results, mode, k, competitive,
+                                  market=market, judge=judge,
+                                  delta=delta),
         }
         severities = [f.severity for f in findings]
         clean, flagged, broken = sra.page_status_counts(pages,
@@ -899,16 +907,22 @@ class Handler(BaseHTTPRequestHandler):
                 return
             fmt = path.rsplit("/", 1)[-1]
             report = JOB.report(fmt)
-            if fmt not in ("html", "json", "text") or report is None:
+            if fmt not in ("html", "json", "text", "md", "csv") \
+                    or report is None:
                 self._send_json(404, {"error": "referto non disponibile"})
                 return
             ctypes = {"html": CONTENT_TYPES[".html"],
                       "json": CONTENT_TYPES[".json"],
-                      "text": "text/plain; charset=utf-8"}
+                      "text": "text/plain; charset=utf-8",
+                      "md": "text/markdown; charset=utf-8",
+                      "csv": "text/csv; charset=utf-8"}
             download = ""
             if "download" in self.path:
-                ext = {"html": "html", "json": "json", "text": "txt"}
-                download = "referto-seo-rrf.%s" % ext[fmt]
+                ext = {"html": "html", "json": "json",
+                       "text": "txt", "md": "md", "csv": "csv"}
+                nome = ("rilievi-seo-rrf" if fmt == "csv"
+                        else "referto-seo-rrf")
+                download = "%s.%s" % (nome, ext[fmt])
             self._send(200, report.encode("utf-8"), ctypes[fmt],
                        download=download)
         elif path.startswith("/api/"):

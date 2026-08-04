@@ -152,7 +152,8 @@
 
   function updateDownloadGate() {
     const locked = !me || !me.profile_complete;
-    ["dl-html", "dl-json", "dl-text", "open-report"].forEach((id) => {
+    ["dl-html", "dl-json", "dl-text", "dl-md", "dl-csv",
+     "open-report"].forEach((id) => {
       const link = el(id);
       link.classList.toggle("disabled", locked);
       link.setAttribute("aria-disabled", locked ? "true" : "false");

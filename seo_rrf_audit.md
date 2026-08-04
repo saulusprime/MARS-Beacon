@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.33.0, ~5900
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.34.0, ~6100
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -543,6 +543,22 @@ semantica cambiata); le aggiunte di campi non lo toccano. I
 consumatori (pipeline, integrazioni, la stessa GUI) possono fare
 il gate su questo numero invece di interpretare la versione dello
 strumento, che cambia a ogni feature. 1 test nuovo (246 totali).
+
+Novità 1.34.0 (2026-08-04): renderer **Markdown** ed export **CSV**
+(`--format md|csv`, quinta e sesta uscita accanto a text/json/
+html). Il Markdown è GitHub-flavored, pensato per issue e PR: il
+**piano di remediation è una task list `- [ ]`** che incollata in
+una issue diventa una checklist spuntabile; punteggi, profili di
+citabilità, giudizio LLM, delta, rilievi per area, RRF per query e
+share of voice in tabelle, gravità come marcatori testuali, pipe
+escapate nelle celle. Il CSV è **una riga per rilievo** (sito,
+area, gravità, peso, titolo, dettaglio, correzione, URL, sforzo,
+quick win — gli ultimi due solo per i rilievi azionabili), con
+delimitatore `;` e **BOM UTF-8** in testa per l'apertura diretta
+in Excel/Sheets. GUI 2.13.0: entrambi scaricabili dai risultati
+("Scarica Markdown", "Scarica CSV rilievi"), stesso gating del
+profilo completo. 3 test nuovi (249 totali), incluso il quoting
+CSV con `;` e `|` nei dettagli.
 
 ## Uso
 
