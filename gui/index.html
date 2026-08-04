@@ -750,6 +750,21 @@
       <div id="graph-block" hidden>
         <h3 class="h5">Architettura dei link interni</h3>
         <p class="small text-muted mb-2" id="graph-intro"></p>
+        <div class="mb-2" role="group"
+             aria-label="Controlli del grafo">
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-2"
+                  id="graph-zoom-in">Ingrandisci</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-2"
+                  id="graph-zoom-out">Riduci</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  id="graph-reset">Reimposta vista</button>
+        </div>
+        <p class="small mb-2" id="graph-info" role="status">
+          Seleziona un nodo (mouse o Tab) per i dettagli.
+        </p>
         <div id="graph-svg" class="mb-4"></div>
       </div>
 

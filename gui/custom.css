@@ -361,3 +361,19 @@ button.score-label.score-link:focus-visible {
     animation: none;
   }
 }
+
+/* Grafo dei link interattivo. */
+.graph-canvas {
+  touch-action: none;
+  cursor: grab;
+  max-height: 560px;
+}
+
+.graph-canvas .graph-node {
+  cursor: pointer;
+}
+
+.graph-canvas .graph-node:focus {
+  outline: none;
+  stroke-width: 3;
+}

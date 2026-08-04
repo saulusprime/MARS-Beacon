@@ -2,8 +2,9 @@
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
 di un sito. Consegnato in chat il 2026-08-03. Versione 1.38.0, ~6420
-righe, licenza MIT. Dal 2026-08-04 il prodotto si chiama **MARS
-Audit** (Meta-fusion, Accessibility, Ranking & Security Audit).
+righe (~6430), licenza MIT. Dal 2026-08-04 il prodotto si chiama
+**MARS Audit** (Meta-fusion, Accessibility, Ranking & Security
+Audit).
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
 (default 10 MB, opzione `--max-body`): scarico a blocchi interrotto al
@@ -623,6 +624,21 @@ referti text/html/markdown, descrizione della CLI, unit systemd,
 README e docstring. Nomi dei file, del repo e il campo `tool` del
 JSON restano invariati (nessun cambio di schema); i test e la
 verifica AT sono stati allineati al nuovo titolo.
+
+Novità 1.39.0 (2026-08-04): grafo dei link **interattivo** in GUI
+(2.18.0) e più leggibile nel referto — feedback dell'utente: la
+resa statica non era leggibile. Nel referto HTML (che resta senza
+JavaScript): canvas 780×540, layout con più iterazioni, nodi più
+grandi, etichette a 11px con **alone di sfondo**
+(`paint-order:stroke`, leggibili anche sopra gli archi), tutte
+visibili fino a 20 nodi. Nella GUI il grafo diventa uno strumento:
+**zoom** (rotella o pulsanti Ingrandisci/Riduci/Reimposta),
+**pan** trascinando lo sfondo, **trascinamento dei nodi** per
+districare le matasse, **evidenziazione del vicinato** al
+passaggio o al focus da tastiera (i nodi sono focusabili, con
+`aria-label` completa) e dettagli nella regione di stato
+`role="status"` — niente informazione solo-hover. Layout iniziale
+sempre dal core (deterministico); Pa11y 3/3.
 
 ## Uso
 

@@ -181,10 +181,13 @@ Cosa offre:
   entrambi anche nel referto HTML; gli eventi del grafico citazioni
   si aggiungono direttamente dalla GUI.
 - **Grafo dell'architettura dei link** (pattern Screaming Frog):
-  layout force-directed **deterministico calcolato in Python** (il
-  referto HTML resta senza JavaScript), home al centro, ampiezza dei
-  nodi = link in ingresso, ambra per le pagine oltre 3 click o senza
-  percorso, dettagli al passaggio del mouse.
+  layout force-directed **deterministico calcolato in Python**, home
+  al centro, ampiezza dei nodi = link in ingresso, ambra per le
+  pagine oltre 3 click o senza percorso. Nella GUI è **interattivo**:
+  zoom, pan, trascinamento dei nodi per districare, evidenziazione
+  del vicinato al passaggio o al focus da tastiera con i dettagli in
+  una regione di stato; nel referto HTML resta statico (niente
+  JavaScript) ma con etichette ad alone leggibili.
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, **profili di citabilità per assistente IA** (barre per
   profilo, indice composito col mercato scelto nel form e "top

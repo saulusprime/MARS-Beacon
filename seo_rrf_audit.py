@@ -102,7 +102,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.38.0"
+__version__ = "1.39.0"
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
 # storico --history), indipendente dalla versione dello strumento:
@@ -2064,13 +2064,17 @@ def depth_distribution(pages: Sequence[Page],
 
 
 # Grafo dell'architettura: dimensioni del canvas e tetto ai nodi.
-GRAPH_W, GRAPH_H = 460.0, 320.0
+# Canvas ampio e piu' iterazioni dalla v1.39.0: il disegno statico
+# del referto deve restare leggibile anche con decine di nodi.
+GRAPH_W, GRAPH_H = 780.0, 540.0
 GRAPH_MAX_NODES = 60
+GRAPH_LABEL_ALL = 20  # fino a qui si etichettano tutti i nodi
 
 
 def _force_layout(count: int, links: Sequence[Tuple[int, int]],
                   width: float = GRAPH_W, height: float = GRAPH_H,
-                  iterations: int = 80) -> List[Tuple[float, float]]:
+                  iterations: int = 150
+                  ) -> List[Tuple[float, float]]:
     """Layout force-directed deterministico (Fruchterman-Reingold).
 
     Inizializzazione su un cerchio (niente casualita': stesso
@@ -5251,16 +5255,19 @@ def render_html(base: str, pages: List[Page],
                 "y2=\"%.1f\" stroke=\"var(--line)\" "
                 "stroke-width=\"0.8\"/>"
                 % (a["x"], a["y"], b["x"], b["y"]))
-        labelled = {n["url"] for n in sorted(
-            nodes, key=lambda n: (not n["home"],
-                                  -n["incoming"]))[:10]}
+        if len(nodes) <= GRAPH_LABEL_ALL:
+            labelled = {n["url"] for n in nodes}
+        else:
+            labelled = {n["url"] for n in sorted(
+                nodes, key=lambda n: (not n["home"],
+                                      -n["incoming"]))[:12]}
         for node in nodes:
             problematico = (node["depth"] is None
                             or node["depth"] > 3)
             hue = ("var(--accent)" if node["home"] else
                    "var(--warn)" if problematico else
                    "var(--good)")
-            r = min(13.0, 4.0 + 1.5 * node["incoming"] ** 0.5)
+            r = min(15.0, 5.0 + 1.8 * node["incoming"] ** 0.5)
             profondita = ("%d click" % node["depth"]
                           if node["depth"] is not None
                           else "solo da sitemap")
@@ -5273,11 +5280,15 @@ def render_html(base: str, pages: List[Page],
                    esc(str(node["label"])), node["incoming"],
                    profondita))
             if node["url"] in labelled:
+                # Alone chiaro sotto il testo: leggibile anche
+                # quando l'etichetta attraversa un arco.
                 parts.append(
-                    "<text x=\"%.1f\" y=\"%.1f\" font-size=\"9\" "
-                    "fill=\"var(--fg)\">%s</text>"
-                    % (node["x"] + r + 2, node["y"] + 3,
-                       esc(str(node["label"])[:28])))
+                    "<text x=\"%.1f\" y=\"%.1f\" font-size=\"11\" "
+                    "fill=\"var(--fg)\" stroke=\"var(--bg)\" "
+                    "stroke-width=\"3\" paint-order=\"stroke\">"
+                    "%s</text>"
+                    % (node["x"] + r + 3, node["y"] + 4,
+                       esc(str(node["label"])[:30])))
         parts.append("</svg></section>")
 
     math = surface_math(pages)

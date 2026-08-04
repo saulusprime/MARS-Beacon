@@ -1966,6 +1966,28 @@
     block.hidden = false;
   }
 
+  /* Grafo dei link interattivo: zoom (rotella o pulsanti), pan
+     (trascina lo sfondo), trascinamento dei nodi per districare,
+     evidenziazione del vicinato al passaggio/focus con dettagli
+     nella regione di stato. Layout iniziale calcolato dal core. */
+  const graphView = { vb: null, base: null };
+
+  function graphApplyView(svg) {
+    svg.setAttribute("viewBox", graphView.vb.join(" "));
+  }
+
+  function graphZoom(svg, factor, cx, cy) {
+    const [x, y, w, h] = graphView.vb;
+    const nw = Math.max(60, Math.min(graphView.base[2] * 3,
+      w * factor));
+    const nh = nw * graphView.base[3] / graphView.base[2];
+    const fx = cx === undefined ? x + w / 2 : cx;
+    const fy = cy === undefined ? y + h / 2 : cy;
+    graphView.vb = [fx - (fx - x) * nw / w,
+      fy - (fy - y) * nh / h, nw, nh];
+    graphApplyView(svg);
+  }
+
   function renderLinkGraph(graph) {
     const block = el("graph-block");
     const box = el("graph-svg");
@@ -1975,60 +1997,182 @@
       return;
     }
     el("graph-intro").textContent =
-      "Ogni cerchio è una pagina (ampiezza = link in ingresso), " +
-      "la home è al centro; in ambra le pagine oltre 3 click o " +
-      "senza percorso di link. Mostrate " + graph.nodes.length +
-      " pagine su " + graph.total +
-      ". Passa sui cerchi per i dettagli.";
+      "Ogni cerchio è una pagina (ampiezza = link in ingresso); " +
+      "in ambra le pagine oltre 3 click o senza percorso di " +
+      "link. Mostrate " + graph.nodes.length + " pagine su " +
+      graph.total + ". Trascina i nodi per districare, rotella " +
+      "o pulsanti per lo zoom, trascina lo sfondo per spostarti.";
+
+    graphView.base = [0, 0, graph.width, graph.height];
+    graphView.vb = graphView.base.slice();
     const svg = svgNode("svg", {
-      viewBox: "0 0 " + graph.width + " " + graph.height,
-      class: "history-trend-svg",
+      viewBox: graphView.vb.join(" "),
+      class: "history-trend-svg graph-canvas",
       role: "img",
-      "aria-label": "Grafo dei link interni: orfane e " +
-        "profondità sono nei rilievi dell'area tecnica",
+      "aria-label": "Grafo interattivo dei link interni: " +
+        "orfane e profondità sono nei rilievi dell'area tecnica",
     });
-    graph.links.forEach((link) => {
-      const a = graph.nodes[link.source];
-      const b = graph.nodes[link.target];
-      svg.appendChild(svgNode("line", {
-        x1: a.x, y1: a.y, x2: b.x, y2: b.y,
-        stroke: "#d8d8d2", "stroke-width": 0.8,
-      }));
+
+    const pos = graph.nodes.map((n) => ({ x: n.x, y: n.y }));
+    const vicini = graph.nodes.map(() => []);
+    const edgeEls = graph.links.map((link) => {
+      const line = svgNode("line", {
+        stroke: "#d8d8d2", "stroke-width": 1,
+      });
+      vicini[link.source].push(link.target);
+      vicini[link.target].push(link.source);
+      svg.appendChild(line);
+      return line;
     });
-    const etichettati = graph.nodes.slice()
+    const mostraTutte = graph.nodes.length <= 20;
+    const top = graph.nodes.slice()
       .sort((m, n) => (n.home - m.home) ||
         (n.incoming - m.incoming))
-      .slice(0, 10)
-      .map((n) => n.url);
-    graph.nodes.forEach((node) => {
+      .slice(0, 12).map((n) => n.url);
+
+    const nodeEls = [];
+    const labelEls = [];
+    graph.nodes.forEach((node, i) => {
       const problematico = node.depth === null || node.depth > 3;
       const hue = node.home ? "#186078"
         : problematico ? "#9a6a00" : "#1c6b45";
-      const r = Math.min(13, 4 + 1.5 * Math.sqrt(node.incoming));
+      const r = Math.min(15, 5 + 1.8 * Math.sqrt(node.incoming));
       const circle = svgNode("circle", {
-        cx: node.x, cy: node.y, r: r, fill: hue,
-        "fill-opacity": "0.75", stroke: hue,
+        r: r, fill: hue, "fill-opacity": "0.8", stroke: hue,
+        tabindex: "0", role: "img",
+        "aria-label": node.label + ": " + node.incoming +
+          " link in ingresso, " + (node.depth === null
+            ? "solo da sitemap" : node.depth + " click"),
+        class: "graph-node",
       });
-      const title = svgNode("title", {});
-      title.textContent = node.label + " — " + node.incoming +
-        " link in ingresso, " +
-        (node.depth === null ? "solo da sitemap"
-          : node.depth + " click");
-      circle.appendChild(title);
       svg.appendChild(circle);
-      if (etichettati.indexOf(node.url) !== -1) {
-        const text = svgNode("text", {
-          x: node.x + r + 2, y: node.y + 3, "font-size": 9,
-          fill: "#14272b",
-        });
-        text.textContent = node.label.slice(0, 28);
-        svg.appendChild(text);
+      nodeEls.push(circle);
+      const text = svgNode("text", {
+        "font-size": 12, fill: "#14272b", stroke: "#ffffff",
+        "stroke-width": 3, "paint-order": "stroke",
+        "pointer-events": "none",
+      });
+      text.textContent = node.label.slice(0, 30);
+      if (!mostraTutte && top.indexOf(node.url) === -1) {
+        text.setAttribute("visibility", "hidden");
+      }
+      svg.appendChild(text);
+      labelEls.push(text);
+    });
+
+    function place(i) {
+      nodeEls[i].setAttribute("cx", pos[i].x);
+      nodeEls[i].setAttribute("cy", pos[i].y);
+      labelEls[i].setAttribute("x", pos[i].x + 8);
+      labelEls[i].setAttribute("y", pos[i].y + 4);
+    }
+    function placeEdges() {
+      graph.links.forEach((link, k) => {
+        edgeEls[k].setAttribute("x1", pos[link.source].x);
+        edgeEls[k].setAttribute("y1", pos[link.source].y);
+        edgeEls[k].setAttribute("x2", pos[link.target].x);
+        edgeEls[k].setAttribute("y2", pos[link.target].y);
+      });
+    }
+    graph.nodes.forEach((_n, i) => place(i));
+    placeEdges();
+
+    function evidenzia(i) {
+      nodeEls.forEach((c, j) => c.setAttribute("fill-opacity",
+        j === i || vicini[i].indexOf(j) !== -1 ? "0.95" : "0.25"));
+      graph.links.forEach((link, k) => {
+        const suo = link.source === i || link.target === i;
+        edgeEls[k].setAttribute("stroke",
+          suo ? "#186078" : "#e8e8e4");
+        edgeEls[k].setAttribute("stroke-width", suo ? 2 : 1);
+      });
+      labelEls[i].setAttribute("visibility", "visible");
+      const node = graph.nodes[i];
+      el("graph-info").textContent = node.label + " — " +
+        node.incoming + " link in ingresso, " +
+        (node.depth === null ? "raggiungibile solo da sitemap"
+          : node.depth + " click dalla home") + ", " +
+        vicini[i].length + " collegamenti mostrati.";
+    }
+    function spegni() {
+      nodeEls.forEach((c) => c.setAttribute("fill-opacity", "0.8"));
+      graph.links.forEach((_l, k) => {
+        edgeEls[k].setAttribute("stroke", "#d8d8d2");
+        edgeEls[k].setAttribute("stroke-width", 1);
+      });
+      labelEls.forEach((t, j) => {
+        if (!mostraTutte && top.indexOf(graph.nodes[j].url) === -1) {
+          t.setAttribute("visibility", "hidden");
+        }
+      });
+    }
+
+    function svgPoint(event) {
+      const rect = svg.getBoundingClientRect();
+      const [x, y, w, h] = graphView.vb;
+      return [x + (event.clientX - rect.left) / rect.width * w,
+        y + (event.clientY - rect.top) / rect.height * h];
+    }
+
+    let dragNode = null;
+    let panFrom = null;
+    nodeEls.forEach((circle, i) => {
+      circle.addEventListener("pointerenter", () => evidenzia(i));
+      circle.addEventListener("focus", () => evidenzia(i));
+      circle.addEventListener("pointerleave", spegni);
+      circle.addEventListener("blur", spegni);
+      circle.addEventListener("pointerdown", (event) => {
+        dragNode = i;
+        circle.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      circle.addEventListener("pointermove", (event) => {
+        if (dragNode !== i) { return; }
+        const [px, py] = svgPoint(event);
+        pos[i].x = px;
+        pos[i].y = py;
+        place(i);
+        placeEdges();
+      });
+      circle.addEventListener("pointerup", () => {
+        dragNode = null;
+      });
+    });
+    svg.addEventListener("pointerdown", (event) => {
+      if (event.target === svg) {
+        panFrom = [event.clientX, event.clientY,
+          graphView.vb.slice()];
+        svg.setPointerCapture(event.pointerId);
       }
     });
+    svg.addEventListener("pointermove", (event) => {
+      if (!panFrom) { return; }
+      const rect = svg.getBoundingClientRect();
+      const scala = graphView.vb[2] / rect.width;
+      graphView.vb = [
+        panFrom[2][0] - (event.clientX - panFrom[0]) * scala,
+        panFrom[2][1] - (event.clientY - panFrom[1]) * scala,
+        panFrom[2][2], panFrom[2][3]];
+      graphApplyView(svg);
+    });
+    svg.addEventListener("pointerup", () => { panFrom = null; });
+    svg.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const [cx, cy] = svgPoint(event);
+      graphZoom(svg, event.deltaY > 0 ? 1.2 : 1 / 1.2, cx, cy);
+    }, { passive: false });
+
+    el("graph-zoom-in").onclick = () => graphZoom(svg, 1 / 1.4);
+    el("graph-zoom-out").onclick = () => graphZoom(svg, 1.4);
+    el("graph-reset").onclick = () => {
+      graphView.vb = graphView.base.slice();
+      graphApplyView(svg);
+    };
+
     box.appendChild(svg);
     block.hidden = false;
   }
-
   function renderRemediation(plan) {
     const block = el("remediation-block");
     const list = el("remediation-list");
