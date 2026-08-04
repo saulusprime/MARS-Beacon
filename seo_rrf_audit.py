@@ -98,7 +98,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.19.0"
+__version__ = "1.20.0"
 
 # La pagina indicata nello user agent spiega chi e' il bot e come
 # escluderlo; sovrascrivibile con --user-agent.
@@ -314,6 +314,28 @@ more most my no nor not of off on once only or other our out over own
 same she should so some such than that the their them then there
 these they this those through to too under until up very was we were
 what when where which while who whom why will with you your
+au aux avec ce ces cette dans des donc du elle elles en est et été
+être il ils je leur leurs lui mais même mes moi mon nos notre nous
+où par pas plus pour qu que qui sa se ses son sont sur tes toi ton
+une vos votre vous comme aussi bien tout tous toute toutes très sans
+sous entre alors avant après chez encore toujours quand pourquoi
+combien quel quelle quels quelles
+aber alle allem allen aller alles als also am an ander andere auch
+auf aus bei bin bis bist da damit dann das dass dein deine dem den
+denn der des dessen dich die dies diese diesem diesen dieser dieses
+doch dort du durch ein eine einem einen einer eines er es für habe
+haben hat hatte hier ich ihr ihre im ist ja jede jedem jeden jeder
+jedes kann kein keine können machen man mein meine mit muss nach
+nicht nichts noch nun nur ob oder ohne sehr sein seine sich sie sind
+so über um und uns unser unter vom von vor war waren warum was wenn
+werden wie wieder will wir wird wo zu zum zur
+al algo algunas algunos ante antes contra cual cuando desde donde
+dos ella ellas ellos era eran esa esas ese eso esos esta estas este
+esto estos fue fueron había han hasta hay las les los más mis mucho
+muy nada ni nosotros nuestra nuestro os otra otras otro otros para
+pero poco porque quien quienes qué ser sin sobre sois somos son soy
+sus también tiene tienen todo todos tus unos usted vosotros ya yo
+cómo cuánto cuál dónde
 """.split())
 
 QUESTION_STARTERS: Tuple[str, ...] = (
@@ -321,6 +343,13 @@ QUESTION_STARTERS: Tuple[str, ...] = (
     "quanti", "quante", "quale", "quali", "chi", "dove", "conviene",
     "what", "how", "when", "why", "which", "who", "where", "is", "are",
     "can", "does", "do",
+    "comment", "pourquoi", "combien", "quel", "quelle", "quels",
+    "quelles", "qu'est", "est-ce", "où",
+    "wie", "was", "warum", "wann", "welche", "welcher", "welches",
+    "wer", "wo", "ist", "sind", "kann",
+    "cómo", "cuándo", "cuánto", "cuánta", "cuántos", "cuál",
+    "cuáles", "quién", "dónde", "qué", "que es", "por que",
+    "por qué", "puede",
 )
 
 DEFINITION_RE = re.compile(
@@ -329,27 +358,50 @@ DEFINITION_RE = re.compile(
     r"|\bconsiste\s+(?:in|nel|nella)\b"
     r"|\bsi\s+definisce\b"
     r"|\bsignifica\b"
-    r"|\bis\s+a\b|\brefers\s+to\b|\bmeans\b",
+    r"|\bis\s+a\b|\brefers\s+to\b|\bmeans\b"
+    r"|\best\s+(?:un|une|le|la|l')\b"
+    r"|\bil\s+s'agit\s+de\b|\bconsiste\s+(?:à|en)\b"
+    r"|\bsignifie\b|\bdésigne\b"
+    r"|\bist\s+(?:ein|eine|der|die|das)\b"
+    r"|\bbezeichnet\b|\bbedeutet\b"
+    r"|\bversteht\s+man\b|\bhandelt\s+es\s+sich\s+um\b"
+    r"|\bes\s+(?:un|una|el|la)\b|\bse\s+trata\s+de\b"
+    r"|\bconsiste\s+en\b|\bse\s+define\s+como\b",
     re.IGNORECASE,
 )
 
 EXAMPLE_RE = re.compile(
     r"\b(?:ad\s+esempio|per\s+esempio|esempio|es\.|caso\s+studio"
-    r"|case\s+study|for\s+example|e\.g\.)\b",
+    r"|case\s+study|for\s+example|e\.g\."
+    r"|par\s+exemple|p\.\s?ex\.|exemple"
+    r"|zum\s+beispiel|z\.\s?b\.|beispielsweise"
+    r"|por\s+ejemplo|p\.\s?ej\.|ejemplo)\b",
     re.IGNORECASE,
 )
 
-# Aperture anaforiche: un chunk che inizia cosi' non e' autoconsistente.
+# Aperture anaforiche: un chunk che inizia cosi' non e'
+# autoconsistente. In tedesco i pronomi nudi es/er/sie restano
+# fuori apposta: "Es gibt..." e' un espletivo comunissimo, non
+# un'anafora.
 ANAPHORA_RE = re.compile(
     r"^(?:questo|questa|questi|queste|cio'|ciò|esso|essa|essi|esse"
     r"|tale|tali|lo\s+stesso|la\s+stessa|quest'|it|this|that|these"
-    r"|those|they|he|she|such)\b",
+    r"|those|they|he|she|such"
+    r"|cela|celui|celle|celles|ceux|ce\s+dernier"
+    r"|cette\s+derni[èe]re"
+    r"|dies|diese|dieser|dieses|diesem|diesen|derselbe|dieselbe"
+    r"|solche|solcher|solches"
+    r"|esto|esta|este|estos|estas|eso|esa|ese|esos|esas|ello"
+    r"|dicho|dicha|dichos|dichas|el\s+mismo|la\s+misma)\b",
     re.IGNORECASE,
 )
 
 FAQ_HINT_RE = re.compile(
     r"\b(?:faq|domande\s+frequenti|domande\s+e\s+risposte"
-    r"|frequently\s+asked)\b",
+    r"|frequently\s+asked"
+    r"|foire\s+aux\s+questions|questions\s+fr[ée]quentes"
+    r"|h[äa]ufig\s+gestellte\s+fragen|h[äa]ufige\s+fragen"
+    r"|preguntas\s+frecuentes|preguntas\s+y\s+respuestas)\b",
     re.IGNORECASE,
 )
 
@@ -2404,7 +2456,7 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
 
 def is_question(text: str) -> bool:
     """Riconosce un heading formulato come domanda."""
-    clean = text.strip().lower()
+    clean = text.strip().lower().lstrip("¿¡ ")
     if clean.endswith("?"):
         return True
     return any(clean.startswith(w) for w in QUESTION_STARTERS)
@@ -2799,6 +2851,48 @@ class QueryResult:
     covered: bool = False
 
 
+# Template delle query auto-generate, per lingua prevalente del
+# sito (attributo lang delle pagine). Il default resta l'italiano.
+QUERY_TEMPLATES: Dict[str, Tuple[str, ...]] = {
+    "it": ("cos'e' %s", "come funziona %s", "quanto costa %s"),
+    "en": ("what is %s", "how does %s work",
+           "how much does %s cost"),
+    "fr": ("qu'est-ce que %s", "comment fonctionne %s",
+           "combien coûte %s"),
+    "de": ("was ist %s", "wie funktioniert %s", "was kostet %s"),
+    "es": ("qué es %s", "cómo funciona %s", "cuánto cuesta %s"),
+}
+
+# Termini dei template (tutte le lingue): esclusi dai temi per non
+# produrre query degeneri tipo "come funziona funziona".
+QUERY_BANNED = {
+    "cosa", "costa", "costo", "funziona", "funzionamento", "come",
+    "quanto", "quali", "perche", "perché",
+    "what", "does", "work", "much", "cost",
+    "est", "que", "comment", "fonctionne", "combien", "coute",
+    "coûte",
+    "was", "ist", "wie", "funktioniert", "kostet",
+    "qué", "cómo", "cuánto", "cuanto", "cuesta",
+}
+
+
+def dominant_language(pages: Sequence[Page]) -> str:
+    """Lingua prevalente dichiarata dalle pagine (default 'it').
+
+    Conta gli attributi lang delle pagine analizzabili (senza la
+    regione: it-IT -> it); una lingua fuori da QUERY_TEMPLATES
+    ricade sull'italiano.
+    """
+    counts: Counter = Counter()
+    for page in pages:
+        if page.ok and page.lang:
+            counts[page.lang.split("-")[0].strip().lower()] += 1
+    if not counts:
+        return "it"
+    lang = counts.most_common(1)[0][0]
+    return lang if lang in QUERY_TEMPLATES else "it"
+
+
 def auto_queries(pages: List[Page], limit: int = 12) -> List[str]:
     """Genera query informative dai temi rilevati sul sito.
 
@@ -2808,9 +2902,8 @@ def auto_queries(pages: List[Page], limit: int = 12) -> List[str]:
     interrogativi sono esclusi per non produrre query degeneri del tipo
     "come funziona funziona".
     """
-    templates = ("cos'e' %s", "come funziona %s", "quanto costa %s")
-    banned = {"cosa", "costa", "costo", "funziona", "funzionamento",
-              "come", "quanto", "quali", "perche", "perché"}
+    templates = QUERY_TEMPLATES[dominant_language(pages)]
+    banned = QUERY_BANNED
     counts: Counter = Counter()
 
     for page in pages:

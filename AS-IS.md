@@ -5,7 +5,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.19.0
+## Strumento CLI — `seo_rrf_audit.py` v1.20.0
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -69,6 +69,13 @@ sono nel [README.md](README.md).
   insieme — salgono in testa e portano un badge dedicato in
   HTML/GUI; senza dati di citabilità l'ordinamento resta
   gravità+peso.
+- **Cinque lingue nell'analisi linguistica** (v1.20.0): stopword e
+  pattern di definizioni, esempi, anafore, FAQ e heading-domanda
+  coprono italiano, inglese, **francese, tedesco e spagnolo**
+  (liste e regex curate a mano, nessuna dipendenza; il "¿" spagnolo
+  è gestito; l'espletivo tedesco "Es gibt…" non conta come
+  anafora). Le query auto-generate usano i template della lingua
+  prevalente del sito (attributo `lang`; default italiano).
 - **Storico e delta anche nella CLI** (v1.19.0): `--history FILE`
   legge l'ultima esecuzione dello stesso sito dal JSONL, riporta
   nei tre referti la sezione "Rispetto all'esecuzione precedente"
@@ -358,7 +365,7 @@ sono nel [README.md](README.md).
   comportamento atteso per ciascuno e registro degli esiti da
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
 
-- **Suite pytest: 181 test in ~15 secondi** (`tests/`), senza rete
+- **Suite pytest: 189 test in ~15 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

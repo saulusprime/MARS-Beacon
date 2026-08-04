@@ -11,8 +11,6 @@ sono proposte.
 
 ## P1 — Qualità dell'analisi
 
-- [ ] Stopword e pattern linguistici oltre it/en (le regex di definizioni,
-      anafore e domande coprono solo italiano e inglese).
 - [ ] Opt-out IA di Microsoft: non esiste un token robots.txt dedicato
       (Bingbot è ricerca classica); valutare un controllo dei meta tag
       `noarchive`/`nocache` che governano Bing Chat/Copilot e il

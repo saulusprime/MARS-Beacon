@@ -1,7 +1,7 @@
 # seo_rrf_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.19.0, ~4830
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.20.0, ~4920
 righe, licenza MIT.
 
 Novità 1.1.0 (2026-08-03): tetto alla dimensione di ogni risposta HTTP
@@ -337,6 +337,22 @@ audit schedulato da cron + storico = monitoraggio headless. GUI
 2.11.0: il delta è calcolato prima dei render, così anche i tre
 referti scaricati includono la sezione. 4 test nuovi (181 totali)
 con doppia esecuzione CLI end-to-end.
+
+Novità 1.20.0 (2026-08-04): stopword e pattern linguistici oltre
+it/en — aggiunti **francese, tedesco e spagnolo**. Estesi:
+STOPWORDS (liste compatte curate a mano, nessuna dipendenza),
+DEFINITION_RE ("est une", "il s'agit de", "ist eine", "versteht
+man", "es una", "se trata de"…), EXAMPLE_RE ("par exemple", "zum
+Beispiel", "beispielsweise", "por ejemplo"…), ANAPHORA_RE ("cela",
+"diese", "esto", "dicha"… — i pronomi nudi tedeschi es/er/sie
+restano fuori apposta: "Es gibt…" è un espletivo, non un'anafora),
+FAQ_HINT_RE ("foire aux questions", "häufig gestellte Fragen",
+"preguntas frecuentes"…), QUESTION_STARTERS (con gestione del "¿"
+spagnolo in is_question). Le query auto-generate ora usano i
+template della **lingua prevalente del sito** (`dominant_language`
+dagli attributi lang; QUERY_TEMPLATES it/en/fr/de/es, default
+italiano invariato — anche per le lingue non supportate). 8 test
+nuovi (189 totali) con frasi campione nelle tre lingue.
 
 ## Uso
 

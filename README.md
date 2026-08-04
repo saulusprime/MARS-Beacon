@@ -81,7 +81,7 @@ python3 seo_rrf_audit.py https://esempio.it \
 | Opzione | Default | Effetto |
 |---|---|---|
 | `--max-pages N` | 25 | numero massimo di pagine analizzate |
-| `--queries FILE` | — | una query per riga; se omesso le query sono auto-generate dai bigrammi tematici di heading e title |
+| `--queries FILE` | — | una query per riga; se omesso le query sono auto-generate dai bigrammi tematici di heading e title, **nella lingua prevalente del sito** (it/en/fr/de/es dall'attributo `lang`; default italiano) |
 | `--embeddings MODELLO` | auto | modello sentence-transformers per il recupero vettoriale reale. Se omesso e la libreria è installata viene usato il modello multilingue predefinito; `none` forza il proxy char-TFIDF |
 | `--rrf-k N` | 60 | costante k della formula RRF (propagata a tutti i renderer) |
 | `--delay SEC` | 0.5 | pausa fra le richieste HTTP |
@@ -306,7 +306,9 @@ riproducibile.
    passaggi (aperture anaforiche), heading in forma di domanda, FAQ,
    definizioni, esempi, ampiezza del vocabolario, segnali **E-E-A-T**
    (autore dichiarato, date di pubblicazione/aggiornamento, pagina
-   "chi siamo", contatti verificabili).
+   "chi siamo", contatti verificabili). Stopword e pattern
+   linguistici (definizioni, anafore, esempi, FAQ, domande) coprono
+   **italiano, inglese, francese, tedesco e spagnolo** (v1.20.0).
 4. **Dati strutturati** — inventario dei tipi JSON-LD, entità principale,
    FAQPage, BreadcrumbList, WebSite, **validazione delle proprietà
    minime** per 23 tipi Schema.org (LocalBusiness, Article, Product,
@@ -427,7 +429,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 181 test, ~15 secondi, nessun accesso alla rete esterna
+pytest            # 189 test, ~15 secondi, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
