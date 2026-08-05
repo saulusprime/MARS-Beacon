@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""MARS Audit — Meta-fusion, Accessibility, Ranking & Security Audit.
+"""MARS Beacon — Meta-fusion, Accessibility, Ranking & Security Audit.
 
 Audit SEO e RRF (Reciprocal Rank Fusion) di un sito web.
 
@@ -102,7 +102,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.39.0"
+__version__ = "1.44.0"
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
 # storico --history), indipendente dalla versione dello strumento:
@@ -116,7 +116,7 @@ JSON_SCHEMA_VERSION = 1
 # escluderlo; sovrascrivibile con --user-agent.
 USER_AGENT = (
     "Mozilla/5.0 (compatible; SeoRrfAudit/%s; "
-    "+https://github.com/saulusprime/SEO-RRF)" % __version__
+    "+https://github.com/saulusprime/MARS-Beacon)" % __version__
 )
 
 # Token con cui lo strumento compare nel robots.txt (gruppo
@@ -178,13 +178,19 @@ RENDER_AUTO = "auto"
 RENDER_ALWAYS = "always"
 RENDER_MODES = (RENDER_OFF, RENDER_AUTO, RENDER_ALWAYS)
 RENDER_SETTLE_MS = 2500
-# Browser di sistema tentati se Playwright non ha un Chromium proprio.
+# Browser di sistema tentati se Playwright non ha un Chromium proprio
+# (percorsi Linux, macOS e Windows: i non pertinenti non esistono e
+# vengono semplicemente saltati).
 CHROME_PATHS = (
     "/usr/bin/google-chrome",
     "/usr/bin/google-chrome-stable",
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
     "/snap/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
 )
 RETRY_BACKOFF_S = 0.5   # attese: 0.5s, 1s, 2s... con tetto sotto
 RETRY_MAX_WAIT_S = 8.0
@@ -245,6 +251,24 @@ AREA_LEX = "Lessicale (BM25)"
 AREA_SEM = "Semantica (vettoriale)"
 AREA_SD = "Dati strutturati"
 AREA_RRF = "Simulazione RRF"
+
+# Tipologie MARS (Meta-fusion, Accessibility, Ranking, Security):
+# classificazione dei rilievi per pilastro di prodotto, usata dalla
+# GUI per separare i risultati. Ogni area ha un pilastro di default;
+# i singoli rilievi possono dichiararne uno diverso (campo
+# ``pillar`` del Finding: oggi i controlli di sicurezza dell'area
+# tecnica — HTTPS, http residuo, opt-out IA Microsoft).
+PILLAR_META = "meta-fusion"
+PILLAR_ACCESS = "accessibility"
+PILLAR_RANK = "ranking"
+PILLAR_SEC = "security"
+AREA_PILLARS: Dict[str, str] = {
+    AREA_TECH: PILLAR_ACCESS,
+    AREA_LEX: PILLAR_RANK,
+    AREA_SEM: PILLAR_RANK,
+    AREA_SD: PILLAR_RANK,
+    AREA_RRF: PILLAR_META,
+}
 
 # Profili euristici di citabilita' per assistente IA ("lenti per
 # modello"). ATTENZIONE: le preferenze attribuite a ciascun
@@ -778,10 +802,24 @@ class Finding:
     fix: str = ""
     url: str = ""
     weight: float = 1.0
+    # Tipologia MARS: vuoto = pilastro di default dell'area
+    # (AREA_PILLARS); valorizzato solo dai rilievi che deviano
+    # (es. sicurezza dentro l'area tecnica).
+    pillar: str = ""
     example: str = ""
+    # Internazionalizzazione: i testi canonici restano in italiano;
+    # ``key`` identifica il rilievo nel catalogo _FINDINGS_EN e
+    # ``params`` porta i valori dinamici gia' interpolati nei testi,
+    # cosi' i renderer possono riformattare i template tradotti.
+    # Senza chiave (o senza voce in catalogo) resta l'italiano.
+    key: str = ""
+    params: Dict[str, object] = field(default_factory=dict)
 
     def as_dict(self) -> Dict[str, object]:
-        return asdict(self)
+        data = asdict(self)
+        data["pillar"] = self.pillar \
+            or AREA_PILLARS.get(self.area, "")
+        return data
 
 
 EFFORT_MINUTES = "minuti"
@@ -868,6 +906,9 @@ def build_remediation(
             "effort": effort,
             "quick_win": (effort == EFFORT_MINUTES
                           and f.severity == SEV_CRITICAL),
+            # per la traduzione dei referti (finding_texts)
+            "key": f.key,
+            "params": dict(f.params),
         }
         if cit:
             item.update(notes[id(f)])
@@ -1200,7 +1241,8 @@ class RobotsAudit:
                 AREA_TECH, SEV_WARNING, "robots.txt non raggiungibile",
                 "Richiesta a %s fallita o non 200." % url,
                 "Pubblica un robots.txt che dichiari la sitemap.",
-                url=url,
+                url=url, key="tech.robots.missing",
+                params={"url": url},
                 example="# /robots.txt\nUser-agent: *\nDisallow:\n\n"
                         "Sitemap: https://esempio.it/sitemap.xml"))
             return findings
@@ -1213,7 +1255,9 @@ class RobotsAudit:
 
         findings.append(Finding(
             AREA_TECH, SEV_OK, "robots.txt presente",
-            "%d righe." % len(self.raw.splitlines()), url=url))
+            "%d righe." % len(self.raw.splitlines()), url=url,
+            key="tech.robots.present",
+            params={"n": len(self.raw.splitlines())}))
 
         blocked = [name for name in AI_CRAWLERS
                    if not self.parser.can_fetch(name, self.base)]
@@ -1225,7 +1269,8 @@ class RobotsAudit:
                 "bloccati non entri in nessuna lista di recupero e "
                 "l'RRF non ha nulla da fondere.",
                 "Rimuovi i Disallow per gli agenti che vuoi ti citino.",
-                url=url, weight=2.0,
+                url=url, weight=2.0, key="tech.robots.ai_blocked",
+                params={"agents": ", ".join(blocked)},
                 example="# robots.txt - sblocca gli agenti IA\n"
                         "User-agent: GPTBot\nDisallow:\n\n"
                         "User-agent: ClaudeBot\nDisallow:\n\n"
@@ -1233,18 +1278,22 @@ class RobotsAudit:
         else:
             findings.append(Finding(
                 AREA_TECH, SEV_OK, "Crawler IA ammessi",
-                "Verificati: %s." % ", ".join(AI_CRAWLERS), url=url))
+                "Verificati: %s." % ", ".join(AI_CRAWLERS), url=url,
+                key="tech.robots.ai_allowed",
+                params={"agents": ", ".join(AI_CRAWLERS)}))
 
         if self.sitemaps:
             findings.append(Finding(
                 AREA_TECH, SEV_OK, "Sitemap dichiarata nel robots.txt",
-                ", ".join(self.sitemaps), url=url))
+                ", ".join(self.sitemaps), url=url,
+                key="tech.robots.sitemap_ok",
+                params={"urls": ", ".join(self.sitemaps)}))
         else:
             findings.append(Finding(
                 AREA_TECH, SEV_WARNING,
                 "Nessuna sitemap dichiarata nel robots.txt",
                 fix="Aggiungi la riga 'Sitemap: https://.../sitemap.xml'.",
-                url=url,
+                url=url, key="tech.robots.sitemap_missing",
                 example="# in fondo al robots.txt\n"
                         "Sitemap: https://esempio.it/sitemap.xml"))
         return findings
@@ -1981,13 +2030,15 @@ def check_llms_txt(base: str, fetcher: Fetcher) -> Finding:
             and "html" not in resp.headers.get("Content-Type", ""):
         return Finding(
             AREA_TECH, SEV_OK, "llms.txt presente",
-            "%d righe." % len(resp.text.splitlines()), url=url)
+            "%d righe." % len(resp.text.splitlines()), url=url,
+            key="tech.llms.present",
+            params={"n": len(resp.text.splitlines())})
     return Finding(
         AREA_TECH, SEV_INFO, "llms.txt assente",
         "Standard emergente (llmstxt.org): un indice in Markdown "
         "dei contenuti chiave pensato per gli agenti IA.",
         "Valuta di pubblicare /llms.txt con i contenuti chiave.",
-        url=url)
+        url=url, key="tech.llms.missing")
 
 
 def _build_link_edges(good: Sequence[Page]) -> Tuple[
@@ -2197,13 +2248,17 @@ def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
             "nessuno linka riceve meno scansioni e meno peso."
             % ", ".join(orphans[:5]),
             "Linkale dalle pagine correlate (testo, menu o footer).",
+            key="tech.links.orphans",
+            params={"n": len(orphans),
+                    "urls": ", ".join(orphans[:5])},
             example="Dalla pagina correlata:\n"
                     "<a href=\"/servizio-collegato/\">nome "
                     "descrittivo del servizio</a>"))
     else:
         out.append(Finding(
             AREA_TECH, SEV_OK,
-            "Tutte le pagine hanno link interni in ingresso"))
+            "Tutte le pagine hanno link interni in ingresso",
+            key="tech.links.no_orphans"))
 
     if home in edges:
         depth = _bfs_depths(edges, home)
@@ -2214,7 +2269,10 @@ def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
                 "%d pagina/e oltre 3 click dalla home" % len(deep),
                 ", ".join(deep[:5]) + ".",
                 "Accorcia i percorsi: le pagine profonde vengono "
-                "scansionate e pesate meno."))
+                "scansionate e pesate meno.",
+                key="tech.links.deep",
+                params={"n": len(deep),
+                        "urls": ", ".join(deep[:5])}))
 
     generic = sum(p.generic_anchors for p in good)
     if generic:
@@ -2224,7 +2282,9 @@ def _audit_link_graph(pages: List[Page], base: str) -> List[Finding]:
             "Testi come \"clicca qui\" o \"leggi di piu'\" non "
             "dicono nulla sul contenuto di arrivo.",
             "Usa anchor descrittive con i termini della pagina "
-            "di destinazione."))
+            "di destinazione.",
+            key="tech.links.generic_anchors",
+            params={"n": generic}))
     return out
 
 
@@ -2268,7 +2328,11 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
             "spreca crawl budget e diluisce i segnali."
             % ", ".join(p.url for p in http_to_https[:5]),
             "Aggiorna sitemap e link interni agli URL https "
-            "definitivi.",
+            "definitivi.", pillar=PILLAR_SEC,
+            key="tech.redirect.http_left",
+            params={"n": len(http_to_https),
+                    "urls": ", ".join(
+                        p.url for p in http_to_https[:5])},
             example="<!-- prima --> <a href=\"http://esempio.it/"
                     "servizio/\">\n<!-- dopo  --> "
                     "<a href=\"https://esempio.it/servizio/\">"))
@@ -2280,7 +2344,11 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
             % ", ".join("%s -> %s" % (p.url, p.final_url)
                         for p in www_mismatch[:5]),
             "Usa un solo host (con o senza www) in sitemap e link "
-            "interni."))
+            "interni.", key="tech.redirect.www_mixed",
+            params={"n": len(www_mismatch),
+                    "urls": ", ".join(
+                        "%s -> %s" % (p.url, p.final_url)
+                        for p in www_mismatch[:5])}))
     if moved:
         out.append(Finding(
             AREA_TECH, SEV_WARNING,
@@ -2290,6 +2358,11 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
                         for p in moved[:5]),
             "Aggiorna sitemap e link interni alla destinazione "
             "finale dei redirect.",
+            key="tech.redirect.moved",
+            params={"n": len(moved),
+                    "urls": ", ".join(
+                        "%s -> %s" % (p.url, p.final_url)
+                        for p in moved[:5])},
             example="Nella sitemap e nei link interni usa gia' "
                     "l'URL di arrivo:\n<url><loc>https://esempio.it/"
                     "nuova-pagina/</loc></url>"))
@@ -2302,6 +2375,11 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
                       for p in chains[:5]) + ".",
             "Fai puntare ogni redirect direttamente alla "
             "destinazione finale (un solo passaggio).", weight=2.0,
+            key="tech.redirect.chains",
+            params={"n": len(chains),
+                    "urls": ", ".join(
+                        "%s (%d)" % (p.url, p.redirects)
+                        for p in chains[:5])},
             example="# un solo salto, non a catena\n"
                     "Redirect 301 /vecchia/ "
                     "https://esempio.it/nuova/\n"
@@ -2309,7 +2387,8 @@ def _audit_redirects(pages: List[Page]) -> List[Finding]:
     if not (http_to_https or www_mismatch or moved):
         out.append(Finding(
             AREA_TECH, SEV_OK, "Nessun redirect interno",
-            "Tutti gli URL analizzati rispondono direttamente."))
+            "Tutti gli URL analizzati rispondono direttamente.",
+            key="tech.redirect.none"))
     return out
 
 
@@ -2355,7 +2434,10 @@ def _audit_msft_ai_optout(pages: Sequence[Page]) -> List[Finding]:
             "una presenza parziale (solo titolo, URL e snippet) "
             "usa nocache.",
             example="<meta name=\"bingbot\" content=\"nocache\">",
-            weight=2.0))
+            weight=2.0, pillar=PILLAR_SEC,
+            key="tech.msft.noarchive",
+            params={"n": len(noarchive),
+                    "urls": ", ".join(sorted(noarchive)[:5])}))
     if nocache:
         out.append(Finding(
             AREA_TECH, SEV_INFO,
@@ -2367,7 +2449,10 @@ def _audit_msft_ai_optout(pages: Sequence[Page]) -> List[Finding]:
             % ", ".join(sorted(nocache)[:5]),
             "Scelta legittima di opt-out parziale: verifica solo "
             "che sia voluta. Per la piena citabilita' su Copilot "
-            "rimuovi il meta."))
+            "rimuovi il meta.", pillar=PILLAR_SEC,
+            key="tech.msft.nocache",
+            params={"n": len(nocache),
+                    "urls": ", ".join(sorted(nocache)[:5])}))
     if not noarchive and not nocache:
         out.append(Finding(
             AREA_TECH, SEV_OK,
@@ -2377,7 +2462,8 @@ def _audit_msft_ai_optout(pages: Sequence[Page]) -> List[Finding]:
             "noarchive/nocache, qui assenti. I contenuti sono "
             "quindi utilizzabili nelle risposte di Copilot e nel "
             "training Microsoft; per l'opt-out usa noarchive "
-            "(totale) o nocache (parziale)."))
+            "(totale) o nocache (parziale).", pillar=PILLAR_SEC,
+            key="tech.msft.no_optout"))
     return out
 
 
@@ -2408,7 +2494,11 @@ def _audit_anchor_variety(good: Sequence[Page]) -> List[Finding]:
             "%d testi unici su %d coppie testo-destinazione "
             "(%.0f%%; soglia di prassi: %.0f%%)."
             % (len(by_text), len(pairs), 100 * ratio,
-               100 * ANCHOR_VARIETY_GOOD))]
+               100 * ANCHOR_VARIETY_GOOD),
+            key="tech.anchors.varied",
+            params={"texts": len(by_text), "pairs": len(pairs),
+                    "pct": 100 * ratio,
+                    "threshold": 100 * ANCHOR_VARIETY_GOOD})]
     ambigui = sorted(
         ((text, targets) for text, targets in by_text.items()
          if len(targets) > 1),
@@ -2431,7 +2521,14 @@ def _audit_anchor_variety(good: Sequence[Page]) -> List[Finding]:
                 "tutto\" -> /prezzi\n"
                 "Dopo:  \"Tutti i servizi di drenaggio\" -> "
                 "/servizi, \"Prezzi delle sedute\" -> /prezzi",
-        weight=1.0)]
+        weight=1.0, key="tech.anchors.repetitive",
+        params={"texts": len(by_text), "pairs": len(pairs),
+                "pct": 100 * ratio,
+                "threshold": 100 * ANCHOR_VARIETY_GOOD,
+                "examples": "; ".join(
+                    "\"%s\" -> %d destinazioni"
+                    % (text, len(targets))
+                    for text, targets in ambigui)})]
 
 
 OG_CORE = ("og:title", "og:description", "og:image")
@@ -2455,6 +2552,9 @@ def _audit_basic_meta(good: Sequence[Page]) -> List[Finding]:
             % len(no_charset),
             ", ".join(sorted(no_charset)[:5]),
             "Dichiara la codifica in testa all'<head>.",
+            key="tech.meta.charset",
+            params={"n": len(no_charset),
+                    "urls": ", ".join(sorted(no_charset)[:5])},
             example="<meta charset=\"utf-8\">"))
     no_viewport = [p.url for p in good if not p.has_viewport]
     if no_viewport:
@@ -2464,6 +2564,9 @@ def _audit_basic_meta(good: Sequence[Page]) -> List[Finding]:
             "Senza viewport la resa mobile non e' dichiarata: %s"
             % ", ".join(sorted(no_viewport)[:5]),
             "Aggiungi il viewport responsive.",
+            key="tech.meta.viewport",
+            params={"n": len(no_viewport),
+                    "urls": ", ".join(sorted(no_viewport)[:5])},
             example="<meta name=\"viewport\" "
                     "content=\"width=device-width, "
                     "initial-scale=1\">"))
@@ -2484,7 +2587,9 @@ def _audit_basic_meta(good: Sequence[Page]) -> List[Finding]:
             "titolo e immagine li decide chi incolla il link. %s"
             % ", ".join(sorted(no_og)[:5]),
             "Aggiungi almeno la triade og:title, og:description, "
-            "og:image.",
+            "og:image.", key="tech.meta.og_missing",
+            params={"n": len(no_og),
+                    "urls": ", ".join(sorted(no_og)[:5])},
             example="<meta property=\"og:title\" "
                     "content=\"Drenaggio linfatico a Parma\">\n"
                     "<meta property=\"og:description\" "
@@ -2499,13 +2604,16 @@ def _audit_basic_meta(good: Sequence[Page]) -> List[Finding]:
             "Open Graph incompleto su %d pagina/e" % len(partial),
             "; ".join(partial[:5]),
             "Completa la triade og:title, og:description, "
-            "og:image."))
+            "og:image.", key="tech.meta.og_partial",
+            params={"n": len(partial),
+                    "urls": "; ".join(partial[:5])}))
     if not out and good:
         out.append(Finding(
             AREA_TECH, SEV_OK,
             "Meta di base a posto",
             "charset, viewport e Open Graph completi su tutte le "
-            "%d pagine analizzate." % len(good)))
+            "%d pagine analizzate." % len(good),
+            key="tech.meta.ok", params={"n": len(good)}))
     return out
 
 
@@ -2519,14 +2627,17 @@ def audit_technical(pages: List[Page], base: str,
         out.append(Finding(
             AREA_TECH, SEV_CRITICAL, "Sito non in HTTPS",
             fix="Attiva un certificato TLS e reindirizza tutto a HTTPS.",
-            url=base, weight=2.0,
+            url=base, weight=2.0, pillar=PILLAR_SEC,
+            key="tech.https.missing",
             example="# nginx\nreturn 301 https://$host$request_uri;\n"
                     "# Apache (.htaccess)\nRewriteEngine On\n"
                     "RewriteCond %{HTTPS} off\n"
                     "RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} "
                     "[L,R=301]"))
     else:
-        out.append(Finding(AREA_TECH, SEV_OK, "HTTPS attivo", url=base))
+        out.append(Finding(AREA_TECH, SEV_OK, "HTTPS attivo",
+                           url=base, pillar=PILLAR_SEC,
+                           key="tech.https.ok"))
 
     broken = [p for p in pages if not p.ok]
     if broken:
@@ -2535,7 +2646,12 @@ def audit_technical(pages: List[Page], base: str,
             "%d URL non raggiungibili o in errore" % len(broken),
             ", ".join("%s (%s)" % (p.url, p.status or p.error)
                       for p in broken[:5]),
-            "Correggi o rimuovi dalla sitemap gli URL in errore."))
+            "Correggi o rimuovi dalla sitemap gli URL in errore.",
+            key="tech.pages.broken",
+            params={"n": len(broken),
+                    "urls": ", ".join(
+                        "%s (%s)" % (p.url, p.status or p.error)
+                        for p in broken[:5])}))
 
     out.extend(_audit_redirects(pages))
     out.extend(_audit_link_graph(pages, base))
@@ -2558,6 +2674,9 @@ def audit_technical(pages: List[Page], base: str,
             % ", ".join(p.url for p in soft404[:5]),
             "Fai rispondere 404 (o 410) agli URL inesistenti e "
             "togli quelli vuoti dalla sitemap.", weight=2.0,
+            key="tech.pages.soft404",
+            params={"n": len(soft404),
+                    "urls": ", ".join(p.url for p in soft404[:5])},
             example="La pagina inesistente deve rispondere con "
                     "stato 404, non 200:\n"
                     "# Apache (.htaccess)\n"
@@ -2574,7 +2693,7 @@ def audit_technical(pages: List[Page], base: str,
             "risponde solo a JavaScript. L'audit dei contenuti non e' "
             "stato eseguito.",
             "Verifica che il sito risponda e che non filtri i crawler.",
-            weight=3.0))
+            weight=3.0, key="tech.pages.none"))
     elif n_pages == 1:
         out.append(Finding(
             AREA_TECH, SEV_CRITICAL,
@@ -2582,26 +2701,32 @@ def audit_technical(pages: List[Page], base: str,
             "Con un solo documento la somma RRF non ha addendi: non "
             "esistono passaggi distinti da far emergere.",
             "Crea pagine autonome per ogni tema/servizio.",
-            weight=3.0))
+            weight=3.0, key="tech.pages.single"))
     elif n_pages < 5:
         out.append(Finding(
             AREA_TECH, SEV_WARNING,
             "Poche pagine indicizzabili (%d)" % n_pages,
             fix="Amplia la superficie: una pagina per intento.",
-            weight=2.0))
+            weight=2.0, key="tech.pages.few",
+            params={"n": n_pages}))
     else:
         out.append(Finding(
             AREA_TECH, SEV_OK,
             "%d pagine indicizzabili analizzate" % n_pages,
             "%s%s." % (", ".join(p.url for p in good[:5]),
                        " e altre %d" % (n_pages - 5)
-                       if n_pages > 5 else "")))
+                       if n_pages > 5 else ""),
+            key="tech.pages.ok",
+            params={"n": n_pages,
+                    "urls": ", ".join(p.url for p in good[:5]),
+                    "more": max(0, n_pages - 5)}))
 
     if not from_sitemap:
         out.append(Finding(
             AREA_TECH, SEV_WARNING, "Sitemap XML assente o illeggibile",
             "URL individuati tramite crawling dei link interni.",
             "Pubblica una sitemap XML e dichiarala nel robots.txt.",
+            key="tech.sitemap.missing",
             example="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                     "<urlset xmlns=\"http://www.sitemaps.org/schemas/"
                     "sitemap/0.9\">\n<url><loc>https://esempio.it/"
@@ -2621,7 +2746,10 @@ def audit_technical(pages: List[Page], base: str,
             "puro nell'indice e segnale di sito incompiuto."
             % ", ".join(p.url for p in placeholders[:5]),
             "Cancellale, oppure imposta noindex e togliile dalla "
-            "sitemap.", weight=2.0))
+            "sitemap.", weight=2.0, key="tech.pages.placeholder",
+            params={"n": len(placeholders),
+                    "urls": ", ".join(
+                        p.url for p in placeholders[:5])}))
 
     noindex = [p for p in good
                if "noindex" in (p.meta_robots or "").lower()]
@@ -2631,6 +2759,9 @@ def audit_technical(pages: List[Page], base: str,
             "%d pagina/e con meta robots noindex" % len(noindex),
             ", ".join(p.url for p in noindex[:5]),
             "Verifica che l'esclusione sia voluta.",
+            key="tech.pages.noindex",
+            params={"n": len(noindex),
+                    "urls": ", ".join(p.url for p in noindex[:5])},
             example="Se la pagina deve essere indicizzata, rimuovi "
                     "il meta o usa:\n<meta name=\"robots\" "
                     "content=\"index, follow\">"))
@@ -2646,13 +2777,18 @@ def audit_technical(pages: List[Page], base: str,
             "%d pagina/e senza canonical" % len(no_canonical),
             ", ".join(p.url for p in no_canonical[:5]),
             "Dichiara <link rel=\"canonical\"> su ogni pagina.",
+            key="tech.canonical.missing",
+            params={"n": len(no_canonical),
+                    "urls": ", ".join(
+                        p.url for p in no_canonical[:5])},
             example="<link rel=\"canonical\" "
                     "href=\"https://esempio.it/servizio/\">"))
     elif good:
         out.append(Finding(
             AREA_TECH, SEV_OK, "Canonical presenti",
             "Dichiarato su tutte le %d pagine analizzate."
-            % len(good)))
+            % len(good),
+            key="tech.canonical.ok", params={"n": len(good)}))
 
     no_lang = [p for p in good if not p.lang]
     if no_lang:
@@ -2660,7 +2796,8 @@ def audit_technical(pages: List[Page], base: str,
             AREA_TECH, SEV_WARNING,
             "%d pagina/e senza attributo lang" % len(no_lang),
             fix="Imposta <html lang=\"it\">: aiuta la selezione del "
-                "modello linguistico in fase di analisi."))
+                "modello linguistico in fase di analisi.",
+            key="tech.lang.missing", params={"n": len(no_lang)}))
 
     js_heavy = [p for p in good
                 if p.raw_js_heavy or is_js_heavy(p)]
@@ -2678,11 +2815,15 @@ def audit_technical(pages: List[Page], base: str,
             "%d pagina/e con testo scarso e molto JavaScript"
             % len(js_heavy), detail,
             "Attiva rendering server-side o pre-rendering.",
-            weight=2.0))
+            weight=2.0,
+            key=("tech.js.rendered" if rendered_any
+                 else "tech.js.heavy"),
+            params={"n": len(js_heavy)}))
     elif good:
         out.append(Finding(
             AREA_TECH, SEV_OK,
-            "Contenuto presente nell'HTML iniziale"))
+            "Contenuto presente nell'HTML iniziale",
+            key="tech.js.ok"))
 
     slow = [p for p in good if p.elapsed > 2.0]
     if slow:
@@ -2690,7 +2831,10 @@ def audit_technical(pages: List[Page], base: str,
             AREA_TECH, SEV_WARNING,
             "%d pagina/e con risposta oltre 2 s" % len(slow),
             "Piu' lenta: %.2f s." % max(p.elapsed for p in slow),
-            "Ottimizza cache e TTFB."))
+            "Ottimizza cache e TTFB.",
+            key="tech.slow",
+            params={"n": len(slow),
+                    "worst": max(p.elapsed for p in slow)}))
 
     langs = {p.lang.split("-")[0] for p in good if p.lang}
     multilingual = len(langs) > 1
@@ -2701,6 +2845,8 @@ def audit_technical(pages: List[Page], base: str,
             "Sito multilingua senza hreflang",
             "Lingue rilevate: %s." % ", ".join(sorted(langs)),
             "Dichiara hreflang reciproci fra le versioni.",
+            key="tech.hreflang.missing",
+            params={"langs": ", ".join(sorted(langs))},
             example="<link rel=\"alternate\" hreflang=\"it\" "
                     "href=\"https://esempio.it/it/\">\n"
                     "<link rel=\"alternate\" hreflang=\"en\" "
@@ -2708,7 +2854,7 @@ def audit_technical(pages: List[Page], base: str,
     elif not multilingual:
         out.append(Finding(
             AREA_TECH, SEV_INFO, "Sito monolingua: hreflang non "
-            "necessario"))
+            "necessario", key="tech.hreflang.na"))
     return out
 
 
@@ -2741,6 +2887,9 @@ def _audit_clickbait(good: Sequence[Page]) -> List[Finding]:
             % "; ".join(colpiti[:5]),
             "Riformula in stile informativo: il beneficio o la "
             "risposta nel titolo, senza iperboli.",
+            key="lex.clickbait.found",
+            params={"n": len(colpiti),
+                    "examples": "; ".join(colpiti[:5])},
             example="Prima: \"Non crederai a cosa fa il "
                     "drenaggio!!\"\n"
                     "Dopo:  \"Drenaggio linfatico: benefici, "
@@ -2750,7 +2899,8 @@ def _audit_clickbait(good: Sequence[Page]) -> List[Finding]:
         AREA_LEX, SEV_OK,
         "Nessuna formula clickbait in title e heading",
         "Titoli in stile informativo su tutte le %d pagine "
-        "analizzate." % len(good))]
+        "analizzate." % len(good),
+        key="lex.clickbait.none", params={"n": len(good)})]
 
 
 def audit_lexical(pages: List[Page]) -> List[Finding]:
@@ -2781,7 +2931,8 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             AREA_LEX, SEV_CRITICAL,
             "%d pagina/e senza <title>" % len(missing_title),
             fix="Il title e' il segnale lessicale a peso piu' alto.",
-            weight=2.0))
+            weight=2.0, key="lex.title.missing",
+            params={"n": len(missing_title)}))
     if bad_title:
         out.append(Finding(
             AREA_LEX, SEV_CRITICAL,
@@ -2791,6 +2942,11 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
                 for p in bad_title[:3]),
             "Title unico, 30-65 caratteri, con i termini di ricerca "
             "reali; evita il nome dominio come titolo.", weight=2.0,
+            key="lex.title.bad",
+            params={"n": len(bad_title),
+                    "examples": " | ".join(
+                        "%r (%d car.)" % (p.title, len(p.title))
+                        for p in bad_title[:3])},
             example="<title>Drenaggio linfatico manuale a Parma | "
                     "Centro Esempio</title>\n"
                     "(52 caratteri: servizio + territorio + brand)"))
@@ -2799,9 +2955,13 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             AREA_LEX, SEV_WARNING,
             "%d title duplicati fra pagine" % len(dup_title),
             "; ".join(dup_title[:3]),
-            "Ogni pagina deve avere un title distinto."))
+            "Ogni pagina deve avere un title distinto.",
+            key="lex.title.dup",
+            params={"n": len(dup_title),
+                    "examples": "; ".join(dup_title[:3])}))
     if not (missing_title or bad_title or dup_title):
-        out.append(Finding(AREA_LEX, SEV_OK, "Title ben impostati"))
+        out.append(Finding(AREA_LEX, SEV_OK, "Title ben impostati",
+                           key="lex.title.ok"))
 
     no_desc = [p for p in good if not p.description]
     weak_desc = [
@@ -2815,7 +2975,9 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             "%d pagina/e senza meta description" % len(no_desc),
             ", ".join(p.url for p in no_desc[:5]),
             "Scrivi 110-165 caratteri con servizio e territorio.",
-            weight=1.5,
+            weight=1.5, key="lex.desc.missing",
+            params={"n": len(no_desc),
+                    "urls": ", ".join(p.url for p in no_desc[:5])},
             example="<meta name=\"description\" content=\"Drenaggio "
                     "linfatico manuale a Parma:\nsedute da 45 minuti "
                     "con fisioterapisti certificati, percorsi "
@@ -2828,16 +2990,23 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             "Esempi: %s" % " | ".join(
                 repr(p.description) for p in weak_desc[:3]),
             "Una description che ripete solo il nome dell'azienda non "
-            "porta alcun segnale."))
+            "porta alcun segnale.",
+            key="lex.desc.short",
+            params={"n": len(weak_desc),
+                    "examples": " | ".join(
+                        repr(p.description)
+                        for p in weak_desc[:3])}))
     if long_desc:
         out.append(Finding(
             AREA_LEX, SEV_INFO,
             "%d meta description oltre %d caratteri"
-            % (len(long_desc), DESC_MAX)))
+            % (len(long_desc), DESC_MAX),
+            key="lex.desc.long",
+            params={"n": len(long_desc), "max": DESC_MAX}))
     if not (no_desc or weak_desc):
         out.append(Finding(
             AREA_LEX, SEV_OK, "Meta description presenti e di lunghezza "
-            "adeguata"))
+            "adeguata", key="lex.desc.ok"))
 
     no_h1 = [p for p in good
              if not any(lv == 1 for lv, _ in p.headings)]
@@ -2848,15 +3017,19 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             AREA_LEX, SEV_CRITICAL, "%d pagina/e senza H1" % len(no_h1),
             ", ".join(p.url for p in no_h1[:5]),
             "Un solo H1 per pagina, con i termini principali.",
-            weight=1.5,
+            weight=1.5, key="lex.h1.missing",
+            params={"n": len(no_h1),
+                    "urls": ", ".join(p.url for p in no_h1[:5])},
             example="<h1>Drenaggio linfatico manuale: cos'e' e "
                     "come funziona</h1>"))
     if multi_h1:
         out.append(Finding(
             AREA_LEX, SEV_WARNING,
-            "%d pagina/e con piu' H1" % len(multi_h1)))
+            "%d pagina/e con piu' H1" % len(multi_h1),
+            key="lex.h1.multi", params={"n": len(multi_h1)}))
     if not (no_h1 or multi_h1):
-        out.append(Finding(AREA_LEX, SEV_OK, "Struttura H1 corretta"))
+        out.append(Finding(AREA_LEX, SEV_OK, "Struttura H1 corretta",
+                           key="lex.h1.ok"))
 
     thin = [p for p in good if p.word_count < THIN_CONTENT_WORDS]
     if thin:
@@ -2870,7 +3043,11 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             % (sum(p.word_count for p in good) / len(good)),
             "Porta le pagine chiave verso le %d+ parole con contenuto "
             "informativo, non promozionale." % GOOD_CONTENT_WORDS,
-            weight=2.0,
+            weight=2.0, key="lex.words.thin",
+            params={"n": len(thin), "min": THIN_CONTENT_WORDS,
+                    "avg": sum(p.word_count for p in good)
+                    // len(good),
+                    "target": GOOD_CONTENT_WORDS},
             example="Struttura tipo per una pagina servizio:\n"
                     "<h2>Cos'e' ...?</h2> <h2>Come funziona una "
                     "seduta</h2>\n<h2>Quando serve</h2> <h2>Quanto "
@@ -2879,7 +3056,10 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
         out.append(Finding(
             AREA_LEX, SEV_OK, "Volume di testo adeguato",
             "Media: %d parole per pagina."
-            % (sum(p.word_count for p in good) / len(good))))
+            % (sum(p.word_count for p in good) / len(good)),
+            key="lex.words.ok",
+            params={"avg": sum(p.word_count for p in good)
+                    // len(good)}))
 
     acronyms = find_acronyms(good)
     expanded = {a for a, ok_ in acronyms.items() if ok_}
@@ -2890,12 +3070,17 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             "Non esplicitate: %s." % ", ".join(
                 sorted(set(acronyms) - expanded)[:8]),
             "Scrivi 'SIGLA (forma estesa)' almeno alla prima "
-            "occorrenza: copre entrambe le formulazioni di ricerca."))
+            "occorrenza: copre entrambe le formulazioni di ricerca.",
+            key="lex.acronyms.bare",
+            params={"list": ", ".join(
+                sorted(set(acronyms) - expanded)[:8])}))
     elif acronyms:
         out.append(Finding(
             AREA_LEX, SEV_OK,
             "Sigle accompagnate dalla forma estesa",
-            ", ".join(sorted(expanded)[:8])))
+            ", ".join(sorted(expanded)[:8]),
+            key="lex.acronyms.ok",
+            params={"list": ", ".join(sorted(expanded)[:8])}))
 
     bad_slug = [p for p in good if re.search(r"[_%]|\d{4,}", p.slug)]
     if bad_slug:
@@ -2903,9 +3088,14 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             AREA_LEX, SEV_WARNING,
             "%d slug poco parlanti" % len(bad_slug),
             ", ".join(p.slug for p in bad_slug[:5]),
-            "Usa slug tematici con trattini."))
+            "Usa slug tematici con trattini.",
+            key="lex.slug.bad",
+            params={"n": len(bad_slug),
+                    "slugs": ", ".join(
+                        p.slug for p in bad_slug[:5])}))
     else:
-        out.append(Finding(AREA_LEX, SEV_OK, "Slug tematici e leggibili"))
+        out.append(Finding(AREA_LEX, SEV_OK, "Slug tematici e leggibili",
+                           key="lex.slug.ok"))
 
     total_img = sum(p.images for p in good)
     with_alt = sum(p.images_with_alt for p in good)
@@ -2914,13 +3104,17 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             AREA_LEX, SEV_WARNING,
             "Attributi alt incompleti (%d/%d)" % (with_alt, total_img),
             fix="L'alt e' testo indicizzabile oltre che accessibilita'.",
+            key="lex.alt.partial",
+            params={"with_alt": with_alt, "total": total_img},
             example="<img src=\"seduta.jpg\" alt=\"fisioterapista "
                     "esegue drenaggio linfatico\nmanuale sulla gamba "
                     "di una paziente\">"))
     elif total_img:
         out.append(Finding(
             AREA_LEX, SEV_OK,
-            "Attributi alt presenti (%d/%d)" % (with_alt, total_img)))
+            "Attributi alt presenti (%d/%d)" % (with_alt, total_img),
+            key="lex.alt.ok",
+            params={"with_alt": with_alt, "total": total_img}))
     return out
 
 
@@ -2970,9 +3164,15 @@ def _audit_extractability(good: Sequence[Page]) -> List[Finding]:
               % (direct, len(substantial), EXTRACT_MIN_WORDS,
                  EXTRACT_MAX_WORDS, 100 * share,
                  100 * EXTRACT_GOOD_SHARE))
+    extract_params = {
+        "direct": direct, "total": len(substantial),
+        "min": EXTRACT_MIN_WORDS, "max": EXTRACT_MAX_WORDS,
+        "pct": 100 * share, "threshold": 100 * EXTRACT_GOOD_SHARE}
     if share >= EXTRACT_GOOD_SHARE:
         return [Finding(AREA_SEM, SEV_OK,
-                        "Buona estraibilita' diretta", detail)]
+                        "Buona estraibilita' diretta", detail,
+                        key="sem.extract.ok",
+                        params=extract_params)]
     return [Finding(
         AREA_SEM, SEV_WARNING,
         "Pochi paragrafi a risposta diretta", detail,
@@ -2980,6 +3180,7 @@ def _audit_extractability(good: Sequence[Page]) -> List[Finding]:
         "(\"X e' ...\", \"Si', ...\", \"In sintesi ...\") e "
         "tienili fra %d e %d parole."
         % (EXTRACT_MIN_WORDS, EXTRACT_MAX_WORDS),
+        key="sem.extract.low", params=extract_params,
         example="Prima: \"Nel panorama attuale del benessere, "
                 "molte persone si chiedono quale percorso...\"\n"
                 "Dopo:  \"Il drenaggio linfatico e' un massaggio "
@@ -3021,6 +3222,9 @@ def _audit_filler(good: Sequence[Page]) -> List[Finding]:
             % (FILLER_MIN_HITS, "; ".join(saturated[:5])),
             "Sostituisci le formule generiche con informazioni "
             "verificabili: numeri, durate, prezzi, procedure.",
+            key="sem.filler.saturated",
+            params={"n": len(saturated), "min": FILLER_MIN_HITS,
+                    "examples": "; ".join(saturated[:5])},
             example="Prima: \"Siamo leader di mercato, qualita' e "
                     "professionalita' al tuo servizio.\"\n"
                     "Dopo:  \"Dal 2012 abbiamo seguito oltre 400 "
@@ -3032,7 +3236,8 @@ def _audit_filler(good: Sequence[Page]) -> List[Finding]:
             AREA_SEM, SEV_OK,
             "Filler di marketing sotto controllo",
             "%d formule generiche in tutto il sito: il testo "
-            "utile domina." % total_hits)]
+            "utile domina." % total_hits,
+            key="sem.filler.ok", params={"n": total_hits})]
     return []
 
 
@@ -3067,7 +3272,9 @@ def _audit_lifecycle(good: Sequence[Page]) -> List[Finding]:
             AREA_SEM, SEV_OK,
             "Ciclo di vita dell'argomento coperto (%d su 6)"
             % len(covered),
-            "Sezioni trovate negli heading: %s." % trovate)]
+            "Sezioni trovate negli heading: %s." % trovate,
+            key="sem.lifecycle.ok",
+            params={"n": len(covered), "found": trovate})]
     return [Finding(
         AREA_SEM, SEV_WARNING,
         "Ciclo di vita dell'argomento incompleto (%d su 6)"
@@ -3082,7 +3289,12 @@ def _audit_lifecycle(good: Sequence[Page]) -> List[Finding]:
         "(anche distribuite su piu' pagine).",
         example="\n".join("<h2>%s</h2>" % LIFECYCLE_HINTS[name]
                           for name in missing),
-        weight=2.0 if len(covered) <= 2 else 1.0)]
+        weight=2.0 if len(covered) <= 2 else 1.0,
+        key="sem.lifecycle.partial",
+        params={"n": len(covered),
+                "found": ("Trovate: %s." % trovate
+                          if trovate else ""),
+                "missing": ", ".join(missing)})]
 
 
 def _page_last_update(page: Page) -> Optional["datetime.date"]:
@@ -3136,7 +3348,10 @@ def _audit_freshness(good: Sequence[Page],
             AREA_SEM, SEV_OK,
             "Contenuti aggiornati di recente",
             "Ultimo aggiornamento dichiarato: %s su %s (%d giorni "
-            "fa)." % (newest.isoformat(), newest_url, max(0, age)))]
+            "fa)." % (newest.isoformat(), newest_url, max(0, age)),
+            key="sem.fresh.ok",
+            params={"date": newest.isoformat(),
+                    "url": newest_url, "days": max(0, age)})]
     stale = sorted(dated)[:5]
     quanto = ("due anni" if age > FRESH_STALE_DAYS else "un anno")
     return [Finding(
@@ -3153,7 +3368,13 @@ def _audit_freshness(good: Sequence[Page],
         "article:modified_time o dateModified nel JSON-LD.",
         example="<meta property=\"article:modified_time\" "
                 "content=\"%s\">" % today.isoformat(),
-        weight=2.0 if age > FRESH_STALE_DAYS else 1.0)]
+        weight=2.0 if age > FRESH_STALE_DAYS else 1.0,
+        key=("sem.fresh.very_stale" if age > FRESH_STALE_DAYS
+             else "sem.fresh.stale"),
+        params={"date": newest.isoformat(), "days": age,
+                "stale": ", ".join(
+                    "%s (%s)" % (url, day.isoformat())
+                    for day, url in stale)})]
 
 
 def _audit_references(good: Sequence[Page]) -> List[Finding]:
@@ -3191,7 +3412,10 @@ def _audit_references(good: Sequence[Page]) -> List[Finding]:
             AREA_SEM, SEV_OK,
             "Riferimenti a fonti presenti",
             "%s (soglia di prassi: una sezione fonti o almeno %d "
-            "citazioni)." % (contesto, CITATIONS_GOOD))]
+            "citazioni)." % (contesto, CITATIONS_GOOD),
+            key="sem.refs.ok",
+            params={"context": contesto,
+                    "threshold": CITATIONS_GOOD})]
     return [Finding(
         AREA_SEM, SEV_WARNING,
         "Nessun riferimento a fonti esterne",
@@ -3200,6 +3424,7 @@ def _audit_references(good: Sequence[Page]) -> List[Finding]:
         "con riferimenti sono piu' citabili." % contesto,
         "Aggiungi una sezione \"Fonti\" con link a linee guida, "
         "studi o documentazione ufficiale (o citazioni nel testo).",
+        key="sem.refs.missing", params={"context": contesto},
         example="<h2>Fonti</h2>\n<ul>\n"
                 "<li><a href=\"https://www.iss.it/...\">Istituto "
                 "Superiore di Sanita' — linee guida</a></li>\n"
@@ -3222,7 +3447,7 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
             AREA_SEM, SEV_CRITICAL, "Nessun chunk estraibile",
             "Il sito non offre passaggi di testo indicizzabili.",
             "Scrivi paragrafi discorsivi di almeno 40-50 parole.",
-            weight=3.0))
+            weight=3.0, key="sem.chunks.none"))
         return out
 
     out.extend(_audit_extractability(good))
@@ -3240,7 +3465,10 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
         "moltiplicatore.",
         "" if len(chunks) >= 20 else
         "Aumenta il numero di passaggi tematici autonomi.",
-        weight=2.0))
+        weight=2.0,
+        key=("sem.chunks.ok" if len(chunks) >= 20
+             else "sem.chunks.few"),
+        params={"chunks": len(chunks), "pages": len(good)}))
 
     anaphoric = [c for c in chunks if ANAPHORA_RE.match(c.text.strip())]
     ratio = len(anaphoric) / len(chunks)
@@ -3255,6 +3483,11 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
                         for c in anaphoric[:3]),
             "Riscrivi le aperture nominando esplicitamente il "
             "soggetto.",
+            key="sem.anaphora.high",
+            params={"pct": ratio * 100,
+                    "examples": "; ".join(
+                        "\"%s...\"" % c.text.strip()[:60]
+                        for c in anaphoric[:3])},
             example="Prima: \"Questo trattamento e' indicato dopo "
                     "gli interventi.\"\nDopo:  \"Il drenaggio "
                     "linfatico manuale e' indicato dopo gli "
@@ -3263,7 +3496,8 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
         out.append(Finding(
             AREA_SEM, SEV_OK,
             "Chunk in larga parte autoconsistenti (%.0f%% anaforici)"
-            % (ratio * 100)))
+            % (ratio * 100),
+            key="sem.anaphora.ok", params={"pct": ratio * 100}))
 
     headings = [h for p in good for _, h in p.headings]
     questions = [h for h in headings if is_question(h)]
@@ -3277,14 +3511,20 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
             "domanda esplicita seguita da risposta diretta.",
             "Aggiungi heading tipo \"Cos'e' X?\", \"Come funziona X?\", "
             "\"Quanto costa X?\" con risposta secca in 2-3 righe.",
-            weight=2.0))
+            weight=2.0, key="sem.questions.few",
+            params={"n": len(questions), "total": len(headings)}))
     else:
         out.append(Finding(
             AREA_SEM, SEV_OK,
             "%d heading in forma di domanda (%.0f%%)"
             % (len(questions), q_ratio * 100),
             "Esempi: %s."
-            % "; ".join("\"%s\"" % q[:60] for q in questions[:3])))
+            % "; ".join("\"%s\"" % q[:60] for q in questions[:3]),
+            key="sem.questions.ok",
+            params={"n": len(questions), "pct": q_ratio * 100,
+                    "examples": "; ".join(
+                        "\"%s\"" % q[:60]
+                        for q in questions[:3])}))
 
     has_faq = any(FAQ_HINT_RE.search(h) for h in headings) or any(
         FAQ_HINT_RE.search(p.text[:4000]) for p in good)
@@ -3295,14 +3535,15 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
              or FAQ_HINT_RE.search(p.text[:4000])), "")
         out.append(Finding(
             AREA_SEM, SEV_OK, "Sezione FAQ rilevata",
-            "Rilevata su %s." % faq_where if faq_where else ""))
+            "Rilevata su %s." % faq_where if faq_where else "",
+            key="sem.faq.ok", params={"url": faq_where}))
     else:
         out.append(Finding(
             AREA_SEM, SEV_CRITICAL, "Nessuna sezione FAQ",
             "Le FAQ allineano un chunk a un intento preciso e "
             "alimentano entrambi gli assi contemporaneamente.",
             "Aggiungi FAQ per pagina, marcate con FAQPage JSON-LD.",
-            weight=1.5,
+            weight=1.5, key="sem.faq.missing",
             example="<h2>Domande frequenti</h2>\n"
                     "<h3>Quanto costa una seduta?</h3>\n"
                     "<p>Da 40 a 80 euro, in base a durata e zona "
@@ -3318,22 +3559,26 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
             "Senza passaggi che spiegano *cos'e'* una cosa, gli "
             "embedding restano lontani dalle query informative.",
             "Aggiungi per ogni tema: cos'e' / come funziona / quando "
-            "serve / esempio."))
+            "serve / esempio.",
+            key="sem.defs.low", params={"pct": def_ratio * 100}))
     else:
         out.append(Finding(
             AREA_SEM, SEV_OK,
             "Presenti passaggi definitori (%.0f%% dei chunk)"
-            % (def_ratio * 100)))
+            % (def_ratio * 100),
+            key="sem.defs.ok", params={"pct": def_ratio * 100}))
 
     examples = sum(1 for c in chunks if EXAMPLE_RE.search(c.text))
     if examples / len(chunks) < 0.05:
         out.append(Finding(
             AREA_SEM, SEV_WARNING, "Quasi nessun esempio concreto",
             fix="Esempi e casi studio sono i contenuti a piu' alta "
-                "densita' semantica."))
+                "densita' semantica.",
+            key="sem.examples.few"))
     else:
         out.append(Finding(
-            AREA_SEM, SEV_OK, "%d chunk con esempi concreti" % examples))
+            AREA_SEM, SEV_OK, "%d chunk con esempi concreti" % examples,
+            key="sem.examples.ok", params={"n": examples}))
 
     tokens = tokenize(" ".join(c.text for c in chunks))
     unique = len(set(tokens))
@@ -3344,11 +3589,13 @@ def audit_semantic(pages: List[Page]) -> List[Finding]:
             "Poca varieta' lessicale significa copertura semantica "
             "limitata: intercetti poche riformulazioni della stessa "
             "domanda.",
-            "Amplia i temi trattati e le formulazioni usate."))
+            "Amplia i temi trattati e le formulazioni usate.",
+            key="sem.vocab.narrow", params={"n": unique}))
     else:
         out.append(Finding(
             AREA_SEM, SEV_OK,
-            "Vocabolario ampio (%d termini distinti)" % unique))
+            "Vocabolario ampio (%d termini distinti)" % unique,
+            key="sem.vocab.ok", params={"n": unique}))
     return out
 
 
@@ -3509,14 +3756,17 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
             "JSON-LD incompleto per %d tipo/i" % len(problems),
             "Proprieta' minime mancanti: %s." % detail,
             "Completa le proprieta' indicate: senza, il tipo non "
-            "e' eleggibile per i risultati arricchiti."))
+            "e' eleggibile per i risultati arricchiti.",
+            key="sd.check.incomplete",
+            params={"n": len(problems), "list": detail}))
     if faq_broken:
         out.append(Finding(
             AREA_SD, SEV_WARNING,
             "%d domanda/e FAQPage incomplete" % faq_broken,
             "Ogni voce di mainEntity richiede una Question con "
             "name e un acceptedAnswer con text.",
-            "Completa le coppie domanda/risposta nel markup."))
+            "Completa le coppie domanda/risposta nel markup.",
+            key="sd.check.faq", params={"n": faq_broken}))
     if offer_issues:
         out.append(Finding(
             AREA_SD, SEV_WARNING,
@@ -3526,6 +3776,8 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
             "In price solo il numero con il punto decimale (niente "
             "simboli di valuta); la valuta in priceCurrency (codice "
             "ISO 4217, es. EUR).",
+            key="sd.check.offers",
+            params={"n": len(offer_issues)},
             example="\"offers\": {\"@type\": \"Offer\",\n"
                     " \"price\": \"50.00\", \"priceCurrency\": "
                     "\"EUR\",\n \"availability\": "
@@ -3539,6 +3791,7 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
             "prodotto.",
             "Aggiungi almeno offers (con price e priceCurrency) "
             "oppure review/aggregateRating.",
+            key="sd.check.product", params={"n": bare_products},
             example="\"aggregateRating\": {\"@type\": "
                     "\"AggregateRating\",\n \"ratingValue\": "
                     "\"4.8\", \"reviewCount\": \"27\"}"))
@@ -3548,27 +3801,38 @@ def validate_jsonld(pages: List[Page]) -> List[Finding]:
             "%d valutazione/i incoerenti" % len(rating_issues),
             "; ".join(rating_issues[:4]) + ".",
             "ratingValue dentro la scala dichiarata (default 1-5) "
-            "e conteggio recensioni in reviewCount o ratingCount."))
+            "e conteggio recensioni in reviewCount o ratingCount.",
+            key="sd.check.rating",
+            params={"n": len(rating_issues)}))
     if bad_dates:
         out.append(Finding(
             AREA_SD, SEV_WARNING,
             "%d data/e non in formato ISO 8601" % len(bad_dates),
             "; ".join(bad_dates[:4]) + ".",
             "Usa AAAA-MM-GG, con l'eventuale orario dopo la T "
-            "(es. 2026-08-03T09:30:00+02:00)."))
+            "(es. 2026-08-03T09:30:00+02:00).",
+            key="sd.check.dates",
+            params={"n": len(bad_dates),
+                    "list": "; ".join(bad_dates[:4])}))
     if bad_urls:
         out.append(Finding(
             AREA_SD, SEV_WARNING,
             "%d URL di media non assoluti nel markup" % len(bad_urls),
             "; ".join(bad_urls[:4]) + ".",
             "In image, logo, thumbnailUrl, contentUrl ed embedUrl "
-            "servono URL http(s) completi."))
+            "servono URL http(s) completi.",
+            key="sd.check.urls",
+            params={"n": len(bad_urls),
+                    "list": "; ".join(bad_urls[:4])}))
     if checked and not out:
         out.append(Finding(
             AREA_SD, SEV_OK,
             "Markup Schema.org coerente (%d tipi verificati)"
             % len(checked),
-            "Verificati: %s." % ", ".join(sorted(checked))))
+            "Verificati: %s." % ", ".join(sorted(checked)),
+            key="sd.check.ok",
+            params={"n": len(checked),
+                    "types": ", ".join(sorted(checked))}))
     return out
 
 
@@ -3628,7 +3892,7 @@ def audit_eeat(pages: List[Page]) -> List[Finding]:
 
     out: List[Finding] = []
     signals = (
-        (author_note, "Autore dei contenuti dichiarato",
+        ("author", author_note, "Autore dei contenuti dichiarato",
          "Nessun autore dichiarato",
          "Aggiungi il meta author o la proprieta' author nel "
          "JSON-LD: i motori IA pesano chi firma i contenuti.",
@@ -3636,7 +3900,8 @@ def audit_eeat(pages: List[Page]) -> List[Finding]:
          "oppure nel JSON-LD:\n"
          "\"author\": {\"@type\": \"Person\", \"name\": "
          "\"Paola Rossi\"}"),
-        (dates_note, "Date di pubblicazione/aggiornamento presenti",
+        ("dates", dates_note,
+         "Date di pubblicazione/aggiornamento presenti",
          "Nessuna data di pubblicazione o aggiornamento",
          "Esponi article:published_time/modified_time o "
          "datePublished/dateModified nel JSON-LD.",
@@ -3645,29 +3910,31 @@ def audit_eeat(pages: List[Page]) -> List[Finding]:
          "oppure nel JSON-LD:\n"
          "\"datePublished\": \"2026-08-03\", "
          "\"dateModified\": \"2026-08-03\""),
-        (about_note, "Pagina \"chi siamo\" presente",
+        ("about", about_note, "Pagina \"chi siamo\" presente",
          "Nessuna pagina \"chi siamo\" rilevata",
          "Una pagina che presenta persone e competenze e' il "
          "segnale di esperienza piu' diretto.",
          "Crea /chi-siamo/ con: chi cura i contenuti, titoli e "
          "formazione,\nda quanto tempo, foto reali. Linkala dal "
          "footer di ogni pagina."),
-        (contact_note, "Contatti verificabili presenti",
+        ("contact", contact_note, "Contatti verificabili presenti",
          "Nessun contatto verificabile rilevato",
          "Esponi telefono ed email (link tel:/mailto:) o una "
          "pagina contatti.",
          "<a href=\"tel:+390521123456\">0521 123456</a>\n"
          "<a href=\"mailto:info@esempio.it\">info@esempio.it</a>"),
     )
-    for evidence, ok_title, warn_title, fix, example in signals:
+    for slug, evidence, ok_title, warn_title, fix, example in signals:
         if evidence:
             out.append(Finding(
                 AREA_SEM, SEV_OK, "E-E-A-T: %s" % ok_title,
-                evidence[0].upper() + evidence[1:] + "."))
+                evidence[0].upper() + evidence[1:] + ".",
+                key="sem.eeat.%s.ok" % slug))
         else:
             out.append(Finding(
                 AREA_SEM, SEV_WARNING, "E-E-A-T: %s" % warn_title,
-                fix=fix, example=example))
+                fix=fix, example=example,
+                key="sem.eeat.%s.missing" % slug))
     return out
 
 
@@ -3702,6 +3969,9 @@ def _audit_semantic_html(good: Sequence[Page]) -> List[Finding]:
             "Racchiudi il contenuto principale in <main> e "
             "<article>, le sezioni tematiche in <section> con il "
             "loro heading, immagini e didascalie in <figure>.",
+            key="sd.semantic.poor",
+            params={"n": len(poveri), "min": SEMANTIC_MIN_TYPES,
+                    "urls": ", ".join(p.url for p in poveri[:5])},
             example="<main><article>\n  <section>\n    <h2>Cos'e' "
                     "il servizio</h2>\n    <p>...</p>\n  "
                     "</section>\n  <figure><img src=\"...\" "
@@ -3723,7 +3993,13 @@ def _audit_semantic_html(good: Sequence[Page]) -> List[Finding]:
                         for p in divitis[:5]),
             "Sostituisci i <div> strutturali con i tag semantici "
             "equivalenti: il markup diventa auto-descrittivo.",
-            weight=1.0))
+            weight=1.0, key="sd.semantic.divitis",
+            params={"n": len(divitis),
+                    "urls": ", ".join(
+                        "%s (%d%%)"
+                        % (p.url, round(100 * p.div_count
+                                        / p.element_count))
+                        for p in divitis[:5])}))
     if not out:
         out.append(Finding(
             AREA_SD, SEV_OK,
@@ -3731,7 +4007,10 @@ def _audit_semantic_html(good: Sequence[Page]) -> List[Finding]:
             "Tutte le %d pagine analizzabili usano i tag di "
             "sezionamento e tengono i <div> sotto il %d%% degli "
             "elementi." % (len(eligible),
-                           round(100 * DIVITIS_RATIO))))
+                           round(100 * DIVITIS_RATIO)),
+            key="sd.semantic.ok",
+            params={"n": len(eligible),
+                    "max": round(100 * DIVITIS_RATIO)}))
     return out
 
 
@@ -3755,13 +4034,18 @@ def audit_structured_data(pages: List[Page]) -> List[Finding]:
             "contenuti non sono eleggibili per i risultati arricchiti.",
             "Aggiungi almeno Organization (o LocalBusiness), poi "
             "Service, FAQPage, BreadcrumbList, Article.",
-            weight=2.0, example=EX_LOCALBUSINESS))
+            weight=2.0, example=EX_LOCALBUSINESS,
+            key="sd.jsonld.none"))
         return out
 
     out.append(Finding(
         AREA_SD, SEV_OK, "JSON-LD presente",
         "Tipi rilevati: %s." % ", ".join(
-            "%s (x%d)" % (t, c) for t, c in all_types.most_common(12))))
+            "%s (x%d)" % (t, c) for t, c in all_types.most_common(12)),
+        key="sd.jsonld.ok",
+        params={"types": ", ".join(
+            "%s (x%d)" % (t, c)
+            for t, c in all_types.most_common(12))}))
 
     entity_types = {"Organization", "LocalBusiness", "Corporation",
                     "ProfessionalService", "Person"}
@@ -3770,10 +4054,12 @@ def audit_structured_data(pages: List[Page]) -> List[Finding]:
             AREA_SD, SEV_CRITICAL, "Entita' principale non dichiarata",
             fix="Aggiungi Organization o LocalBusiness con nome, "
                 "indirizzo, contatti e identificativi fiscali.",
-            weight=1.5, example=EX_LOCALBUSINESS))
+            weight=1.5, example=EX_LOCALBUSINESS,
+            key="sd.entity.missing"))
     else:
         out.append(Finding(
-            AREA_SD, SEV_OK, "Entita' principale dichiarata"))
+            AREA_SD, SEV_OK, "Entita' principale dichiarata",
+            key="sd.entity.ok"))
 
     for wanted, sev, why in (
         ("FAQPage", SEV_WARNING,
@@ -3786,14 +4072,18 @@ def audit_structured_data(pages: List[Page]) -> List[Finding]:
             out.append(Finding(
                 AREA_SD, sev, "Markup %s assente" % wanted, why,
                 "Aggiungi il tipo %s dove pertinente." % wanted,
-                example=EX_FAQPAGE if wanted == "FAQPage" else ""))
+                example=EX_FAQPAGE if wanted == "FAQPage" else "",
+                key="sd.type.%s" % wanted.lower(),
+                params={"type": wanted}))
 
     covered = sum(1 for p in good if p.jsonld_types)
     if covered < len(good):
         out.append(Finding(
             AREA_SD, SEV_WARNING,
             "JSON-LD solo su %d pagine su %d" % (covered, len(good)),
-            fix="Estendi il markup a tutte le pagine rilevanti."))
+            fix="Estendi il markup a tutte le pagine rilevanti.",
+            key="sd.jsonld.partial",
+            params={"covered": covered, "total": len(good)}))
 
     out.extend(validate_jsonld(good))
     return out
@@ -3977,7 +4267,8 @@ def simulate_rrf(pages: List[Page], queries: Sequence[str],
         findings.append(Finding(
             AREA_RRF, SEV_CRITICAL,
             "Simulazione RRF non eseguibile",
-            "Servono almeno un chunk e una query.", weight=2.0))
+            "Servono almeno un chunk e una query.", weight=2.0,
+            key="rrf.not_runnable"))
         return [], findings, "n/d"
 
     corpus = [c.searchable for c in chunks]
@@ -4006,16 +4297,16 @@ def simulate_rrf(pages: List[Page], queries: Sequence[str],
     avg_consensus = sum(r.consensus for r in results) / len(results)
     consensus_ratio = avg_consensus / top_n
     if consensus_ratio < 0.2:
-        sev, note = SEV_CRITICAL, (
-            "Le due liste puntano a passaggi diversi: nessun documento "
-            "accumula punteggio su entrambi gli assi.")
+        sev, level = SEV_CRITICAL, "low"
+        note = ("Le due liste puntano a passaggi diversi: nessun "
+                "documento accumula punteggio su entrambi gli assi.")
     elif consensus_ratio < 0.45:
-        sev, note = SEV_WARNING, (
-            "Consenso parziale fra i due recuperatori.")
+        sev, level = SEV_WARNING, "mid"
+        note = "Consenso parziale fra i due recuperatori."
     else:
-        sev, note = SEV_OK, (
-            "Buona sovrapposizione fra recupero lessicale e "
-            "vettoriale.")
+        sev, level = SEV_OK, "good"
+        note = ("Buona sovrapposizione fra recupero lessicale e "
+                "vettoriale.")
     per_query = "; ".join(
         "\"%s\" %d/%d" % (r.query, r.consensus, top_n)
         for r in results[:12])
@@ -4030,7 +4321,10 @@ def simulate_rrf(pages: List[Page], queries: Sequence[str],
         "lista sola. Consenso per query: %s." % per_query,
         "Ottimizza gli stessi passaggi su entrambi gli assi: termini "
         "espliciti (BM25) e spiegazione completa (vettoriale).",
-        weight=2.0,
+        weight=2.0, key="rrf.consensus.%s" % level,
+        params={"avg": avg_consensus, "top_n": top_n,
+                "pct": consensus_ratio * 100,
+                "per_query": per_query},
         example="Prima (solo lessicale): \"Drenaggio linfatico. "
                 "Chiama per info.\"\n"
                 "Dopo (entrambi gli assi): \"Il drenaggio linfatico "
@@ -4046,6 +4340,9 @@ def simulate_rrf(pages: List[Page], queries: Sequence[str],
             "Nessun chunk del sito risponde a: %s."
             % "; ".join(uncovered[:5]),
             "Crea contenuti dedicati a questi intenti.", weight=2.0,
+            key="rrf.uncovered",
+            params={"n": len(uncovered),
+                    "queries": "; ".join(uncovered[:5])},
             example="Per ogni query scoperta, una sezione con "
                     "heading uguale alla domanda:\n"
                     "<h2>Quanto costa il drenaggio linfatico?</h2>\n"
@@ -4059,7 +4356,9 @@ def simulate_rrf(pages: List[Page], queries: Sequence[str],
             AREA_RRF, SEV_OK,
             "Tutte le %d query trovano almeno un passaggio"
             % len(results),
-            "Query verificate: %s." % elenco))
+            "Query verificate: %s." % elenco,
+            key="rrf.covered",
+            params={"n": len(results), "queries": elenco}))
 
     return results, findings, vector.mode
 
@@ -4122,7 +4421,8 @@ def simulate_share_of_voice(
                 AREA_RRF, SEV_INFO,
                 "Concorrente %s senza contenuto recuperabile" % host,
                 "Nessuna pagina analizzabile: il confronto lo "
-                "include con 0 passaggi."))
+                "include con 0 passaggi.",
+                key="rrf.comp.empty", params={"host": host}))
 
     chunks: List[Chunk] = list(own_chunks)
     owners: List[str] = [main_host] * len(own_chunks)
@@ -4134,7 +4434,8 @@ def simulate_share_of_voice(
         findings.append(Finding(
             AREA_RRF, SEV_CRITICAL,
             "Confronto competitivo non eseguibile",
-            "Servono almeno un chunk e una query.", weight=2.0))
+            "Servono almeno un chunk e una query.", weight=2.0,
+            key="rrf.comp.not_runnable"))
         return None, findings
 
     corpus = [c.searchable for c in chunks]
@@ -4172,16 +4473,18 @@ def simulate_share_of_voice(
         for host in sites)
 
     if mine < parity * 0.5:
-        sev, note = SEV_CRITICAL, (
-            "I concorrenti occupano i posti che servirebbero a te: "
-            "sui tuoi stessi temi vieni recuperato raramente.")
+        sev, level = SEV_CRITICAL, "low"
+        note = ("I concorrenti occupano i posti che servirebbero "
+                "a te: sui tuoi stessi temi vieni recuperato "
+                "raramente.")
     elif mine < parity:
-        sev, note = SEV_WARNING, (
-            "Sei sotto la parita': sui tuoi temi i concorrenti "
-            "vengono recuperati piu' spesso di te.")
+        sev, level = SEV_WARNING, "mid"
+        note = ("Sei sotto la parita': sui tuoi temi i "
+                "concorrenti vengono recuperati piu' spesso di "
+                "te.")
     else:
-        sev, note = SEV_OK, (
-            "Tieni testa ai concorrenti sui tuoi temi.")
+        sev, level = SEV_OK, "good"
+        note = "Tieni testa ai concorrenti sui tuoi temi."
     findings.append(Finding(
         AREA_RRF, sev,
         "Share of voice: %.0f%% dei primi %d posti fusi "
@@ -4189,7 +4492,10 @@ def simulate_share_of_voice(
         "%s Ripartizione: %s." % (note, breakdown),
         "Rafforza i passaggi sulle query dove i concorrenti ti "
         "superano: stessi termini espliciti, risposta completa.",
-        weight=2.0))
+        weight=2.0, key="rrf.share.%s" % level,
+        params={"pct": mine * 100, "top_n": top_n,
+                "parity": parity * 100,
+                "breakdown": breakdown}))
 
     absent = [r.query for r in results if r.mine_in_top == 0]
     if absent:
@@ -4202,7 +4508,10 @@ def simulate_share_of_voice(
             "Nessun tuo passaggio fra i primi %d per: %s."
             % (top_n, "; ".join(absent[:5])),
             "Crea o riscrivi contenuti dedicati a questi intenti.",
-            weight=2.0))
+            weight=2.0, key="rrf.comp.lost",
+            params={"n": len(absent), "total": len(results),
+                    "top_n": top_n,
+                    "queries": "; ".join(absent[:5])}))
     else:
         elenco = "; ".join("\"%s\"" % r.query for r in results[:12])
         if len(results) > 12:
@@ -4211,7 +4520,10 @@ def simulate_share_of_voice(
             AREA_RRF, SEV_OK,
             "Presente nei primi %d per tutte le %d query"
             % (top_n, len(results)),
-            "Query del confronto: %s." % elenco))
+            "Query del confronto: %s." % elenco,
+            key="rrf.comp.present",
+            params={"top_n": top_n, "n": len(results),
+                    "queries": elenco}))
 
     presence: Counter = Counter()
     for res in results:
@@ -4646,55 +4958,79 @@ def render_text(base: str, pages: List[Page],
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
                 judge: Optional[Dict[str, object]] = None,
-                delta: Optional[Dict[str, object]] = None) -> str:
+                delta: Optional[Dict[str, object]] = None,
+                lang: str = "it") -> str:
     """Referto testuale per la console."""
+    def T(it_text: str, en_text: str) -> str:
+        return en_text if lang == "en" else it_text
+
     marks = {SEV_CRITICAL: "[X]", SEV_WARNING: "[!]",
              SEV_OK: "[v]", SEV_INFO: "[i]"}
     lines: List[str] = []
     lines.append("=" * 70)
-    lines.append("MARS AUDIT  ·  %s" % base)
+    lines.append("MARS BEACON  ·  %s" % base)
     lines.append("Meta-fusion, Accessibility, Ranking & Security "
                  "Audit")
     lines.append("=" * 70)
-    lines.append("Pagine analizzate : %d" % len([p for p in pages if p.ok]))
-    lines.append("Chunk indicizzati : %d"
+    lines.append(T("Pagine analizzate : %d",
+                   "Pages analysed    : %d")
+                 % len([p for p in pages if p.ok]))
+    lines.append(T("Chunk indicizzati : %d",
+                   "Indexed chunks    : %d")
                  % sum(len(p.chunks) for p in pages if p.ok))
-    lines.append("Recuperatore vett.: %s" % mode)
+    lines.append(T("Recuperatore vett.: %s",
+                   "Vector retriever  : %s") % mode)
+    if lang == "en":
+        lines.append("Note: quoted evidence from the audited site "
+                     "stays in the site's language.")
     lines.append("")
-    lines.append("PUNTEGGI")
+    lines.append(T("PUNTEGGI", "SCORES"))
+    area_label = {} if lang != "en" else {
+        AREA_TECH: "Technical", AREA_LEX: "Lexical (BM25)",
+        AREA_SEM: "Semantic (vector)", AREA_SD: "Structured data",
+        AREA_RRF: "RRF simulation"}
     for area, score in scores.items():
         if score is None:
             continue
         bar = "#" * int(score / 5)
-        lines.append("  %-24s %5.1f/100  %s" % (area, score, bar))
-    lines.append("  %-24s %5.1f/100" % ("COMPLESSIVO",
-                                        overall_score(scores)))
+        lines.append("  %-24s %5.1f/100  %s"
+                     % (area_label.get(area, area), score, bar))
+    lines.append("  %-24s %5.1f/100"
+                 % (T("COMPLESSIVO", "OVERALL"),
+                    overall_score(scores)))
     lines.append("")
 
     if delta:
         marks_d = {SEV_CRITICAL: "[X]", SEV_WARNING: "[!]"}
-        lines.append("RISPETTO ALL'ESECUZIONE PRECEDENTE  ·  %s"
+        lines.append(T("RISPETTO ALL'ESECUZIONE PRECEDENTE  ·  %s",
+                       "COMPARED WITH THE PREVIOUS RUN  ·  %s")
                      % (delta.get("previous_generated_at") or ""))
         variazioni = [
-            "%s %+.1f" % (area, value) if value else "%s =" % area
+            "%s %+.1f" % (area_label.get(area, area), value)
+            if value else "%s =" % area_label.get(area, area)
             for area, value in dict(delta["scores"]).items()]
         if variazioni:
             lines.append("  " + " · ".join(variazioni))
-        for label, items in (("Risolti", delta["resolved"]),
-                             ("Nuovi", delta["new"])):
+        for label, items in ((T("Risolti", "Resolved"),
+                              delta["resolved"]),
+                             (T("Nuovi", "New"), delta["new"])):
             lines.append("  %s (%d):" % (label, len(list(items)))
-                         if items else "  %s: nessuno" % label)
+                         if items else
+                         T("  %s: nessuno", "  %s: none") % label)
             for f in items:
                 lines.append("    %s %s"
                              % (marks_d.get(str(f["severity"]),
                                             "[i]"), f["title"]))
-        lines.append("  Nota: rilievi confrontati per tipo (i "
-                     "conteggi nei titoli possono variare).")
+        lines.append(T("  Nota: rilievi confrontati per tipo (i "
+                       "conteggi nei titoli possono variare).",
+                       "  Note: findings compared by type (counts "
+                       "in titles may vary)."))
         lines.append("")
 
     cit = citability_profiles(pages, scores, market)
     if cit:
-        lines.append("PROFILI DI CITABILITA' PER ASSISTENTE IA")
+        lines.append(T("PROFILI DI CITABILITA' PER ASSISTENTE IA",
+                       "CITABILITY PROFILES PER AI ASSISTANT"))
         for prof in cit["profiles"]:
             if prof["score"] is None:
                 continue
@@ -4702,9 +5038,11 @@ def render_text(base: str, pages: List[Page],
             lines.append("  %-24s %5.1f/100  %s"
                          % (prof["label"], prof["score"], bar))
         if cit["index"] is not None:
-            lines.append("  %-24s %5.1f/100" % ("INDICE COMPOSITO",
-                                                cit["index"]))
-        lines.append("  Pesi (mercato %s): %s"
+            lines.append("  %-24s %5.1f/100"
+                         % (T("INDICE COMPOSITO", "COMPOSITE INDEX"),
+                            cit["index"]))
+        lines.append(T("  Pesi (mercato %s): %s",
+                       "  Weights (%s market): %s")
                      % (cit["market"],
                         ", ".join("%s %d%%" % (key, round(100 * w))
                                   for key, w
@@ -4712,28 +5050,38 @@ def render_text(base: str, pages: List[Page],
         actions = citability_top_actions(findings, pages, scores,
                                          market)
         if actions:
-            lines.append("  Azioni con maggior guadagno di "
-                         "profilo:")
+            lines.append(T("  Azioni con maggior guadagno di "
+                           "profilo:",
+                           "  Actions with the highest profile "
+                           "gain:"))
             for act in actions:
-                gain = (" -> %s (+%.1f punti profilo)"
-                        % (act["best_label"], act["best_gain"])
+                gain = ((T(" -> %s (+%.1f punti profilo)",
+                           " -> %s (+%.1f profile points)")
+                         % (act["best_label"], act["best_gain"]))
                         if act["best_profile"] else "")
-                lines.append("   %d. [sforzo: %s] %s%s"
+                lines.append(T("   %d. [sforzo: %s] %s%s",
+                               "   %d. [effort: %s] %s%s")
                              % (act["priority"], act["effort"],
-                                act["title"], gain))
-        lines.append("  Nota: %s" % cit["note"])
+                                finding_texts(act, lang)["title"],
+                                gain))
+        lines.append(T("  Nota: %s", "  Note: %s") % cit["note"])
         lines.append("")
 
     if judge:
-        lines.append("GIUDIZIO LLM SULLA CITABILITA'")
+        lines.append(T("GIUDIZIO LLM SULLA CITABILITA'",
+                       "LLM JUDGEMENT ON CITABILITY"))
         if judge.get("status") == "ok":
-            lines.append("  Modello: %s · passaggi valutati: %d · "
-                         "media: %.1f/100"
+            lines.append(T("  Modello: %s · passaggi valutati: %d "
+                           "· media: %.1f/100",
+                           "  Model: %s · passages judged: %d · "
+                           "average: %.1f/100")
                          % (judge["model"], judge["sampled"],
                             judge["average"]))
             if cit and cit["index"] is not None:
-                lines.append("  Indice euristico: %.1f — scarto "
-                             "giudice-euristica: %+.1f"
+                lines.append(T("  Indice euristico: %.1f — scarto "
+                               "giudice-euristica: %+.1f",
+                               "  Heuristic index: %.1f — "
+                               "judge-heuristic gap: %+.1f")
                              % (cit["index"],
                                 float(str(judge["average"]))
                                 - float(str(cit["index"]))))
@@ -4742,9 +5090,10 @@ def render_text(base: str, pages: List[Page],
                              % (v["score"], v["query"]))
                 if v["reason"]:
                     lines.append("             %s" % v["reason"])
-            lines.append("  Nota: %s" % judge["note"])
+            lines.append(T("  Nota: %s", "  Note: %s")
+                         % judge["note"])
         else:
-            lines.append("  Non eseguito: %s"
+            lines.append(T("  Non eseguito: %s", "  Not run: %s")
                          % judge.get("reason", ""))
         lines.append("")
 
@@ -4753,103 +5102,135 @@ def render_text(base: str, pages: List[Page],
         if not subset:
             continue
         lines.append("-" * 70)
-        lines.append(area.upper())
+        lines.append(area_label.get(area, area).upper())
         lines.append("-" * 70)
         order = {SEV_CRITICAL: 0, SEV_WARNING: 1, SEV_INFO: 2,
                  SEV_OK: 3}
         for finding in sorted(subset, key=lambda f: order[f.severity]):
+            texts = finding_texts(finding, lang)
             lines.append("%s %s" % (marks[finding.severity],
-                                    finding.title))
-            if finding.detail:
-                lines.append("    %s" % finding.detail)
-            if finding.fix:
-                lines.append("    -> Fix: %s" % finding.fix)
+                                    texts["title"]))
+            if texts["detail"]:
+                lines.append("    %s" % texts["detail"])
+            if texts["fix"]:
+                lines.append("    -> Fix: %s" % texts["fix"])
         lines.append("")
 
     math = surface_math(pages)
     if math:
         lines.append("-" * 70)
-        lines.append("LA MATEMATICA DEL PROBLEMA")
+        lines.append(T("LA MATEMATICA DEL PROBLEMA",
+                       "THE MATHS OF THE PROBLEM"))
         lines.append("-" * 70)
-        lines.append("  Superficie attuale   : %d pagine, %d chunk "
-                     "(~%d parole/pagina)"
+        lines.append(T("  Superficie attuale   : %d pagine, %d "
+                       "chunk (~%d parole/pagina)",
+                       "  Current surface     : %d pages, %d "
+                       "chunks (~%d words/page)")
                      % (math["pages"], math["chunks_now"],
                         math["words_avg"]))
-        lines.append("  Superficie potenziale: ~%d chunk (%s)"
+        lines.append(T("  Superficie potenziale: ~%d chunk (%s)",
+                       "  Potential surface   : ~%d chunks (%s)")
                      % (math["chunks_potential"], math["assumption"]))
         if math["multiplier"] is not None:
-            lines.append("  Effetto sull'RRF     : ~%.1fx occasioni "
-                         "di comparire nelle liste fuse"
+            lines.append(T("  Effetto sull'RRF     : ~%.1fx "
+                           "occasioni di comparire nelle liste "
+                           "fuse",
+                           "  Effect on RRF       : ~%.1fx "
+                           "opportunities to appear in the fused "
+                           "lists")
                          % math["multiplier"])
         else:
-            lines.append("  Effetto sull'RRF     : da 0 addendi a "
-                         "~%d occasioni di comparire nelle liste"
+            lines.append(T("  Effetto sull'RRF     : da 0 addendi "
+                           "a ~%d occasioni di comparire nelle "
+                           "liste",
+                           "  Effect on RRF       : from 0 "
+                           "addends to ~%d opportunities to "
+                           "appear in the lists")
                          % math["chunks_potential"])
         lines.append("")
 
     plan = build_remediation(findings, pages, scores, market)
     if plan:
         quick = sum(1 for i in plan if i["quick_win"])
-        criterio = ("gravita' e guadagno di citabilita'"
+        criterio = (T("gravita' e guadagno di citabilita'",
+                      "severity and citability gain")
                     if "index_gain" in plan[0] else
-                    "gravita' e peso")
+                    T("gravita' e peso", "severity and weight"))
         lines.append("-" * 70)
-        lines.append("PIANO DI REMEDIATION  ·  %d interventi per "
-                     "%s%s"
+        lines.append(T("PIANO DI REMEDIATION  ·  %d interventi "
+                       "per %s%s",
+                       "REMEDIATION PLAN  ·  %d actions by %s%s")
                      % (len(plan), criterio,
                         " · %d quick win" % quick if quick else ""))
         lines.append("-" * 70)
         for item in plan:
-            tag = ("CRITICO" if item["severity"] == SEV_CRITICAL
-                   else "AVVISO")
+            tag = (T("CRITICO", "CRITICAL")
+                   if item["severity"] == SEV_CRITICAL
+                   else T("AVVISO", "WARNING"))
             marker = "  ** QUICK WIN" if item["quick_win"] else ""
-            lines.append("%2d. [%s · %s · sforzo: %s] %s%s"
-                         % (item["priority"], tag, item["area"],
-                            item["effort"], item["title"], marker))
+            texts = finding_texts(item, lang)
+            lines.append(T("%2d. [%s · %s · sforzo: %s] %s%s",
+                           "%2d. [%s · %s · effort: %s] %s%s")
+                         % (item["priority"], tag,
+                            area_label.get(str(item["area"]),
+                                           item["area"]),
+                            item["effort"], texts["title"], marker))
             if item.get("cross"):
-                lines.append("    Trasversale: deprime %d profili "
-                             "di citabilita' (risolto vale +%.1f "
-                             "sull'indice)"
+                lines.append(T("    Trasversale: deprime %d "
+                               "profili di citabilita' (risolto "
+                               "vale +%.1f sull'indice)",
+                               "    Cross-cutting: depresses %d "
+                               "citability profiles (fixed it is "
+                               "worth +%.1f on the index)")
                              % (len(list(item["profiles_hit"])),
                                 item["index_gain"]))
-            if item["fix"]:
-                lines.append("    Fix: %s" % item["fix"])
-            if item["example"]:
-                lines.append("    Esempio:")
-                for row in str(item["example"]).splitlines():
+            if texts["fix"]:
+                lines.append("    Fix: %s" % texts["fix"])
+            if texts["example"]:
+                lines.append(T("    Esempio:", "    Example:"))
+                for row in texts["example"].splitlines():
                     lines.append("        %s" % row)
             lines.append("")
 
     if results:
         lines.append("-" * 70)
-        lines.append("DETTAGLIO SIMULAZIONE RRF")
+        lines.append(T("DETTAGLIO SIMULAZIONE RRF",
+                       "RRF SIMULATION DETAIL"))
         lines.append("-" * 70)
         for res in results:
-            lines.append("Query: %s   (consenso %d)"
+            lines.append(T("Query: %s   (consenso %d)",
+                           "Query: %s   (consensus %d)")
                          % (res.query, res.consensus))
             for rank, (label, score) in enumerate(res.fused_top, 1):
                 lines.append("   %d. %-52s  %.5f"
                              % (rank, label[:52], score))
             if not res.fused_top:
-                lines.append("   (nessun passaggio recuperato)")
+                lines.append(T("   (nessun passaggio recuperato)",
+                               "   (no passage retrieved)"))
             lines.append("")
 
     if competitive:
         lines.append("-" * 70)
-        lines.append("CONFRONTO COMPETITIVO  ·  share of voice sui "
-                     "primi %d posti fusi" % competitive["top_n"])
+        lines.append(T("CONFRONTO COMPETITIVO  ·  share of voice "
+                       "sui primi %d posti fusi",
+                       "COMPETITIVE COMPARISON  ·  share of voice "
+                       "over the first %d fused slots")
+                     % competitive["top_n"])
         lines.append("-" * 70)
         share = competitive["share"]
         for host in competitive["sites"]:
-            marker = "  <- tuo sito" if host == competitive["main"] \
-                else ""
+            marker = (T("  <- tuo sito", "  <- your site")
+                      if host == competitive["main"] else "")
             lines.append("  %-38s %5.1f%%%s"
                          % (host, share[host], marker))
         lines.append("")
         for row in competitive["queries"]:
-            best = ("miglior posizione %d" % row["best_rank_mine"]
-                    if row["best_rank_mine"] else "ASSENTE")
-            lines.append("  %-46s  tuoi %d/%d · %s"
+            best = (T("miglior posizione %d", "best position %d")
+                    % row["best_rank_mine"]
+                    if row["best_rank_mine"]
+                    else T("ASSENTE", "ABSENT"))
+            lines.append(T("  %-46s  tuoi %d/%d · %s",
+                           "  %-46s  yours %d/%d · %s")
                          % (row["query"][:46], row["mine_in_top"],
                             competitive["top_n"], best))
         lines.append("")
@@ -4867,6 +5248,1295 @@ def score_verdict(value: float) -> Tuple[str, str, str]:
     if value >= 40:
         return "Da migliorare", "var(--warn)", "!"
     return "Critico", "var(--bad)", "&#10005;"
+
+
+# Lingue dei referti (--lang, formati html/text/md/csv). La cornice
+# HTML passa da _HTML_I18N; i rilievi da _FINDINGS_EN via
+# finding_texts(). Le evidenze citate dal sito auditato restano
+# nella lingua del sito (nota dichiarata nel referto).
+HTML_LANGS = ("it", "en")
+
+_HTML_I18N: Dict[str, Dict[str, str]] = {
+    "it": {
+        "hero.ring": "Punteggio complessivo %.0f su 100: %s",
+        "hero.of100": "su 100",
+        "hero.thresholds": "buono &ge; 70 &middot; da migliorare "
+                           "40&ndash;69 &middot; critico &lt; 40",
+        "verdict.Buono": "Buono",
+        "verdict.Da migliorare": "Da migliorare",
+        "verdict.Critico": "Critico",
+        "tile.critical": "Critici",
+        "tile.warning": "Avvertenze",
+        "tile.info": "Informazioni",
+        "hero.donut_aria": "%d pagine: %d senza rilievi, %d con "
+                           "rilievi, %d in errore",
+        "hero.pages": "pagine",
+        "hero.clean": "%d senza rilievi",
+        "hero.flagged": "%d con rilievi",
+        "hero.broken": "%d in errore",
+        "meta.line": "Pagine analizzate: %d &middot; chunk "
+                     "indicizzati: %d &middot; recuperatore "
+                     "vettoriale: <code>%s</code>",
+        "note.findings_lang": "",
+        "top.h": "Top rilievi",
+        "top.critical": "CRITICO",
+        "top.warning": "AVVISO",
+        "gain.index": "+%.1f indice",
+        "score.total": "Complessivo",
+        "area.Tecnica": "Tecnica",
+        "area.Lessicale (BM25)": "Lessicale (BM25)",
+        "area.Semantica (vettoriale)": "Semantica (vettoriale)",
+        "area.Dati strutturati": "Dati strutturati",
+        "area.Simulazione RRF": "Simulazione RRF",
+        "delta.h": "Rispetto all'esecuzione precedente",
+        "delta.meta": "Confronto con l'audit del %s sullo stesso "
+                      "sito: l'audit diventa monitoraggio. Rilievi "
+                      "confrontati per tipo (i conteggi nei titoli "
+                      "possono variare).",
+        "delta.resolved": "Risolti",
+        "delta.new": "Nuovi",
+        "delta.none": "Nessuno.",
+        "cit.h": "Profili di citabilita' per assistente IA",
+        "cit.meta": "%s Mercato di riferimento: <b>%s</b> "
+                    "(pesi: %s).",
+        "cit.assistant": "Assistente",
+        "cit.focus": "Cosa premia",
+        "cit.score": "Punteggio",
+        "cit.index": "Indice composito (mercato %s)",
+        "cit.actions_h": "Top %d azioni prioritarie",
+        "cit.actions_meta": "Le prime voci del piano di remediation "
+                            "con il profilo che ne guadagna di piu' "
+                            "(stima in punti profilo, stessa natura "
+                            "euristica).",
+        "cit.best": " &mdash; guadagna di piu': <b>%s</b> "
+                    "(+%.1f punti profilo)",
+        "badge.effort": "sforzo: %s",
+        "badge.qw": "quick win",
+        "badge.cross": "trasversale: %d profili &middot; "
+                       "+%.1f indice",
+        "judge.h": "Giudizio LLM sulla citabilita'",
+        "judge.compare": " Indice euristico: %.1f — scarto "
+                         "giudice-euristica: %+.1f.",
+        "judge.meta": "Modello <code>%s</code> su %d passaggio/i "
+                      "&middot; media <b>%.1f</b>/100.%s %s",
+        "judge.query": "Query",
+        "judge.score": "Punteggio",
+        "judge.reason": "Motivazione",
+        "judge.skipped": "Non eseguito: %s",
+        "depth.h": "Profondita' di crawl",
+        "depth.meta": "Quanti click servono dalla home per "
+                      "raggiungere ogni pagina lungo i link "
+                      "interni: oltre 3 click scansione e peso "
+                      "calano.",
+        "graph.h": "Architettura dei link interni",
+        "graph.meta": "Ogni cerchio e' una pagina (ampiezza = link "
+                      "in ingresso), la home e' al centro; in ambra "
+                      "le pagine oltre 3 click o senza percorso. "
+                      "Mostrate %d pagine su %d.",
+        "graph.aria": "Grafo dei link interni; orfane e profondita' "
+                      "sono nei rilievi dell'area tecnica",
+        "graph.clicks": "%d click",
+        "graph.sitemap_only": "solo da sitemap",
+        "graph.node_title": "%s — %d link in ingresso, %s",
+        "math.h": "La matematica del problema",
+        "math.meta": "L'RRF premia chi compare in piu' liste con "
+                     "piu' passaggi pertinenti: il numero di chunk "
+                     "indicizzabili e' il vero moltiplicatore.",
+        "math.now": "Superficie attuale",
+        "math.now_v": "%d pagine, %d chunk (~%d parole/pagina)",
+        "math.pot": "Superficie potenziale",
+        "math.pot_v": "~%d chunk (%s)",
+        "math.fx": "Effetto sull'RRF",
+        "math.mult": "~%.1fx occasioni di comparire nelle liste "
+                     "fuse",
+        "math.zero": "da 0 addendi a ~%d occasioni di comparire "
+                     "nelle liste",
+        "plan.h": "Piano di remediation",
+        "plan.crit_gain": "gravita' e guadagno di citabilita': in "
+                          "testa i problemi trasversali, che "
+                          "deprimono piu' profili insieme",
+        "plan.crit_weight": "gravita' e peso: si parte da cio' che "
+                            "rende di piu' sul punteggio",
+        "plan.meta": "%d interventi ordinati per %s. Lo sforzo "
+                     "stimato (minuti/ore/giorni) individua i "
+                     "quick win%s.",
+        "plan.quick_here": " — qui sono %d",
+        "rrf.h": "Dettaglio simulazione RRF",
+        "rrf.meta": "Le tacche sul consenso sono le soglie del "
+                    "giudizio: sotto il 20% e' critico, sotto il "
+                    "45% da migliorare.",
+        "rrf.query": "Query",
+        "rrf.consensus": "Consenso",
+        "rrf.top": "Passaggio in testa dopo la fusione",
+        "rrf.score": "Punteggio",
+        "rrf.of5": "%d su 5",
+        "comp.h": "Confronto competitivo",
+        "comp.meta": "Share of voice sui primi %d posti delle "
+                     "liste fuse, sulle query dei temi del tuo "
+                     "sito. La tacca indica la parita' (%.0f%%): "
+                     "sopra la tacca si e' sopra la propria quota "
+                     "naturale.",
+        "comp.site": "Sito",
+        "comp.share": "Share",
+        "comp.mine": " <strong>(tuo sito)</strong>",
+        "comp.bubble_meta": "Mappa: orizzontale la share of voice, "
+                            "verticale in quante query su %d il "
+                            "sito compare, ampiezza della bolla il "
+                            "corpus in chunk.",
+        "comp.bubble_aria": "Mappa a bolle del posizionamento "
+                            "competitivo; i valori sono nelle "
+                            "tabelle",
+        "comp.query": "Query",
+        "comp.mine_passages": "Tuoi passaggi",
+        "comp.best": "Migliore posizione",
+        "comp.absent": "<strong>assente</strong>",
+        "footer.gen": "Generato da <code>seo_rrf_audit.py</code> "
+                      "v%s. La formula applicata e' <code>score(d) "
+                      "= &Sigma; 1/(k + rank_i(d))</code> con k=%d, "
+                      "pesi uguali per ogni lista.",
+        "footer.refs": "Riferimenti",
+        "anchor.label": "Link a questo rilievo",
+    },
+    "en": {
+        "hero.ring": "Overall score %.0f out of 100: %s",
+        "hero.of100": "out of 100",
+        "hero.thresholds": "good &ge; 70 &middot; needs work "
+                           "40&ndash;69 &middot; critical &lt; 40",
+        "verdict.Buono": "Good",
+        "verdict.Da migliorare": "Needs work",
+        "verdict.Critico": "Critical",
+        "tile.critical": "Critical",
+        "tile.warning": "Warnings",
+        "tile.info": "Notices",
+        "hero.donut_aria": "%d pages: %d clean, %d with findings, "
+                           "%d failing",
+        "hero.pages": "pages",
+        "hero.clean": "%d clean",
+        "hero.flagged": "%d with findings",
+        "hero.broken": "%d failing",
+        "meta.line": "Pages analysed: %d &middot; indexed chunks: "
+                     "%d &middot; vector retriever: <code>%s</code>",
+        "note.findings_lang": "Report in English. Quoted evidence "
+                              "from the audited site (URLs, page "
+                              "excerpts) and the run-comparison "
+                              "titles stay in the site's "
+                              "language.",
+        "top.h": "Top findings",
+        "top.critical": "CRITICAL",
+        "top.warning": "WARNING",
+        "gain.index": "+%.1f index",
+        "score.total": "Overall",
+        "area.Tecnica": "Technical",
+        "area.Lessicale (BM25)": "Lexical (BM25)",
+        "area.Semantica (vettoriale)": "Semantic (vector)",
+        "area.Dati strutturati": "Structured data",
+        "area.Simulazione RRF": "RRF simulation",
+        "delta.h": "Compared with the previous run",
+        "delta.meta": "Comparison with the %s audit of the same "
+                      "site: the audit becomes monitoring. "
+                      "Findings are compared by type (counts in "
+                      "titles may vary).",
+        "delta.resolved": "Resolved",
+        "delta.new": "New",
+        "delta.none": "None.",
+        "cit.h": "Citability profiles per AI assistant",
+        "cit.meta": "%s Reference market: <b>%s</b> "
+                    "(weights: %s).",
+        "cit.assistant": "Assistant",
+        "cit.focus": "What it rewards",
+        "cit.score": "Score",
+        "cit.index": "Composite index (%s market)",
+        "cit.actions_h": "Top %d priority actions",
+        "cit.actions_meta": "The first remediation-plan items with "
+                            "the profile that gains the most "
+                            "(estimate in profile points, same "
+                            "heuristic nature).",
+        "cit.best": " &mdash; gains the most: <b>%s</b> "
+                    "(+%.1f profile points)",
+        "badge.effort": "effort: %s",
+        "badge.qw": "quick win",
+        "badge.cross": "cross-cutting: %d profiles &middot; "
+                       "+%.1f index",
+        "judge.h": "LLM judgement on citability",
+        "judge.compare": " Heuristic index: %.1f — judge-heuristic "
+                         "gap: %+.1f.",
+        "judge.meta": "Model <code>%s</code> on %d passage(s) "
+                      "&middot; average <b>%.1f</b>/100.%s %s",
+        "judge.query": "Query",
+        "judge.score": "Score",
+        "judge.reason": "Rationale",
+        "judge.skipped": "Not run: %s",
+        "depth.h": "Crawl depth",
+        "depth.meta": "How many clicks from the home page it takes "
+                      "to reach each page along internal links: "
+                      "beyond 3 clicks crawling and weight "
+                      "decline.",
+        "graph.h": "Internal link architecture",
+        "graph.meta": "Each circle is a page (size = incoming "
+                      "links), the home page is at the centre; "
+                      "amber marks pages beyond 3 clicks or with "
+                      "no path. Showing %d pages out of %d.",
+        "graph.aria": "Internal link graph; orphans and depth are "
+                      "covered by the technical-area findings",
+        "graph.clicks": "%d clicks",
+        "graph.sitemap_only": "sitemap only",
+        "graph.node_title": "%s — %d incoming links, %s",
+        "math.h": "The maths of the problem",
+        "math.meta": "RRF rewards sites that appear in more lists "
+                     "with more relevant passages: the number of "
+                     "indexable chunks is the real multiplier.",
+        "math.now": "Current surface",
+        "math.now_v": "%d pages, %d chunks (~%d words/page)",
+        "math.pot": "Potential surface",
+        "math.pot_v": "~%d chunks (%s)",
+        "math.fx": "Effect on RRF",
+        "math.mult": "~%.1fx opportunities to appear in the fused "
+                     "lists",
+        "math.zero": "from 0 addends to ~%d opportunities to "
+                     "appear in the lists",
+        "plan.h": "Remediation plan",
+        "plan.crit_gain": "severity and citability gain: "
+                          "cross-cutting problems, which depress "
+                          "several profiles at once, come first",
+        "plan.crit_weight": "severity and weight: starting from "
+                            "what yields the most on the score",
+        "plan.meta": "%d actions sorted by %s. The estimated "
+                     "effort (minutes/hours/days) singles out the "
+                     "quick wins%s.",
+        "plan.quick_here": " — %d here",
+        "rrf.h": "RRF simulation detail",
+        "rrf.meta": "The ticks on consensus are the judgement "
+                    "thresholds: below 20% critical, below 45% "
+                    "needs work.",
+        "rrf.query": "Query",
+        "rrf.consensus": "Consensus",
+        "rrf.top": "Top passage after fusion",
+        "rrf.score": "Score",
+        "rrf.of5": "%d of 5",
+        "comp.h": "Competitive comparison",
+        "comp.meta": "Share of voice over the first %d fused "
+                     "positions, on queries from your site's "
+                     "themes. The tick marks parity (%.0f%%): "
+                     "above it you exceed your natural share.",
+        "comp.site": "Site",
+        "comp.share": "Share",
+        "comp.mine": " <strong>(your site)</strong>",
+        "comp.bubble_meta": "Map: share of voice horizontally, in "
+                            "how many of %d queries the site "
+                            "appears vertically, bubble size the "
+                            "corpus in chunks.",
+        "comp.bubble_aria": "Bubble map of competitive "
+                            "positioning; values are in the "
+                            "tables",
+        "comp.query": "Query",
+        "comp.mine_passages": "Your passages",
+        "comp.best": "Best position",
+        "comp.absent": "<strong>absent</strong>",
+        "footer.gen": "Generated by <code>seo_rrf_audit.py</code> "
+                      "v%s. The applied formula is <code>score(d) "
+                      "= &Sigma; 1/(k + rank_i(d))</code> with "
+                      "k=%d, equal weights per list.",
+        "footer.refs": "References",
+        "anchor.label": "Link to this finding",
+    },
+}
+
+# Catalogo inglese dei rilievi: chiave -> template dei testi
+# (title/detail/fix/example) con parametri %(nome)s. Contiene SOLO
+# l'inglese: l'italiano canonico vive nei punti di creazione dei
+# Finding, quindi il referto italiano non passa mai dal catalogo
+# (zero rischio di regressione). Le evidenze dinamiche nei params
+# (URL, estratti del sito auditato) restano nella lingua del sito.
+_FINDINGS_EN: Dict[str, Dict[str, str]] = {
+    "tech.robots.missing": {
+        "title": "robots.txt not reachable",
+        "detail": "Request to %(url)s failed or returned non-200.",
+        "fix": "Publish a robots.txt that declares the sitemap.",
+    },
+    "tech.robots.present": {
+        "title": "robots.txt present",
+        "detail": "%(n)d lines.",
+    },
+    "tech.robots.ai_blocked": {
+        "title": "AI crawlers blocked: %(agents)s",
+        "detail": "These agents cannot access the home page. If "
+                  "they are blocked you enter no retrieval list "
+                  "and RRF has nothing to fuse.",
+        "fix": "Remove the Disallow rules for the agents you want "
+               "to be cited by.",
+        "example": "# robots.txt - unblock the AI agents\n"
+                   "User-agent: GPTBot\nDisallow:\n\n"
+                   "User-agent: ClaudeBot\nDisallow:\n\n"
+                   "User-agent: PerplexityBot\nDisallow:",
+    },
+    "tech.robots.ai_allowed": {
+        "title": "AI crawlers allowed",
+        "detail": "Verified: %(agents)s.",
+    },
+    "tech.robots.sitemap_ok": {
+        "title": "Sitemap declared in robots.txt",
+        "detail": "%(urls)s",
+    },
+    "tech.robots.sitemap_missing": {
+        "title": "No sitemap declared in robots.txt",
+        "fix": "Add the line 'Sitemap: https://.../sitemap.xml'.",
+        "example": "# at the end of robots.txt\n"
+                   "Sitemap: https://esempio.it/sitemap.xml",
+    },
+    "tech.llms.present": {
+        "title": "llms.txt present",
+        "detail": "%(n)d lines.",
+    },
+    "tech.llms.missing": {
+        "title": "llms.txt missing",
+        "detail": "Emerging standard (llmstxt.org): a Markdown "
+                  "index of the key content meant for AI agents.",
+        "fix": "Consider publishing /llms.txt with your key "
+               "content.",
+    },
+    "tech.links.orphans": {
+        "title": "%(n)d page(s) with no incoming internal links "
+                 "(orphans)",
+        "detail": "Reachable only from the sitemap: %(urls)s. A "
+                  "page nobody links to gets fewer crawls and "
+                  "less weight.",
+        "fix": "Link them from related pages (body copy, menu or "
+               "footer).",
+        "example": "From the related page:\n"
+                   "<a href=\"/servizio-collegato/\">descriptive "
+                   "name of the service</a>",
+    },
+    "tech.links.no_orphans": {
+        "title": "Every page has incoming internal links",
+    },
+    "tech.links.deep": {
+        "title": "%(n)d page(s) more than 3 clicks from the home "
+                 "page",
+        "detail": "%(urls)s.",
+        "fix": "Shorten the paths: deep pages get crawled and "
+               "weighted less.",
+    },
+    "tech.links.generic_anchors": {
+        "title": "%(n)d generic anchors in internal links",
+        "detail": "Texts like \"click here\" or \"read more\" say "
+                  "nothing about the destination content.",
+        "fix": "Use descriptive anchors with the destination "
+               "page's terms.",
+    },
+    "tech.redirect.http_left": {
+        "title": "%(n)d internal URLs still on http",
+        "detail": "Redirected to the https version: %(urls)s. "
+                  "Every hop wastes crawl budget and dilutes the "
+                  "signals.",
+        "fix": "Update sitemap and internal links to the final "
+               "https URLs.",
+        "example": "<!-- before --> <a href=\"http://esempio.it/"
+                   "servizio/\">\n<!-- after  --> "
+                   "<a href=\"https://esempio.it/servizio/\">",
+    },
+    "tech.redirect.www_mixed": {
+        "title": "%(n)d URLs with mixed www/non-www host",
+        "detail": "Redirected to the canonical host: %(urls)s.",
+        "fix": "Use a single host (with or without www) in the "
+               "sitemap and internal links.",
+    },
+    "tech.redirect.moved": {
+        "title": "%(n)d internal URLs answer with a redirect",
+        "detail": "Moved URLs: %(urls)s.",
+        "fix": "Update sitemap and internal links to the final "
+               "destination of the redirects.",
+        "example": "In the sitemap and internal links use the "
+                   "landing URL directly:\n<url><loc>https://"
+                   "esempio.it/nuova-pagina/</loc></url>",
+    },
+    "tech.redirect.chains": {
+        "title": "%(n)d URLs with a multi-hop redirect chain",
+        "detail": "%(urls)s.",
+        "fix": "Point every redirect straight to the final "
+               "destination (a single hop).",
+        "example": "# one hop, not a chain\n"
+                   "Redirect 301 /vecchia/ "
+                   "https://esempio.it/nuova/\n"
+                   "# NOT: /vecchia/ -> /intermedia/ -> /nuova/",
+    },
+    "tech.redirect.none": {
+        "title": "No internal redirects",
+        "detail": "Every analysed URL answers directly.",
+    },
+    "tech.msft.noarchive": {
+        "title": "%(n)d page(s) excluded from Copilot (noarchive)",
+        "detail": "The noarchive meta excludes the content from "
+                  "Bing Chat/Copilot answers and from Microsoft "
+                  "model training (classic search is unaffected): "
+                  "on these pages citability on the Microsoft "
+                  "channel is zero. %(urls)s",
+        "fix": "If the exclusion is unintended remove noarchive; "
+               "for a partial presence (title, URL and snippet "
+               "only) use nocache.",
+    },
+    "tech.msft.nocache": {
+        "title": "%(n)d page(s) with partial presence in Copilot "
+                 "(nocache)",
+        "detail": "With nocache, Bing Chat/Copilot shows only the "
+                  "page's URL, title and snippet and uses only "
+                  "those elements for Microsoft training. "
+                  "%(urls)s",
+        "fix": "A legitimate partial opt-out: just check it is "
+               "intended. For full citability on Copilot remove "
+               "the meta.",
+    },
+    "tech.msft.no_optout": {
+        "title": "No Microsoft AI opt-out active",
+        "detail": "There is no robots.txt token dedicated to "
+                  "Microsoft's AI: control goes through the "
+                  "noarchive/nocache metas, absent here. Your "
+                  "content can therefore be used in Copilot "
+                  "answers and Microsoft training; to opt out use "
+                  "noarchive (full) or nocache (partial).",
+    },
+    "tech.anchors.varied": {
+        "title": "Varied internal anchor profile",
+        "detail": "%(texts)d unique texts over %(pairs)d "
+                  "text-destination pairs (%(pct).0f%%; common "
+                  "practice threshold: %(threshold).0f%%).",
+    },
+    "tech.anchors.repetitive": {
+        "title": "Repetitive internal anchor profile",
+        "detail": "%(texts)d unique texts over %(pairs)d "
+                  "text-destination pairs (%(pct).0f%%, common "
+                  "practice threshold %(threshold).0f%%): the "
+                  "same text leads to different destinations and "
+                  "the reader — human or model — cannot predict "
+                  "where the link goes. %(examples)s",
+        "fix": "Use descriptive anchors, distinct per "
+               "destination: the link text must say what is on "
+               "the other side.",
+        "example": "Before: \"Read more\" -> /servizi, \"Read "
+                   "more\" -> /prezzi\n"
+                   "After:  \"All lymphatic drainage services\" "
+                   "-> /servizi, \"Session prices\" -> /prezzi",
+    },
+    "tech.meta.charset": {
+        "title": "%(n)d page(s) without a declared charset",
+        "detail": "%(urls)s",
+        "fix": "Declare the encoding at the top of the <head>.",
+    },
+    "tech.meta.viewport": {
+        "title": "%(n)d page(s) without a viewport meta",
+        "detail": "Without a viewport the mobile rendering is "
+                  "undeclared: %(urls)s",
+        "fix": "Add the responsive viewport.",
+    },
+    "tech.meta.og_missing": {
+        "title": "%(n)d page(s) without Open Graph",
+        "detail": "Previews in shared links (and in many "
+                  "assistant answers) are built from the og:* "
+                  "tags: without them, whoever pastes the link "
+                  "decides the title and image. %(urls)s",
+        "fix": "Add at least the og:title, og:description, "
+               "og:image triad.",
+    },
+    "tech.meta.og_partial": {
+        "title": "Incomplete Open Graph on %(n)d page(s)",
+        "detail": "%(urls)s",
+        "fix": "Complete the og:title, og:description, og:image "
+               "triad.",
+    },
+    "tech.meta.ok": {
+        "title": "Basic metas in order",
+        "detail": "charset, viewport and Open Graph complete on "
+                  "all %(n)d analysed pages.",
+    },
+    "tech.https.missing": {
+        "title": "Site not on HTTPS",
+        "fix": "Enable a TLS certificate and redirect everything "
+               "to HTTPS.",
+    },
+    "tech.https.ok": {
+        "title": "HTTPS active",
+    },
+    "tech.pages.broken": {
+        "title": "%(n)d URLs unreachable or failing",
+        "detail": "%(urls)s",
+        "fix": "Fix the failing URLs or remove them from the "
+               "sitemap.",
+    },
+    "tech.pages.soft404": {
+        "title": "%(n)d possible soft-404s (200 with \"not "
+                 "found\" content)",
+        "detail": "They answer 200 but the content says the page "
+                  "does not exist: %(urls)s. They enter the index "
+                  "as empty pages and dilute the site's signals.",
+        "fix": "Make non-existent URLs answer 404 (or 410) and "
+               "remove the empty ones from the sitemap.",
+        "example": "The non-existent page must answer with status "
+                   "404, not 200:\n# Apache (.htaccess)\n"
+                   "ErrorDocument 404 /404.html\n"
+                   "# no redirect to the home instead of the 404",
+    },
+    "tech.pages.none": {
+        "title": "No analysable page",
+        "detail": "No URL returned valid HTML: the site is "
+                  "unreachable, blocks the tool's user-agent or "
+                  "only responds to JavaScript. The content audit "
+                  "was not performed.",
+        "fix": "Check that the site responds and does not filter "
+               "crawlers.",
+    },
+    "tech.pages.single": {
+        "title": "Minimal indexable surface (1 page)",
+        "detail": "With a single document the RRF sum has no "
+                  "addends: there are no distinct passages to "
+                  "surface.",
+        "fix": "Create standalone pages for every topic/service.",
+    },
+    "tech.pages.few": {
+        "title": "Few indexable pages (%(n)d)",
+        "fix": "Widen the surface: one page per intent.",
+    },
+    "tech.pages.ok": {
+        "title": "%(n)d indexable pages analysed",
+        "detail": "First pages: %(urls)s.",
+    },
+    "tech.sitemap.missing": {
+        "title": "XML sitemap missing or unreadable",
+        "detail": "URLs discovered by crawling internal links.",
+        "fix": "Publish an XML sitemap and declare it in "
+               "robots.txt.",
+    },
+    "tech.pages.placeholder": {
+        "title": "%(n)d indexable placeholder page(s)",
+        "detail": "Detected: %(urls)s. They are default CMS "
+                  "content: pure noise in the index and a signal "
+                  "of an unfinished site.",
+        "fix": "Delete them, or set noindex and remove them from "
+               "the sitemap.",
+    },
+    "tech.pages.noindex": {
+        "title": "%(n)d page(s) with a noindex robots meta",
+        "detail": "%(urls)s",
+        "fix": "Check the exclusion is intended.",
+        "example": "If the page must be indexed, remove the meta "
+                   "or use:\n<meta name=\"robots\" "
+                   "content=\"index, follow\">",
+    },
+    "tech.canonical.missing": {
+        "title": "%(n)d page(s) without a canonical",
+        "detail": "%(urls)s",
+        "fix": "Declare <link rel=\"canonical\"> on every page.",
+    },
+    "tech.canonical.ok": {
+        "title": "Canonicals present",
+        "detail": "Declared on all %(n)d analysed pages.",
+    },
+    "tech.lang.missing": {
+        "title": "%(n)d page(s) without a lang attribute",
+        "fix": "Set <html lang=\"it\">: it helps language-model "
+               "selection during analysis.",
+    },
+    "tech.js.heavy": {
+        "title": "%(n)d page(s) with little text and heavy "
+                 "JavaScript",
+        "detail": "The content may be rendered client-side and "
+                  "not be seen by crawlers.",
+        "fix": "Enable server-side rendering or pre-rendering.",
+    },
+    "tech.js.rendered": {
+        "title": "%(n)d page(s) with little text and heavy "
+                 "JavaScript",
+        "detail": "The content was analysed with JavaScript "
+                  "rendering, but crawlers that do not run "
+                  "JavaScript (most AI crawlers) still cannot "
+                  "see it.",
+        "fix": "Enable server-side rendering or pre-rendering.",
+    },
+    "tech.js.ok": {
+        "title": "Content present in the initial HTML",
+    },
+    "tech.slow": {
+        "title": "%(n)d page(s) answering in more than 2 s",
+        "detail": "Slowest: %(worst).2f s.",
+        "fix": "Optimise caching and TTFB.",
+    },
+    "tech.hreflang.missing": {
+        "title": "Multilingual site without hreflang",
+        "detail": "Detected languages: %(langs)s.",
+        "fix": "Declare reciprocal hreflang between the "
+               "versions.",
+    },
+    "tech.hreflang.na": {
+        "title": "Single-language site: hreflang not needed",
+    },
+    "lex.clickbait.found": {
+        "title": "%(n)d titles or headings with clickbait "
+                 "formulas",
+        "detail": "Sensationalist formulas and multiple "
+                  "exclamation marks attract the click but answer "
+                  "nothing: generative engines select informative "
+                  "titles. %(examples)s",
+        "fix": "Rewrite in an informative style: the benefit or "
+               "the answer in the title, no hyperbole.",
+        "example": "Before: \"You won't believe what drainage "
+                   "does!!\"\nAfter:  \"Lymphatic drainage: "
+                   "benefits, duration and cost of a session\"",
+    },
+    "lex.clickbait.none": {
+        "title": "No clickbait formula in titles and headings",
+        "detail": "Informative-style titles on all %(n)d analysed "
+                  "pages.",
+    },
+    "lex.title.missing": {
+        "title": "%(n)d page(s) without a <title>",
+        "fix": "The title is the highest-weight lexical signal.",
+    },
+    "lex.title.bad": {
+        "title": "%(n)d titles not optimised",
+        "detail": "Examples: %(examples)s",
+        "fix": "Unique title, 30-65 characters, with the real "
+               "search terms; avoid the domain name as a title.",
+        "example": "<title>Drenaggio linfatico manuale a Parma | "
+                   "Centro Esempio</title>\n"
+                   "(52 characters: service + territory + brand)",
+    },
+    "lex.title.dup": {
+        "title": "%(n)d titles duplicated across pages",
+        "detail": "%(examples)s",
+        "fix": "Every page must have a distinct title.",
+    },
+    "lex.title.ok": {
+        "title": "Titles well set up",
+    },
+    "lex.desc.missing": {
+        "title": "%(n)d page(s) without a meta description",
+        "detail": "%(urls)s",
+        "fix": "Write 110-165 characters with service and "
+               "territory.",
+    },
+    "lex.desc.short": {
+        "title": "%(n)d meta descriptions too short",
+        "detail": "Examples: %(examples)s",
+        "fix": "A description that only repeats the company name "
+               "carries no signal.",
+    },
+    "lex.desc.long": {
+        "title": "%(n)d meta descriptions above %(max)d "
+                 "characters",
+    },
+    "lex.desc.ok": {
+        "title": "Meta descriptions present and of adequate "
+                 "length",
+    },
+    "lex.h1.missing": {
+        "title": "%(n)d page(s) without an H1",
+        "detail": "%(urls)s",
+        "fix": "A single H1 per page, with the main terms.",
+    },
+    "lex.h1.multi": {
+        "title": "%(n)d page(s) with multiple H1s",
+    },
+    "lex.h1.ok": {
+        "title": "Correct H1 structure",
+    },
+    "lex.words.thin": {
+        "title": "%(n)d page(s) below %(min)d words",
+        "detail": "Site average: %(avg)d words. With so little "
+                  "text the useful terms never reach a frequency "
+                  "BM25 can reward.",
+        "fix": "Bring the key pages towards %(target)d+ words of "
+               "informative, non-promotional content.",
+        "example": "Typical structure for a service page:\n"
+                   "<h2>What is ...?</h2> <h2>How a session "
+                   "works</h2>\n<h2>When it is needed</h2> "
+                   "<h2>How much it costs</h2> <h2>FAQ</h2>",
+    },
+    "lex.words.ok": {
+        "title": "Adequate text volume",
+        "detail": "Average: %(avg)d words per page.",
+    },
+    "lex.acronyms.bare": {
+        "title": "Acronyms used without their expanded form",
+        "detail": "Not spelled out: %(list)s.",
+        "fix": "Write 'ACRONYM (expanded form)' at least at the "
+               "first occurrence: it covers both search "
+               "phrasings.",
+    },
+    "lex.acronyms.ok": {
+        "title": "Acronyms accompanied by their expanded form",
+        "detail": "%(list)s",
+    },
+    "lex.slug.bad": {
+        "title": "%(n)d slugs that say little",
+        "detail": "%(slugs)s",
+        "fix": "Use topical slugs with hyphens.",
+    },
+    "lex.slug.ok": {
+        "title": "Topical, readable slugs",
+    },
+    "lex.alt.partial": {
+        "title": "Incomplete alt attributes (%(with_alt)d/"
+                 "%(total)d)",
+        "fix": "The alt is indexable text as well as "
+               "accessibility.",
+    },
+    "lex.alt.ok": {
+        "title": "Alt attributes present (%(with_alt)d/"
+                 "%(total)d)",
+    },
+    "sem.extract.ok": {
+        "title": "Good direct extractability",
+        "detail": "%(direct)d paragraphs out of %(total)d open "
+                  "with an explicit answer in %(min)d-%(max)d "
+                  "words (%(pct).0f%% against a common practice "
+                  "threshold of %(threshold).0f%%): these are the "
+                  "passages an assistant can quote as they are.",
+    },
+    "sem.extract.low": {
+        "title": "Few direct-answer paragraphs",
+        "detail": "%(direct)d paragraphs out of %(total)d open "
+                  "with an explicit answer in %(min)d-%(max)d "
+                  "words (%(pct).0f%% against a common practice "
+                  "threshold of %(threshold).0f%%): these are the "
+                  "passages an assistant can quote as they are.",
+        "fix": "Rewrite the key paragraphs opening with the "
+               "answer (\"X is ...\", \"Yes, ...\", \"In short "
+               "...\") and keep them between %(min)d and %(max)d "
+               "words.",
+        "example": "Before: \"In today's wellness landscape, many "
+                   "people wonder which path...\"\n"
+                   "After:  \"Lymphatic drainage is a gentle "
+                   "massage that eases lymph flow: a session "
+                   "lasts 45 minutes and costs 40-80 euros.\"",
+    },
+    "sem.filler.saturated": {
+        "title": "%(n)d page(s) saturated with marketing "
+                 "formulas",
+        "detail": "Filler takes up space without saying anything "
+                  "extractable (common practice threshold: at "
+                  "least %(min)d formulas and one every 100 "
+                  "words). %(examples)s",
+        "fix": "Replace the generic formulas with verifiable "
+               "information: numbers, durations, prices, "
+               "procedures.",
+        "example": "Before: \"We are market leaders, quality and "
+                   "professionalism at your service.\"\n"
+                   "After:  \"Since 2012 we have followed more "
+                   "than 400 post-surgery patients; the first "
+                   "evaluation is free and takes 30 minutes.\"",
+    },
+    "sem.filler.ok": {
+        "title": "Marketing filler under control",
+        "detail": "%(n)d generic formulas across the whole site: "
+                  "useful text dominates.",
+    },
+    "sem.lifecycle.ok": {
+        "title": "Topic life cycle covered (%(n)d of 6)",
+        "detail": "Sections found in the headings: %(found)s.",
+    },
+    "sem.lifecycle.partial": {
+        "title": "Topic life cycle incomplete (%(n)d of 6)",
+        "detail": "A complete treatment covers definition, "
+                  "history, use cases, limits, FAQ and outlook: "
+                  "it is the content generative engines can cite "
+                  "for every angle of a question. %(found)s "
+                  "Missing: %(missing)s.",
+        "fix": "Add the missing sections with explicit headings "
+               "(they can be spread across several pages).",
+    },
+    "sem.fresh.ok": {
+        "title": "Recently updated content",
+        "detail": "Most recent declared update: %(date)s on "
+                  "%(url)s (%(days)d days ago).",
+    },
+    "sem.fresh.stale": {
+        "title": "Content untouched for over a year",
+        "detail": "The most recent declared update is from "
+                  "%(date)s (%(days)d days ago). Generative "
+                  "engines prefer maintained sources: a frozen "
+                  "date signals possibly outdated content. Oldest "
+                  "pages: %(stale)s.",
+        "fix": "Review the key content and declare the update "
+               "with article:modified_time or dateModified in "
+               "the JSON-LD.",
+    },
+    "sem.fresh.very_stale": {
+        "title": "Content untouched for over two years",
+        "detail": "The most recent declared update is from "
+                  "%(date)s (%(days)d days ago). Generative "
+                  "engines prefer maintained sources: a frozen "
+                  "date signals possibly outdated content. Oldest "
+                  "pages: %(stale)s.",
+        "fix": "Review the key content and declare the update "
+               "with article:modified_time or dateModified in "
+               "the JSON-LD.",
+    },
+    "sem.refs.ok": {
+        "title": "References to sources present",
+        "detail": "%(context)s (common practice threshold: a "
+                  "sources section or at least %(threshold)d "
+                  "citations).",
+    },
+    "sem.refs.missing": {
+        "title": "No reference to external sources",
+        "detail": "%(context)s. Citing sources strengthens "
+                  "E-E-A-T signals and gives AI assistants "
+                  "something to verify: referenced content is "
+                  "more citable.",
+        "fix": "Add a \"Sources\" section with links to "
+               "guidelines, studies or official documentation "
+               "(or citations in the text).",
+    },
+    "sem.chunks.none": {
+        "title": "No extractable chunk",
+        "detail": "The site offers no indexable text passages.",
+        "fix": "Write discursive paragraphs of at least 40-50 "
+               "words.",
+    },
+    "sem.chunks.ok": {
+        "title": "%(chunks)d indexable chunks across %(pages)d "
+                 "pages",
+        "detail": "Every chunk is a chance to appear in the "
+                  "lists: in the RRF sum the number of relevant "
+                  "passages is the real multiplier.",
+    },
+    "sem.chunks.few": {
+        "title": "%(chunks)d indexable chunks across %(pages)d "
+                 "pages",
+        "detail": "Every chunk is a chance to appear in the "
+                  "lists: in the RRF sum the number of relevant "
+                  "passages is the real multiplier.",
+        "fix": "Increase the number of self-contained topical "
+               "passages.",
+    },
+    "sem.anaphora.high": {
+        "title": "%(pct).0f%% of the chunks are not "
+                 "self-contained",
+        "detail": "They open with an anaphoric reference (this, "
+                  "such, that...): extracted on their own they "
+                  "answer nothing. Examples: %(examples)s.",
+        "fix": "Rewrite the openings naming the subject "
+               "explicitly.",
+        "example": "Before: \"This treatment is indicated after "
+                   "surgery.\"\nAfter:  \"Manual lymphatic "
+                   "drainage is indicated after surgery.\"",
+    },
+    "sem.anaphora.ok": {
+        "title": "Chunks largely self-contained (%(pct).0f%% "
+                 "anaphoric)",
+    },
+    "sem.questions.few": {
+        "title": "Almost no question-form heading (%(n)d of "
+                 "%(total)d)",
+        "detail": "It is the format AI engines cite most often: "
+                  "an explicit question followed by a direct "
+                  "answer.",
+        "fix": "Add headings like \"What is X?\", \"How does X "
+               "work?\", \"How much does X cost?\" with a crisp "
+               "2-3 line answer.",
+    },
+    "sem.questions.ok": {
+        "title": "%(n)d question-form headings (%(pct).0f%%)",
+        "detail": "Examples: %(examples)s.",
+    },
+    "sem.faq.ok": {
+        "title": "FAQ section detected",
+        "detail": "Detected on %(url)s.",
+    },
+    "sem.faq.missing": {
+        "title": "No FAQ section",
+        "detail": "FAQs align a chunk with a precise intent and "
+                  "feed both axes at the same time.",
+        "fix": "Add per-page FAQs, marked up with FAQPage "
+               "JSON-LD.",
+    },
+    "sem.defs.low": {
+        "title": "Content poor in definitions (%(pct).0f%% of "
+                 "chunks)",
+        "detail": "Without passages explaining *what* something "
+                  "is, the embeddings stay far from "
+                  "informational queries.",
+        "fix": "For every topic add: what it is / how it works / "
+               "when it is needed / an example.",
+    },
+    "sem.defs.ok": {
+        "title": "Defining passages present (%(pct).0f%% of "
+                 "chunks)",
+    },
+    "sem.examples.few": {
+        "title": "Almost no concrete example",
+        "fix": "Examples and case studies are the content with "
+               "the highest semantic density.",
+    },
+    "sem.examples.ok": {
+        "title": "%(n)d chunks with concrete examples",
+    },
+    "sem.vocab.narrow": {
+        "title": "Narrow vocabulary (%(n)d distinct terms)",
+        "detail": "Little lexical variety means limited semantic "
+                  "coverage: you intercept few rephrasings of "
+                  "the same question.",
+        "fix": "Broaden the topics covered and the phrasings "
+               "used.",
+    },
+    "sem.vocab.ok": {
+        "title": "Broad vocabulary (%(n)d distinct terms)",
+    },
+    "sem.eeat.author.ok": {
+        "title": "E-E-A-T: content author declared",
+    },
+    "sem.eeat.author.missing": {
+        "title": "E-E-A-T: no author declared",
+        "fix": "Add the author meta or the author property in "
+               "the JSON-LD: AI engines weigh who signs the "
+               "content.",
+    },
+    "sem.eeat.dates.ok": {
+        "title": "E-E-A-T: publication/update dates present",
+    },
+    "sem.eeat.dates.missing": {
+        "title": "E-E-A-T: no publication or update date",
+        "fix": "Expose article:published_time/modified_time or "
+               "datePublished/dateModified in the JSON-LD.",
+    },
+    "sem.eeat.about.ok": {
+        "title": "E-E-A-T: \"about us\" page present",
+    },
+    "sem.eeat.about.missing": {
+        "title": "E-E-A-T: no \"about us\" page detected",
+        "fix": "A page introducing people and expertise is the "
+               "most direct experience signal.",
+        "example": "Create /chi-siamo/ with: who curates the "
+                   "content, titles and training,\nsince when, "
+                   "real photos. Link it from every page's "
+                   "footer.",
+    },
+    "sem.eeat.contact.ok": {
+        "title": "E-E-A-T: verifiable contacts present",
+    },
+    "sem.eeat.contact.missing": {
+        "title": "E-E-A-T: no verifiable contact detected",
+        "fix": "Expose phone and email (tel:/mailto: links) or a "
+               "contact page.",
+    },
+    "sd.semantic.poor": {
+        "title": "%(n)d page(s) without semantic markup",
+        "detail": "Fewer than %(min)d sectioning tag types "
+                  "(article, section, main, figure...): the "
+                  "chunkers of generative engines have fewer "
+                  "hooks to segment the content into coherent "
+                  "blocks. %(urls)s",
+        "fix": "Wrap the main content in <main> and <article>, "
+               "topical sections in <section> with their "
+               "heading, images and captions in <figure>.",
+    },
+    "sd.semantic.divitis": {
+        "title": "%(n)d page(s) with an excess of <div> "
+                 "(divitis)",
+        "detail": "More than half the elements are a generic "
+                  "<div>: %(urls)s.",
+        "fix": "Replace structural <div>s with the equivalent "
+               "semantic tags: the markup becomes "
+               "self-describing.",
+    },
+    "sd.semantic.ok": {
+        "title": "Semantic markup in use",
+        "detail": "All %(n)d analysable pages use sectioning "
+                  "tags and keep <div>s below %(max)d%% of the "
+                  "elements.",
+    },
+    "sd.jsonld.none": {
+        "title": "No JSON-LD structured data",
+        "detail": "Without markup the entity is not recognised "
+                  "and the content is not eligible for rich "
+                  "results.",
+        "fix": "Add at least Organization (or LocalBusiness), "
+               "then Service, FAQPage, BreadcrumbList, Article.",
+    },
+    "sd.jsonld.ok": {
+        "title": "JSON-LD present",
+        "detail": "Detected types: %(types)s.",
+    },
+    "sd.entity.missing": {
+        "title": "Main entity not declared",
+        "fix": "Add Organization or LocalBusiness with name, "
+               "address, contacts and tax identifiers.",
+    },
+    "sd.entity.ok": {
+        "title": "Main entity declared",
+    },
+    "sd.type.faqpage": {
+        "title": "FAQPage markup missing",
+        "detail": "Marked-up FAQs are the format AI engines cite "
+                  "the most.",
+        "fix": "Add the FAQPage type where relevant.",
+    },
+    "sd.type.breadcrumblist": {
+        "title": "BreadcrumbList markup missing",
+        "detail": "It clarifies the site hierarchy.",
+        "fix": "Add the BreadcrumbList type where relevant.",
+    },
+    "sd.type.website": {
+        "title": "WebSite markup missing",
+        "detail": "Useful for the sitelinks searchbox.",
+        "fix": "Add the WebSite type where relevant.",
+    },
+    "sd.jsonld.partial": {
+        "title": "JSON-LD on only %(covered)d pages out of "
+                 "%(total)d",
+        "fix": "Extend the markup to all relevant pages.",
+    },
+    "sd.check.incomplete": {
+        "title": "Incomplete JSON-LD for %(n)d type(s)",
+        "fix": "Complete the listed properties: without them the "
+               "type is not eligible for rich results.",
+    },
+    "sd.check.faq": {
+        "title": "%(n)d incomplete FAQPage question(s)",
+        "detail": "Every mainEntity item requires a Question "
+                  "with name and an acceptedAnswer with text.",
+        "fix": "Complete the question/answer pairs in the "
+               "markup.",
+    },
+    "sd.check.offers": {
+        "title": "%(n)d issue(s) in offer prices",
+        "fix": "In price only the number with a decimal point "
+               "(no currency symbols); the currency in "
+               "priceCurrency (ISO 4217 code, e.g. EUR).",
+    },
+    "sd.check.product": {
+        "title": "%(n)d Product without offers or reviews",
+        "detail": "A Product without offers, review and "
+                  "aggregateRating is not eligible for product "
+                  "rich results.",
+        "fix": "Add at least offers (with price and "
+               "priceCurrency) or review/aggregateRating.",
+    },
+    "sd.check.rating": {
+        "title": "%(n)d inconsistent rating(s)",
+        "fix": "ratingValue inside the declared scale (default "
+               "1-5) and the review count in reviewCount or "
+               "ratingCount.",
+    },
+    "sd.check.dates": {
+        "title": "%(n)d date(s) not in ISO 8601 format",
+        "detail": "%(list)s.",
+        "fix": "Use YYYY-MM-DD, with the optional time after the "
+               "T (e.g. 2026-08-03T09:30:00+02:00).",
+    },
+    "sd.check.urls": {
+        "title": "%(n)d non-absolute media URLs in the markup",
+        "detail": "%(list)s.",
+        "fix": "image, logo, thumbnailUrl, contentUrl and "
+               "embedUrl require full http(s) URLs.",
+    },
+    "sd.check.ok": {
+        "title": "Consistent Schema.org markup (%(n)d types "
+                 "verified)",
+        "detail": "Verified: %(types)s.",
+    },
+    "rrf.not_runnable": {
+        "title": "RRF simulation not runnable",
+        "detail": "At least one chunk and one query are needed.",
+    },
+    "rrf.consensus.low": {
+        "title": "Average consensus between the lists: "
+                 "%(avg).1f/%(top_n)d (%(pct).0f%%)",
+        "detail": "The two lists point to different passages: no "
+                  "document accumulates score on both axes. In "
+                  "the RRF formula a document present in both "
+                  "lists sums two 1/(k+rank) addends and beats "
+                  "one that dominates a single list. Consensus "
+                  "per query: %(per_query)s.",
+        "fix": "Optimise the same passages on both axes: "
+               "explicit terms (BM25) and a complete explanation "
+               "(vector).",
+        "example": "Before (lexical only): \"Lymphatic drainage. "
+                   "Call for info.\"\nAfter (both axes): \"Manual "
+                   "lymphatic drainage is a gentle massage\nthat "
+                   "eases lymph flow: a session lasts 45 minutes"
+                   "\nand the typical cycle is 5 to 10 visits.\"",
+    },
+    "rrf.consensus.mid": {
+        "title": "Average consensus between the lists: "
+                 "%(avg).1f/%(top_n)d (%(pct).0f%%)",
+        "detail": "Partial consensus between the two retrievers. "
+                  "In the RRF formula a document present in both "
+                  "lists sums two 1/(k+rank) addends and beats "
+                  "one that dominates a single list. Consensus "
+                  "per query: %(per_query)s.",
+        "fix": "Optimise the same passages on both axes: "
+               "explicit terms (BM25) and a complete explanation "
+               "(vector).",
+    },
+    "rrf.consensus.good": {
+        "title": "Average consensus between the lists: "
+                 "%(avg).1f/%(top_n)d (%(pct).0f%%)",
+        "detail": "Good overlap between lexical and vector "
+                  "retrieval. In the RRF formula a document "
+                  "present in both lists sums two 1/(k+rank) "
+                  "addends and beats one that dominates a single "
+                  "list. Consensus per query: %(per_query)s.",
+    },
+    "rrf.uncovered": {
+        "title": "%(n)d queries with no result at all",
+        "detail": "No chunk of the site answers: %(queries)s.",
+        "fix": "Create content dedicated to these intents.",
+        "example": "For every uncovered query, a section with a "
+                   "heading equal to the question:\n"
+                   "<h2>How much does lymphatic drainage cost?"
+                   "</h2>\n<p>A session costs on average 40-80 "
+                   "euros, depending on duration and treated "
+                   "area.</p>",
+    },
+    "rrf.covered": {
+        "title": "All %(n)d queries find at least one passage",
+        "detail": "Verified queries: %(queries)s.",
+    },
+    "rrf.comp.empty": {
+        "title": "Competitor %(host)s with no retrievable "
+                 "content",
+        "detail": "No analysable page: the comparison includes "
+                  "it with 0 passages.",
+    },
+    "rrf.comp.not_runnable": {
+        "title": "Competitive comparison not runnable",
+        "detail": "At least one chunk and one query are needed.",
+    },
+    "rrf.share.low": {
+        "title": "Share of voice: %(pct).0f%% of the first "
+                 "%(top_n)d fused slots (parity %(parity).0f%%)",
+        "detail": "Competitors occupy the slots you would need: "
+                  "on your own topics you are rarely retrieved. "
+                  "Breakdown: %(breakdown)s.",
+        "fix": "Strengthen the passages on the queries where "
+               "competitors beat you: same explicit terms, "
+               "complete answer.",
+    },
+    "rrf.share.mid": {
+        "title": "Share of voice: %(pct).0f%% of the first "
+                 "%(top_n)d fused slots (parity %(parity).0f%%)",
+        "detail": "You are below parity: on your topics "
+                  "competitors get retrieved more often than "
+                  "you. Breakdown: %(breakdown)s.",
+        "fix": "Strengthen the passages on the queries where "
+               "competitors beat you: same explicit terms, "
+               "complete answer.",
+    },
+    "rrf.share.good": {
+        "title": "Share of voice: %(pct).0f%% of the first "
+                 "%(top_n)d fused slots (parity %(parity).0f%%)",
+        "detail": "You hold your own against competitors on your "
+                  "topics. Breakdown: %(breakdown)s.",
+    },
+    "rrf.comp.lost": {
+        "title": "%(n)d queries out of %(total)d won entirely by "
+                 "competitors",
+        "detail": "None of your passages in the first %(top_n)d "
+                  "for: %(queries)s.",
+        "fix": "Create or rewrite content dedicated to these "
+               "intents.",
+    },
+    "rrf.comp.present": {
+        "title": "Present in the first %(top_n)d for all %(n)d "
+                 "queries",
+        "detail": "Comparison queries: %(queries)s.",
+    },
+    "tech.robots.own": {
+        "title": "Site declared as your own",
+        "detail": "The robots.txt Disallow rules are not applied "
+                  "to the audited site (--own-site); they still "
+                  "apply to any competitors.",
+    },
+    "tech.robots.forced": {
+        "title": "robots.txt Disallow rules ignored on explicit "
+                 "request",
+        "detail": "Crawling beyond the Disallow rules was "
+                  "enabled with --ignore-robots %(ack)s: "
+                  "responsibility for the crawl was explicitly "
+                  "assumed by the user.",
+    },
+    "tech.robots.excluded": {
+        "title": "%(n)d URLs excluded out of respect for "
+                 "robots.txt",
+        "detail": "Disallow rules addressed to the %(agent)s "
+                  "agent are respected (default behaviour): "
+                  "%(urls)s. Use --own-site if the site is "
+                  "yours.",
+    },
+    "tech.render.done": {
+        "title": "%(n)d page(s) analysed with JavaScript "
+                 "rendering",
+        "detail": "Mode --render %(mode)s: the content comes "
+                  "from the DOM rendered in a headless browser; "
+                  "HTTP status, redirects and timings remain "
+                  "those of the original response.",
+    },
+    "tech.render.failed": {
+        "title": "Rendering failed for %(n)d page(s)",
+        "detail": "For these pages the static HTML was "
+                  "analysed.",
+        "fix": "Retry, or raise the timeout if the site is "
+               "slow.",
+    },
+    "tech.pages.duplicates": {
+        "title": "%(n)d URLs serve identical content",
+        "detail": "The same text is reachable from several "
+                  "addresses: %(urls)s. Duplicates add no "
+                  "addends to the RRF sum, dilute the signals "
+                  "and waste crawl budget.",
+        "fix": "Pick one canonical URL and redirect the others "
+               "with a 301.",
+    },
+}
+# fine _FINDINGS_EN
+
+
+def finding_texts(source: object, lang: str = "it") -> Dict[str, str]:
+    """Testi (title/detail/fix/example) nella lingua del referto.
+
+    ``source`` e' un Finding oppure un dict con le stesse chiavi
+    (es. voci del piano di remediation). Con "it", senza chiave o
+    senza voce in catalogo restano i testi italiani canonici; un
+    template incoerente coi params non interrompe mai il rendering
+    (ripiega sull'italiano campo per campo).
+    """
+    if isinstance(source, Finding):
+        data = {"title": source.title, "detail": source.detail,
+                "fix": source.fix, "example": source.example}
+        key: str = source.key
+        params: Dict[str, object] = source.params
+    else:
+        src = dict(source)  # type: ignore[call-overload]
+        data = {name: str(src.get(name) or "")
+                for name in ("title", "detail", "fix", "example")}
+        key = str(src.get("key") or "")
+        params = dict(src.get("params") or {})  # type: ignore
+    if lang == "it" or not key:
+        return data
+    entry = _FINDINGS_EN.get(key) or {}
+    for name, template in entry.items():
+        try:
+            data[name] = template % params
+        except (KeyError, TypeError, ValueError):
+            pass  # parametri incoerenti: resta l'italiano
+    return data
+
+
+def _finding_anchor(area: str, title: str,
+                    seen: Dict[str, int]) -> str:
+    """Ancora stabile di un rilievo nel referto HTML.
+
+    Come in ``_finding_key``, i numeri nel titolo diventano "n":
+    il link resta valido fra esecuzioni successive sullo stesso
+    sito anche quando i conteggi cambiano. I duplicati nello
+    stesso referto prendono un suffisso progressivo.
+    """
+    raw = "%s-%s" % (area, re.sub(r"\d+", "n", title))
+    slug = re.sub(r"[^a-z0-9]+", "-", raw.lower()).strip("-")[:70]
+    slug = "r-" + (slug.strip("-") or "rilievo")
+    seen[slug] = seen.get(slug, 0) + 1
+    if seen[slug] > 1:
+        slug = "%s-%d" % (slug, seen[slug])
+    return slug
 
 
 def page_status_counts(pages: List[Page],
@@ -4912,11 +6582,14 @@ def _donut_svg(segments: List[Tuple[int, str]], total: int,
 
 
 def _render_hero(pages: List[Page], findings: List[Finding],
-                 scores: Dict[str, Optional[float]]) -> str:
+                 scores: Dict[str, Optional[float]],
+                 lang: str = "it") -> str:
     """Testata visiva del referto: anello, verdetto, tile, donut."""
     esc = html.escape
+    lab = _HTML_I18N.get(lang) or _HTML_I18N["it"]
     total = overall_score(scores)
     label, hue, mark = score_verdict(total)
+    label = lab.get("verdict." + label, label)
     ring_c = 326.73  # 2 * pi * r, con r = 52
 
     sev_counts = Counter(f.severity for f in findings)
@@ -4925,52 +6598,55 @@ def _render_hero(pages: List[Page], findings: List[Finding],
 
     out: List[str] = ["<div class=\"hero\">"]
     out.append(
-        "<div class=\"ringbox\" role=\"img\" aria-label=\"Punteggio "
-        "complessivo %.0f su 100: %s\"><svg viewBox=\"0 0 120 120\" "
+        "<div class=\"ringbox\" role=\"img\" aria-label=\"%s\">"
+        "<svg viewBox=\"0 0 120 120\" "
         "width=\"124\" height=\"124\" aria-hidden=\"true\">"
         "<circle class=\"rtrack\" cx=\"60\" cy=\"60\" r=\"52\"></circle>"
         "<circle class=\"rfill\" cx=\"60\" cy=\"60\" r=\"52\" "
         "style=\"stroke:%s;stroke-dasharray:%.2f %.2f\" "
         "transform=\"rotate(-90 60 60)\"></circle></svg>"
         "<div class=\"rnum\" aria-hidden=\"true\"><b>%.0f</b>"
-        "<small>su 100</small></div></div>"
-        % (total, esc(label), hue, ring_c * total / 100.0,
-           ring_c, total))
+        "<small>%s</small></div></div>"
+        % (lab["hero.ring"] % (total, esc(label)), hue,
+           ring_c * total / 100.0, ring_c, total,
+           lab["hero.of100"]))
     out.append(
         "<div class=\"heroside\"><p class=\"verdict\"><span class="
         "\"ico\" style=\"background:%s\">%s</span>%s</p>"
-        "<p class=\"soglie\">buono &ge; 70 &middot; da migliorare "
-        "40&ndash;69 &middot; critico &lt; 40</p><div class=\"tiles\">"
-        % (hue, mark, esc(label)))
-    for sev, label_it, color in (
-            (SEV_CRITICAL, "Critici", "var(--bad)"),
-            (SEV_WARNING, "Avvertenze", "var(--warn)"),
-            (SEV_INFO, "Informazioni", "var(--muted)")):
+        "<p class=\"soglie\">%s</p><div class=\"tiles\">"
+        % (hue, mark, esc(label), lab["hero.thresholds"]))
+    for sev, tile_key, color in (
+            (SEV_CRITICAL, "tile.critical", "var(--bad)"),
+            (SEV_WARNING, "tile.warning", "var(--warn)"),
+            (SEV_INFO, "tile.info", "var(--muted)")):
         out.append(
             "<div class=\"tile\"><span class=\"lbl\"><span class="
             "\"dot\" style=\"background:%s\"></span>%s</span>"
             "<b>%d</b></div>"
-            % (color, esc(label_it), sev_counts.get(sev, 0)))
+            % (color, esc(lab[tile_key]), sev_counts.get(sev, 0)))
     out.append("</div></div>")
 
     if n_pages:
         donut = _donut_svg(
             [(clean, "var(--good)"), (flagged, "var(--warn)"),
              (broken, "var(--bad)")], n_pages,
-            "%d pagine: %d senza rilievi, %d con rilievi, %d in "
-            "errore" % (n_pages, clean, flagged, broken))
+            lab["hero.donut_aria"]
+            % (n_pages, clean, flagged, broken))
         out.append(
             "<div class=\"donutbox\"><div class=\"donutwrap\">%s"
             "<div class=\"dnum\" aria-hidden=\"true\"><b>%d</b>"
-            "<small>pagine</small></div></div>"
+            "<small>%s</small></div></div>"
             "<ul class=\"dleg\" aria-hidden=\"true\">"
             "<li><span class=\"dot\" style=\"background:var(--good)\">"
-            "</span>%d senza rilievi</li>"
+            "</span>%s</li>"
             "<li><span class=\"dot\" style=\"background:var(--warn)\">"
-            "</span>%d con rilievi</li>"
+            "</span>%s</li>"
             "<li><span class=\"dot\" style=\"background:var(--bad)\">"
-            "</span>%d in errore</li></ul></div>"
-            % (donut, n_pages, clean, flagged, broken))
+            "</span>%s</li></ul></div>"
+            % (donut, n_pages, lab["hero.pages"],
+               lab["hero.clean"] % clean,
+               lab["hero.flagged"] % flagged,
+               lab["hero.broken"] % broken))
     out.append("</div>")
     return "".join(out)
 
@@ -4983,57 +6659,96 @@ def render_html(base: str, pages: List[Page],
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
                 judge: Optional[Dict[str, object]] = None,
-                delta: Optional[Dict[str, object]] = None) -> str:
-    """Referto HTML autonomo, leggibile in chiaro e in scuro."""
+                delta: Optional[Dict[str, object]] = None,
+                lang: str = "it") -> str:
+    """Referto HTML autonomo, leggibile in chiaro e in scuro.
+
+    ``lang`` governa la lingua della cornice (sezioni, tabelle,
+    legende, catalogo ``_HTML_I18N``); i rilievi e i testi generati
+    dall'audit restano in italiano e con "en" il referto lo
+    dichiara in testa.
+    """
     esc = html.escape
+    lab = _HTML_I18N.get(lang) or _HTML_I18N["it"]
+    lang = lang if lang in _HTML_I18N else "it"
     colors = {SEV_CRITICAL: "var(--bad)", SEV_WARNING: "var(--warn)",
               SEV_OK: "var(--good)", SEV_INFO: "var(--muted)"}
     marks = {SEV_CRITICAL: "&#10005;", SEV_WARNING: "!",
              SEV_OK: "&#10003;", SEV_INFO: "i"}
 
+    # Ancore stabili per rilievo, nell'ordine in cui le sezioni per
+    # area li mostrano; la mappa per chiave storica serve ai link
+    # interni di "Top rilievi" e del piano di remediation.
+    order = {SEV_CRITICAL: 0, SEV_WARNING: 1, SEV_INFO: 2, SEV_OK: 3}
+    anchor_ids: Dict[int, str] = {}
+    anchor_by_key: Dict[Tuple[str, str], str] = {}
+    slug_seen: Dict[str, int] = {}
+    for area in (AREA_TECH, AREA_LEX, AREA_SEM, AREA_SD, AREA_RRF):
+        for finding in sorted(
+                (f for f in findings if f.area == area),
+                key=lambda f: order[f.severity]):
+            slug = _finding_anchor(area, finding.title, slug_seen)
+            anchor_ids[id(finding)] = slug
+            anchor_by_key.setdefault(
+                _finding_key({"area": area,
+                              "title": finding.title}), slug)
+
+    def link_to(area: object, title: object) -> Tuple[str, str]:
+        """(apertura, chiusura) del link all'ancora del rilievo."""
+        slug = anchor_by_key.get(
+            _finding_key({"area": str(area), "title": str(title)}))
+        if not slug:
+            return "", ""
+        return "<a class=\"rlink\" href=\"#%s\">" % slug, "</a>"
+
     parts: List[str] = []
     parts.append(
-        "<!DOCTYPE html><html lang=\"it\"><head>"
+        "<!DOCTYPE html><html lang=\"%s\"><head>"
         "<meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,"
         "initial-scale=1\">"
-        "<title>MARS Audit - %s</title><style>%s</style>"
-        "</head><body><div class=\"wrap\">" % (esc(base), _CSS))
+        "<title>MARS Beacon - %s</title><style>%s</style>"
+        "</head><body><div class=\"wrap\">"
+        % (lang, esc(base), _CSS))
 
-    parts.append("<h1>MARS Audit</h1>")
+    parts.append("<h1>MARS Beacon</h1>")
     parts.append("<p class=\"meta\">Meta-fusion, Accessibility, "
                  "Ranking &amp; Security Audit</p>")
     parts.append("<p class=\"sub\">%s</p>" % esc(base))
     parts.append(
-        "<p class=\"meta\">Pagine analizzate: %d &middot; chunk "
-        "indicizzati: %d &middot; recuperatore vettoriale: <code>%s"
-        "</code></p>" % (
+        "<p class=\"meta\">%s</p>" % (lab["meta.line"] % (
             len([p for p in pages if p.ok]),
-            sum(len(p.chunks) for p in pages if p.ok), esc(mode)))
+            sum(len(p.chunks) for p in pages if p.ok), esc(mode))))
+    if lab["note.findings_lang"]:
+        parts.append("<p class=\"meta\"><em>%s</em></p>"
+                     % lab["note.findings_lang"])
 
-    parts.append(_render_hero(pages, findings, scores))
+    parts.append(_render_hero(pages, findings, scores, lang))
 
     # Widget "Top rilievi": la testa del piano di remediation come
     # vista compatta trasversale alle aree (pattern Top Issues di
     # Ahrefs/Semrush); pallino + etichetta testuale, mai solo colore.
     top_plan = build_remediation(findings, pages, scores, market)[:5]
     if top_plan:
-        parts.append("<section class=\"toplist\"><h2>Top rilievi"
-                     "</h2><ol>")
+        parts.append("<section class=\"toplist\"><h2>%s"
+                     "</h2><ol>" % lab["top.h"])
         for item in top_plan:
             sev = str(item["severity"])
             gain = ""
             if item.get("index_gain"):
-                gain = (" <span class=\"eff\">+%.1f indice</span>"
-                        % item["index_gain"])
+                gain = (" <span class=\"eff\">%s</span>"
+                        % (lab["gain.index"] % item["index_gain"]))
+            a_open, a_close = link_to(item["area"], item["title"])
             parts.append(
                 "<li><span class=\"dot\" style=\"background:%s\">"
-                "</span> <b>%s</b> <span class=\"meta\">[%s · %s]"
-                "</span>%s</li>"
-                % (colors.get(sev, "var(--muted)"),
-                   esc(str(item["title"])),
-                   "CRITICO" if sev == SEV_CRITICAL else "AVVISO",
-                   esc(str(item["area"])), gain))
+                "</span> %s<b>%s</b>%s <span class=\"meta\">"
+                "[%s · %s]</span>%s</li>"
+                % (colors.get(sev, "var(--muted)"), a_open,
+                   esc(finding_texts(item, lang)["title"]), a_close,
+                   lab["top.critical"] if sev == SEV_CRITICAL
+                   else lab["top.warning"],
+                   esc(lab.get("area." + str(item["area"]),
+                               str(item["area"]))), gain))
         parts.append("</ol></section>")
 
     parts.append("<div class=\"scores\">")
@@ -5046,37 +6761,38 @@ def render_html(base: str, pages: List[Page],
             "<div class=\"sc\"><h3>%s<span style=\"color:%s\">%.0f</span>"
             "</h3><div class=\"bar\"><div class=\"fill\" style=\"width:"
             "%.0f%%;background:%s\"></div></div></div>"
-            % (esc(area), hue, score, score, hue))
+            % (esc(lab.get("area." + area, area)), hue, score,
+               score, hue))
     total = overall_score(scores)
     hue = "var(--good)" if total >= 70 else (
         "var(--warn)" if total >= 40 else "var(--bad)")
     parts.append(
-        "<div class=\"sc tot\"><h3>Complessivo<span style=\"color:%s\">"
+        "<div class=\"sc tot\"><h3>%s<span style=\"color:%s\">"
         "%.0f</span></h3><div class=\"bar\"><div class=\"fill\" "
         "style=\"width:%.0f%%;background:%s\"></div></div></div>"
-        % (hue, total, total, hue))
+        % (lab["score.total"], hue, total, total, hue))
     parts.append("</div>")
 
     if delta:
         parts.append(
-            "<section><h2>Rispetto all'esecuzione precedente</h2>"
-            "<p class=\"meta\">Confronto con l'audit del %s sullo "
-            "stesso sito: l'audit diventa monitoraggio. Rilievi "
-            "confrontati per tipo (i conteggi nei titoli possono "
-            "variare).</p>"
-            % esc(str(delta.get("previous_generated_at") or "")))
+            "<section><h2>%s</h2><p class=\"meta\">%s</p>"
+            % (lab["delta.h"], lab["delta.meta"]
+               % esc(str(delta.get("previous_generated_at") or ""))))
         variazioni = " · ".join(
-            "%s <b>%+.1f</b>" % (esc(area), value) if value
-            else "%s =" % esc(area)
+            "%s <b>%+.1f</b>"
+            % (esc(lab.get("area." + area, area)), value) if value
+            else "%s =" % esc(lab.get("area." + area, area))
             for area, value in dict(delta["scores"]).items())
         if variazioni:
             parts.append("<p class=\"meta\">%s</p>" % variazioni)
-        for label, items in (("Risolti", delta["resolved"]),
-                             ("Nuovi", delta["new"])):
+        for label, items in ((lab["delta.resolved"],
+                              delta["resolved"]),
+                             (lab["delta.new"], delta["new"])):
             parts.append("<h3>%s (%d)</h3>"
                          % (label, len(list(items))))
             if not items:
-                parts.append("<p class=\"meta\">Nessuno.</p>")
+                parts.append("<p class=\"meta\">%s</p>"
+                             % lab["delta.none"])
             for f in items:
                 sev = str(f["severity"])
                 parts.append(
@@ -5093,13 +6809,15 @@ def render_html(base: str, pages: List[Page],
         pesi = ", ".join("%s %d%%" % (key, round(100 * w))
                          for key, w in cit["market_weights"].items())
         parts.append(
-            "<section><h2>Profili di citabilita' per assistente IA"
-            "</h2><p class=\"meta\">%s Mercato di riferimento: "
-            "<b>%s</b> (pesi: %s).</p>"
-            "<table class=\"citprof\"><thead><tr><th>Assistente"
-            "</th><th>Cosa premia</th><th>Punteggio</th></tr>"
+            "<section><h2>%s</h2><p class=\"meta\">%s</p>"
+            "<table class=\"citprof\"><thead><tr><th>%s"
+            "</th><th>%s</th><th>%s</th></tr>"
             "</thead><tbody>"
-            % (esc(cit["note"]), esc(cit["market"]), esc(pesi)))
+            % (lab["cit.h"],
+               lab["cit.meta"] % (esc(cit["note"]),
+                                  esc(cit["market"]), esc(pesi)),
+               lab["cit.assistant"], lab["cit.focus"],
+               lab["cit.score"]))
         for prof in cit["profiles"]:
             if prof["score"] is None:
                 continue
@@ -5119,59 +6837,60 @@ def render_html(base: str, pages: List[Page],
             hue = "var(--good)" if val >= 70 else (
                 "var(--warn)" if val >= 40 else "var(--bad)")
             parts.append(
-                "<tr><th>Indice composito (mercato %s)</th>"
+                "<tr><th>%s</th>"
                 "<td>&mdash;</td><td style=\"color:%s\">"
                 "<b>%.1f</b>/100<div class=\"bar\">"
                 "<div class=\"fill\" style=\"width:%.0f%%;"
                 "background:%s\"></div></div></td></tr>"
-                % (esc(cit["market"]), hue, val, val, hue))
+                % (lab["cit.index"] % esc(cit["market"]), hue,
+                   val, val, hue))
         parts.append("</tbody></table>")
         actions = citability_top_actions(findings, pages, scores,
                                          market)
         if actions:
             parts.append(
-                "<h3>Top %d azioni prioritarie</h3>"
-                "<p class=\"meta\">Le prime voci del piano di "
-                "remediation con il profilo che ne guadagna di "
-                "piu' (stima in punti profilo, stessa natura "
-                "euristica).</p><ol class=\"cit-actions\">"
-                % len(actions))
+                "<h3>%s</h3><p class=\"meta\">%s</p>"
+                "<ol class=\"cit-actions\">"
+                % (lab["cit.actions_h"] % len(actions),
+                   lab["cit.actions_meta"]))
             for act in actions:
-                badges = ("<span class=\"eff\">sforzo: %s</span>"
-                          % esc(str(act["effort"])))
+                badges = ("<span class=\"eff\">%s</span>"
+                          % (lab["badge.effort"]
+                             % esc(str(act["effort"]))))
                 if act["quick_win"]:
-                    badges += "<span class=\"qw\">quick win</span>"
+                    badges += ("<span class=\"qw\">%s</span>"
+                               % lab["badge.qw"])
                 gain = ""
                 if act["best_profile"]:
-                    gain = (" &mdash; guadagna di piu': <b>%s</b> "
-                            "(+%.1f punti profilo)"
+                    gain = (lab["cit.best"]
                             % (esc(str(act["best_label"])),
                                act["best_gain"]))
                 parts.append("<li>%s %s%s</li>"
-                             % (esc(str(act["title"])), badges,
-                                gain))
+                             % (esc(finding_texts(
+                                 act, lang)["title"]),
+                                badges, gain))
             parts.append("</ol>")
         parts.append("</section>")
 
     if judge:
-        parts.append("<section><h2>Giudizio LLM sulla "
-                     "citabilita'</h2>")
+        parts.append("<section><h2>%s</h2>" % lab["judge.h"])
         if judge.get("status") == "ok":
             confronto = ""
             if cit and cit["index"] is not None:
-                confronto = (" Indice euristico: %.1f — scarto "
-                             "giudice-euristica: %+.1f."
+                confronto = (lab["judge.compare"]
                              % (cit["index"],
                                 float(str(judge["average"]))
                                 - float(str(cit["index"]))))
             parts.append(
-                "<p class=\"meta\">Modello <code>%s</code> su %d "
-                "passaggio/i · media <b>%.1f</b>/100.%s %s</p>"
-                "<table><thead><tr><th>Query</th><th>Punteggio"
-                "</th><th>Motivazione</th></tr></thead><tbody>"
-                % (esc(str(judge["model"])), judge["sampled"],
-                   judge["average"], esc(confronto),
-                   esc(str(judge["note"]))))
+                "<p class=\"meta\">%s</p>"
+                "<table><thead><tr><th>%s</th><th>%s"
+                "</th><th>%s</th></tr></thead><tbody>"
+                % (lab["judge.meta"]
+                   % (esc(str(judge["model"])), judge["sampled"],
+                      judge["average"], esc(confronto),
+                      esc(str(judge["note"]))),
+                   lab["judge.query"], lab["judge.score"],
+                   lab["judge.reason"]))
             for v in judge["verdicts"]:
                 val = float(str(v["score"]))
                 hue = "var(--good)" if val >= 70 else (
@@ -5183,29 +6902,36 @@ def render_html(base: str, pages: List[Page],
                        esc(str(v["reason"]))))
             parts.append("</tbody></table>")
         else:
-            parts.append("<p class=\"meta\">Non eseguito: %s</p>"
-                         % esc(str(judge.get("reason", ""))))
+            parts.append("<p class=\"meta\">%s</p>"
+                         % (lab["judge.skipped"]
+                            % esc(str(judge.get("reason", "")))))
         parts.append("</section>")
 
-    order = {SEV_CRITICAL: 0, SEV_WARNING: 1, SEV_INFO: 2, SEV_OK: 3}
     for area in (AREA_TECH, AREA_LEX, AREA_SEM, AREA_SD, AREA_RRF):
         subset = sorted((f for f in findings if f.area == area),
                         key=lambda f: order[f.severity])
         if not subset:
             continue
-        parts.append("<section><h2>%s</h2>" % esc(area))
+        parts.append("<section><h2>%s</h2>"
+                     % esc(lab.get("area." + area, area)))
         for finding in subset:
+            slug = anchor_ids[id(finding)]
+            texts = finding_texts(finding, lang)
             parts.append(
-                "<div class=\"find\"><span class=\"ico\" style=\""
-                "background:%s\">%s</span><div class=\"txt\"><b>%s</b>"
-                % (colors[finding.severity], marks[finding.severity],
-                   esc(finding.title)))
-            if finding.detail:
+                "<div class=\"find\" id=\"%s\"><span class=\"ico\" "
+                "style=\"background:%s\">%s</span>"
+                "<div class=\"txt\"><b>%s</b> "
+                "<a class=\"anchor\" href=\"#%s\" "
+                "aria-label=\"%s\">#</a>"
+                % (slug, colors[finding.severity],
+                   marks[finding.severity], esc(texts["title"]),
+                   slug, lab["anchor.label"]))
+            if texts["detail"]:
                 parts.append("<span class=\"d\">%s</span>"
-                             % esc(finding.detail))
-            if finding.fix:
+                             % esc(texts["detail"]))
+            if texts["fix"]:
                 parts.append("<span class=\"fix\">%s</span>"
-                             % esc(finding.fix))
+                             % esc(texts["fix"]))
             parts.append("</div></div>")
         parts.append("</section>")
 
@@ -5213,11 +6939,9 @@ def render_html(base: str, pages: List[Page],
     if depths:
         massimo = max(b["count"] for b in depths["buckets"]) or 1
         parts.append(
-            "<section><h2>Profondita' di crawl</h2>"
-            "<p class=\"meta\">Quanti click servono dalla home per "
-            "raggiungere ogni pagina lungo i link interni: oltre 3 "
-            "click scansione e peso calano.</p>"
-            "<table class=\"citprof\"><tbody>")
+            "<section><h2>%s</h2><p class=\"meta\">%s</p>"
+            "<table class=\"citprof\"><tbody>"
+            % (lab["depth.h"], lab["depth.meta"]))
         for bucket in depths["buckets"]:
             width = 100.0 * bucket["count"] / massimo
             hue = ("var(--warn)" if "4+" in bucket["label"]
@@ -5235,17 +6959,16 @@ def render_html(base: str, pages: List[Page],
     graph = link_graph_data(pages, base)
     if graph and graph["links"]:
         parts.append(
-            "<section><h2>Architettura dei link interni</h2>"
-            "<p class=\"meta\">Ogni cerchio e' una pagina "
-            "(ampiezza = link in ingresso), la home e' al centro; "
-            "in ambra le pagine oltre 3 click o senza percorso. "
-            "Mostrate %d pagine su %d.</p>"
+            "<section><h2>%s</h2>"
+            "<p class=\"meta\">%s</p>"
             "<svg viewBox=\"0 0 %.0f %.0f\" role=\"img\" "
-            "aria-label=\"Grafo dei link interni; orfane e "
-            "profondita' sono nei rilievi dell'area tecnica\" "
+            "aria-label=\"%s\" "
             "style=\"max-width:520px;width:100%%\">"
-            % (len(graph["nodes"]), graph["total"],
-               graph["width"], graph["height"]))
+            % (lab["graph.h"],
+               lab["graph.meta"] % (len(graph["nodes"]),
+                                    graph["total"]),
+               graph["width"], graph["height"],
+               lab["graph.aria"]))
         nodes = graph["nodes"]
         for link in graph["links"]:
             a = nodes[link["source"]]
@@ -5268,17 +6991,17 @@ def render_html(base: str, pages: List[Page],
                    "var(--warn)" if problematico else
                    "var(--good)")
             r = min(15.0, 5.0 + 1.8 * node["incoming"] ** 0.5)
-            profondita = ("%d click" % node["depth"]
+            profondita = (lab["graph.clicks"] % node["depth"]
                           if node["depth"] is not None
-                          else "solo da sitemap")
+                          else lab["graph.sitemap_only"])
             parts.append(
                 "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" "
                 "fill=\"%s\" fill-opacity=\"0.75\" stroke=\"%s\">"
-                "<title>%s — %d link in ingresso, %s</title>"
-                "</circle>"
+                "<title>%s</title></circle>"
                 % (node["x"], node["y"], r, hue, hue,
-                   esc(str(node["label"])), node["incoming"],
-                   profondita))
+                   lab["graph.node_title"]
+                   % (esc(str(node["label"])), node["incoming"],
+                      profondita)))
             if node["url"] in labelled:
                 # Alone chiaro sotto il testo: leggibile anche
                 # quando l'etichetta attraversa un arco.
@@ -5293,78 +7016,78 @@ def render_html(base: str, pages: List[Page],
 
     math = surface_math(pages)
     if math:
-        effetto = ("~%.1fx occasioni di comparire nelle liste fuse"
-                   % math["multiplier"]
+        effetto = (lab["math.mult"] % math["multiplier"]
                    if math["multiplier"] is not None else
-                   "da 0 addendi a ~%d occasioni di comparire "
-                   "nelle liste" % math["chunks_potential"])
+                   lab["math.zero"] % math["chunks_potential"])
         parts.append(
-            "<section><h2>La matematica del problema</h2>"
-            "<p class=\"meta\">L'RRF premia chi compare in piu' "
-            "liste con piu' passaggi pertinenti: il numero di chunk "
-            "indicizzabili e' il vero moltiplicatore.</p>"
+            "<section><h2>%s</h2>"
+            "<p class=\"meta\">%s</p>"
             "<table><tbody>"
-            "<tr><th>Superficie attuale</th><td>%d pagine, %d chunk "
-            "(~%d parole/pagina)</td></tr>"
-            "<tr><th>Superficie potenziale</th><td>~%d chunk "
-            "(%s)</td></tr>"
-            "<tr><th>Effetto sull'RRF</th><td>%s</td></tr>"
+            "<tr><th>%s</th><td>%s</td></tr>"
+            "<tr><th>%s</th><td>%s</td></tr>"
+            "<tr><th>%s</th><td>%s</td></tr>"
             "</tbody></table></section>"
-            % (math["pages"], math["chunks_now"], math["words_avg"],
-               math["chunks_potential"], esc(str(math["assumption"])),
-               esc(effetto)))
+            % (lab["math.h"], lab["math.meta"], lab["math.now"],
+               lab["math.now_v"] % (math["pages"],
+                                    math["chunks_now"],
+                                    math["words_avg"]),
+               lab["math.pot"],
+               lab["math.pot_v"] % (math["chunks_potential"],
+                                    esc(str(math["assumption"]))),
+               lab["math.fx"], esc(effetto)))
 
     plan = build_remediation(findings, pages, scores, market)
     if plan:
         quick = sum(1 for i in plan if i["quick_win"])
-        criterio = (
-            "gravita' e guadagno di citabilita': in testa i "
-            "problemi trasversali, che deprimono piu' profili "
-            "insieme"
-            if "index_gain" in plan[0] else
-            "gravita' e peso: si parte da cio' che rende di piu' "
-            "sul punteggio")
+        criterio = (lab["plan.crit_gain"]
+                    if "index_gain" in plan[0]
+                    else lab["plan.crit_weight"])
         parts.append(
-            "<section><h2>Piano di remediation</h2>"
-            "<p class=\"meta\">%d interventi ordinati per %s. "
-            "Lo sforzo stimato (minuti/ore/giorni) "
-            "individua i quick win%s.</p>"
-            % (len(plan), criterio,
-               " — qui sono %d" % quick if quick else ""))
+            "<section><h2>%s</h2><p class=\"meta\">%s</p>"
+            % (lab["plan.h"],
+               lab["plan.meta"]
+               % (len(plan), criterio,
+                  lab["plan.quick_here"] % quick if quick else "")))
         for item in plan:
             sev = str(item["severity"])
-            badges = ("<span class=\"eff\">sforzo: %s</span>"
-                      % esc(str(item["effort"])))
+            badges = ("<span class=\"eff\">%s</span>"
+                      % (lab["badge.effort"]
+                         % esc(str(item["effort"]))))
             if item["quick_win"]:
-                badges += "<span class=\"qw\">quick win</span>"
+                badges += ("<span class=\"qw\">%s</span>"
+                           % lab["badge.qw"])
             if item.get("cross"):
-                badges += ("<span class=\"crossb\">trasversale: "
-                           "%d profili · +%.1f indice</span>"
-                           % (len(list(item["profiles_hit"])),
-                              item["index_gain"]))
+                badges += ("<span class=\"crossb\">%s</span>"
+                           % (lab["badge.cross"]
+                              % (len(list(item["profiles_hit"])),
+                                 item["index_gain"])))
+            a_open, a_close = link_to(item["area"], item["title"])
+            texts = finding_texts(item, lang)
             parts.append(
                 "<div class=\"find\"><span class=\"ico\" style=\""
                 "background:%s\">%s</span><div class=\"txt\">"
-                "<b>%d. %s</b> %s"
-                % (colors[sev], marks[sev], item["priority"],
-                   esc(str(item["title"])), badges))
-            if item["fix"]:
+                "%s<b>%d. %s</b>%s %s"
+                % (colors[sev], marks[sev], a_open,
+                   item["priority"], esc(texts["title"]),
+                   a_close, badges))
+            if texts["fix"]:
                 parts.append("<span class=\"d\">%s</span>"
-                             % esc(str(item["fix"])))
-            if item["example"]:
+                             % esc(texts["fix"]))
+            if texts["example"]:
                 parts.append("<pre class=\"ex\">%s</pre>"
-                             % esc(str(item["example"])))
+                             % esc(texts["example"]))
             parts.append("</div></div>")
         parts.append("</section>")
 
     if results:
-        parts.append("<section><h2>Dettaglio simulazione RRF</h2>"
-                     "<p class=\"meta\">Le tacche sul consenso sono "
-                     "le soglie del giudizio: sotto il 20% e' "
-                     "critico, sotto il 45% da migliorare.</p>"
-                     "<table><thead><tr><th>Query</th><th>Consenso"
-                     "</th><th>Passaggio in testa dopo la fusione</th>"
-                     "<th>Punteggio</th></tr></thead><tbody>")
+        parts.append("<section><h2>%s</h2>"
+                     "<p class=\"meta\">%s</p>"
+                     "<table><thead><tr><th>%s</th><th>%s"
+                     "</th><th>%s</th>"
+                     "<th>%s</th></tr></thead><tbody>"
+                     % (lab["rrf.h"], lab["rrf.meta"],
+                        lab["rrf.query"], lab["rrf.consensus"],
+                        lab["rrf.top"], lab["rrf.score"]))
         for res in results:
             top = res.fused_top[0] if res.fused_top else ("-", 0.0)
             ratio = res.consensus / 5.0
@@ -5372,33 +7095,30 @@ def render_html(base: str, pages: List[Page],
                 "var(--warn)" if ratio >= 0.2 else "var(--bad)")
             parts.append(
                 "<tr><td>%s</td><td class=\"cons\">"
-                "<span class=\"mnum\">%d su 5</span>"
+                "<span class=\"mnum\">%s</span>"
                 "<div class=\"meter\" aria-hidden=\"true\">"
                 "<div class=\"mfill\" style=\"width:%.0f%%;"
                 "background:%s\"></div>"
                 "<span class=\"tick\" style=\"left:20%%\"></span>"
                 "<span class=\"tick\" style=\"left:45%%\"></span>"
                 "</div></td><td>%s</td><td>%.5f</td></tr>"
-                % (esc(res.query), res.consensus, ratio * 100,
-                   hue, esc(str(top[0])), top[1]))
+                % (esc(res.query), lab["rrf.of5"] % res.consensus,
+                   ratio * 100, hue, esc(str(top[0])), top[1]))
         parts.append("</tbody></table></section>")
 
     if competitive:
         share = competitive["share"]
         parity = 100.0 / max(1, len(competitive["sites"]))
         parts.append(
-            "<section><h2>Confronto competitivo</h2>"
-            "<p class=\"meta\">Share of voice sui primi %d posti "
-            "delle liste fuse, sulle query dei temi del tuo sito. "
-            "La tacca indica la parita' (%.0f%%): sopra la tacca si "
-            "e' sopra la propria quota naturale.</p>"
-            % (competitive["top_n"], parity))
-        parts.append("<table><thead><tr><th>Sito</th>"
-                     "<th>Share</th><th></th></tr></thead><tbody>")
+            "<section><h2>%s</h2><p class=\"meta\">%s</p>"
+            % (lab["comp.h"],
+               lab["comp.meta"] % (competitive["top_n"], parity)))
+        parts.append("<table><thead><tr><th>%s</th>"
+                     "<th>%s</th><th></th></tr></thead><tbody>"
+                     % (lab["comp.site"], lab["comp.share"]))
         for host in competitive["sites"]:
             mine = host == competitive["main"]
-            name = esc(host) + (" <strong>(tuo sito)</strong>"
-                                if mine else "")
+            name = esc(host) + (lab["comp.mine"] if mine else "")
             hue = "var(--accent)" if mine else "var(--muted)"
             parts.append(
                 "<tr><td>%s</td><td>%.1f%%</td>"
@@ -5419,18 +7139,16 @@ def render_html(base: str, pages: List[Page],
         q_tot = int(competitive.get("queries_total") or 0)
         if presence and q_tot:
             parts.append(
-                "<p class=\"meta\">Mappa: orizzontale la share of "
-                "voice, verticale in quante query su %d il sito "
-                "compare, ampiezza della bolla il corpus in "
-                "chunk.</p>"
+                "<p class=\"meta\">%s</p>"
                 "<svg viewBox=\"0 0 420 190\" role=\"img\" "
-                "aria-label=\"Mappa a bolle del posizionamento "
-                "competitivo; i valori sono nelle tabelle\" "
+                "aria-label=\"%s\" "
                 "style=\"max-width:460px;width:100%%\">"
                 "<line x1=\"40\" y1=\"160\" x2=\"400\" y2=\"160\" "
                 "stroke=\"var(--line)\"/>"
                 "<line x1=\"40\" y1=\"20\" x2=\"40\" y2=\"160\" "
-                "stroke=\"var(--line)\"/>" % q_tot)
+                "stroke=\"var(--line)\"/>"
+                % (lab["comp.bubble_meta"] % q_tot,
+                   lab["comp.bubble_aria"]))
             max_chunks = max(chunks_by.values()) or 1
             for host in competitive["sites"]:
                 mine = host == competitive["main"]
@@ -5449,13 +7167,15 @@ def render_html(base: str, pages: List[Page],
                        esc(host)))
             parts.append("</svg>")
 
-        parts.append("<table><thead><tr><th>Query</th>"
-                     "<th>Tuoi passaggi</th><th>Migliore posizione"
-                     "</th></tr></thead><tbody>")
+        parts.append("<table><thead><tr><th>%s</th>"
+                     "<th>%s</th><th>%s"
+                     "</th></tr></thead><tbody>"
+                     % (lab["comp.query"], lab["comp.mine_passages"],
+                        lab["comp.best"]))
         for row in competitive["queries"]:
             best = (str(row["best_rank_mine"])
                     if row["best_rank_mine"]
-                    else "<strong>assente</strong>")
+                    else lab["comp.absent"])
             parts.append(
                 "<tr><td>%s</td><td>%d su %d</td><td>%s</td></tr>"
                 % (esc(row["query"]), row["mine_in_top"],
@@ -5464,16 +7184,16 @@ def render_html(base: str, pages: List[Page],
 
     parts.append(
         "<footer><p class=\"brand\">Lympha Technologies S.r.l.</p>"
-        "<p>Generato da <code>seo_rrf_audit.py</code> v%s. "
-        "La formula applicata e' <code>score(d) = &Sigma; 1/(k + "
-        "rank_i(d))</code> con k=%d, pesi uguali per ogni lista.</p>"
-        "<p>Riferimenti: Cormack et al. (SIGIR 2009); "
+        "<p>%s</p>"
+        "<p>%s: Cormack et al. (SIGIR 2009); "
         "<a href=\"https://learn.microsoft.com/en-us/azure/search/"
         "hybrid-search-ranking\">Microsoft Learn</a>; "
         "<a href=\"https://www.elastic.co/docs/reference/elasticsearch/"
         "rest-apis/reciprocal-rank-fusion\">Elastic</a>; "
         "<a href=\"https://schema.org/\">Schema.org</a>.</p>"
-        "</footer></div></body></html>" % (__version__, k))
+        "</footer></div></body></html>"
+        % (lab["footer.gen"] % (__version__, k),
+           lab["footer.refs"]))
     return "".join(parts)
 
 
@@ -5585,6 +7305,32 @@ footer{color:var(--muted);font-size:.78rem;padding:0 4px}
 footer a{color:var(--accent)}
 footer .brand{color:var(--accent);font-weight:700;font-size:.88rem;
 letter-spacing:.04em}
+.anchor{color:var(--muted);text-decoration:none;font-size:.85em;
+opacity:.55}
+.anchor:hover,.anchor:focus{opacity:1;color:var(--accent)}
+.rlink{color:inherit;text-decoration:none;
+border-bottom:1px dotted var(--muted)}
+.rlink:hover,.rlink:focus{color:var(--accent);
+border-bottom-color:var(--accent)}
+.find:target{background:var(--accent-soft);border-radius:8px;
+padding-left:8px;padding-right:8px}
+@media print{
+:root{--bg:#fff;--card:#fff;--ink:#000;--muted:#444;--line:#bbb;
+--accent:#0d4c60;--accent-soft:#eef2f4;--good:#0b6e54;
+--warn:#9a3412;--bad:#a01e1e}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@page{margin:16mm 14mm}
+body{background:#fff;padding:0;font-size:10.5pt}
+.wrap{max-width:none}
+section,.hero,.sc,.tile{box-shadow:none;border-color:#bbb}
+.find,tr,.tile,.sc,.toplist li,.cit-actions li{
+break-inside:avoid;page-break-inside:avoid}
+h2,h3{break-after:avoid;page-break-after:avoid}
+.anchor{display:none}
+a,.rlink{color:inherit;text-decoration:none;border-bottom:none}
+svg{max-height:70mm}
+footer a::after{content:" (" attr(href) ")";font-size:.9em}
+}
 """
 
 
@@ -5659,43 +7405,62 @@ def render_markdown(base: str, pages: List[Page],
                     competitive: Optional[Dict[str, object]] = None,
                     market: str = DEFAULT_MARKET,
                     judge: Optional[Dict[str, object]] = None,
-                    delta: Optional[Dict[str, object]] = None
-                    ) -> str:
+                    delta: Optional[Dict[str, object]] = None,
+                    lang: str = "it") -> str:
     """Referto Markdown (GitHub-flavored), per issue e pull request.
 
     Il piano di remediation e' una task list `- [ ]`: incollato in
     una issue diventa una checklist spuntabile. Le gravita' sono
     marcatori testuali, mai solo colore.
     """
-    marks = {SEV_CRITICAL: "**[CRITICO]**", SEV_WARNING: "[AVVISO]",
+    def T(it_text: str, en_text: str) -> str:
+        return en_text if lang == "en" else it_text
+
+    marks = {SEV_CRITICAL: T("**[CRITICO]**", "**[CRITICAL]**"),
+             SEV_WARNING: T("[AVVISO]", "[WARNING]"),
              SEV_OK: "[ok]", SEV_INFO: "[info]"}
+    area_label = {} if lang != "en" else {
+        AREA_TECH: "Technical", AREA_LEX: "Lexical (BM25)",
+        AREA_SEM: "Semantic (vector)", AREA_SD: "Structured data",
+        AREA_RRF: "RRF simulation"}
     out: List[str] = []
-    out.append("# MARS Audit — %s" % base)
+    out.append("# MARS Beacon — %s" % base)
     out.append("")
     out.append("*Meta-fusion, Accessibility, Ranking & Security "
                "Audit*")
     out.append("")
-    out.append("Pagine analizzate: %d · chunk indicizzati: %d · "
-               "recuperatore vettoriale: `%s`"
+    out.append(T("Pagine analizzate: %d · chunk indicizzati: %d · "
+                 "recuperatore vettoriale: `%s`",
+                 "Pages analysed: %d · indexed chunks: %d · "
+                 "vector retriever: `%s`")
                % (len([p for p in pages if p.ok]),
                   sum(len(p.chunks) for p in pages if p.ok), mode))
     out.append("")
-    out.append("## Punteggi")
+    if lang == "en":
+        out.append("> Quoted evidence from the audited site stays "
+                   "in the site's language.")
+        out.append("")
+    out.append(T("## Punteggi", "## Scores"))
     out.append("")
-    out.append("| Area | Punteggio |")
+    out.append(T("| Area | Punteggio |", "| Area | Score |"))
     out.append("|---|---:|")
     for area, score in scores.items():
         if score is not None:
-            out.append("| %s | %.1f/100 |" % (_md_cell(area), score))
-    out.append("| **Complessivo** | **%.1f/100** |"
+            out.append("| %s | %.1f/100 |"
+                       % (_md_cell(area_label.get(area, area)),
+                          score))
+    out.append(T("| **Complessivo** | **%.1f/100** |",
+                 "| **Overall** | **%.1f/100** |")
                % overall_score(scores))
     out.append("")
 
     cit = citability_profiles(pages, scores, market)
     if cit:
-        out.append("## Profili di citabilita' per assistente IA")
+        out.append(T("## Profili di citabilita' per assistente IA",
+                     "## Citability profiles per AI assistant"))
         out.append("")
-        out.append("| Profilo | Cosa premia | Punteggio |")
+        out.append(T("| Profilo | Cosa premia | Punteggio |",
+                     "| Profile | What it rewards | Score |"))
         out.append("|---|---|---:|")
         for prof in cit["profiles"]:
             if prof["score"] is not None:
@@ -5704,44 +7469,53 @@ def render_markdown(base: str, pages: List[Page],
                               _md_cell(prof["focus"]),
                               prof["score"]))
         if cit["index"] is not None:
-            out.append("| **Indice composito (%s)** | | "
-                       "**%.1f/100** |"
+            out.append(T("| **Indice composito (%s)** | | "
+                         "**%.1f/100** |",
+                         "| **Composite index (%s)** | | "
+                         "**%.1f/100** |")
                        % (_md_cell(cit["market"]), cit["index"]))
         out.append("")
         out.append("> %s" % cit["note"])
         out.append("")
 
     if delta:
-        out.append("## Rispetto all'esecuzione precedente (%s)"
+        out.append(T("## Rispetto all'esecuzione precedente (%s)",
+                     "## Compared with the previous run (%s)")
                    % (delta.get("previous_generated_at") or ""))
         out.append("")
         variazioni = " · ".join(
-            "%s **%+.1f**" % (_md_cell(area), value) if value
-            else "%s =" % _md_cell(area)
+            "%s **%+.1f**"
+            % (_md_cell(area_label.get(area, area)), value)
+            if value else "%s =" % _md_cell(area_label.get(area, area))
             for area, value in dict(delta["scores"]).items())
         if variazioni:
             out.append(variazioni)
             out.append("")
-        for label, items in (("Risolti", delta["resolved"]),
-                             ("Nuovi", delta["new"])):
+        for label, items in ((T("Risolti", "Resolved"),
+                              delta["resolved"]),
+                             (T("Nuovi", "New"), delta["new"])):
             out.append("**%s (%d):**" % (label, len(list(items))))
             for f in items:
                 out.append("- %s %s"
                            % (marks.get(str(f["severity"]), ""),
                               f["title"]))
             if not items:
-                out.append("- nessuno")
+                out.append(T("- nessuno", "- none"))
             out.append("")
 
     if judge and judge.get("status") == "ok":
-        out.append("## Giudizio LLM sulla citabilita'")
+        out.append(T("## Giudizio LLM sulla citabilita'",
+                     "## LLM judgement on citability"))
         out.append("")
-        out.append("Modello `%s` su %d passaggio/i · media "
-                   "**%.1f/100**." % (judge["model"],
-                                      judge["sampled"],
-                                      judge["average"]))
+        out.append(T("Modello `%s` su %d passaggio/i · media "
+                     "**%.1f/100**.",
+                     "Model `%s` on %d passage(s) · average "
+                     "**%.1f/100**.") % (judge["model"],
+                                         judge["sampled"],
+                                         judge["average"]))
         out.append("")
-        out.append("| Query | Punteggio | Motivazione |")
+        out.append(T("| Query | Punteggio | Motivazione |",
+                     "| Query | Score | Rationale |"))
         out.append("|---|---:|---|")
         for v in judge["verdicts"]:
             out.append("| %s | %.1f | %s |"
@@ -5753,64 +7527,77 @@ def render_markdown(base: str, pages: List[Page],
 
     plan = build_remediation(findings, pages, scores, market)
     if plan:
-        out.append("## Piano di remediation")
+        out.append(T("## Piano di remediation",
+                     "## Remediation plan"))
         out.append("")
         for item in plan:
-            tag = ("CRITICO" if item["severity"] == SEV_CRITICAL
-                   else "AVVISO")
+            tag = (T("CRITICO", "CRITICAL")
+                   if item["severity"] == SEV_CRITICAL
+                   else T("AVVISO", "WARNING"))
             extra = ""
             if item["quick_win"]:
                 extra += " · QUICK WIN"
             if item.get("cross"):
-                extra += (" · trasversale: %d profili"
+                extra += (T(" · trasversale: %d profili",
+                            " · cross-cutting: %d profiles")
                           % len(list(item["profiles_hit"])))
-            out.append("- [ ] **%d.** %s _(%s · %s · sforzo: "
-                       "%s%s)_"
-                       % (item["priority"], item["title"], tag,
-                          item["area"], item["effort"], extra))
+            out.append(T("- [ ] **%d.** %s _(%s · %s · sforzo: "
+                         "%s%s)_",
+                         "- [ ] **%d.** %s _(%s · %s · effort: "
+                         "%s%s)_")
+                       % (item["priority"],
+                          finding_texts(item, lang)["title"], tag,
+                          area_label.get(str(item["area"]),
+                                         item["area"]),
+                          item["effort"], extra))
         out.append("")
 
-    out.append("## Rilievi per area")
+    out.append(T("## Rilievi per area", "## Findings by area"))
     for area in (AREA_TECH, AREA_LEX, AREA_SEM, AREA_SD, AREA_RRF):
         subset = [f for f in findings if f.area == area]
         if not subset:
             continue
         out.append("")
-        out.append("### %s" % area)
+        out.append("### %s" % area_label.get(area, area))
         out.append("")
         order = {SEV_CRITICAL: 0, SEV_WARNING: 1, SEV_INFO: 2,
                  SEV_OK: 3}
         for f in sorted(subset, key=lambda x: order[x.severity]):
-            out.append("- %s %s" % (marks[f.severity], f.title))
-            if f.detail:
-                out.append("  %s" % f.detail)
-            if f.fix:
-                out.append("  _Fix: %s_" % f.fix)
+            texts = finding_texts(f, lang)
+            out.append("- %s %s" % (marks[f.severity],
+                                    texts["title"]))
+            if texts["detail"]:
+                out.append("  %s" % texts["detail"])
+            if texts["fix"]:
+                out.append("  _Fix: %s_" % texts["fix"])
     out.append("")
 
     if results:
-        out.append("## Simulazione RRF per query")
+        out.append(T("## Simulazione RRF per query",
+                     "## RRF simulation per query"))
         out.append("")
-        out.append("| Query | Consenso | Primo passaggio fuso |")
+        out.append(T("| Query | Consenso | Primo passaggio fuso |",
+                     "| Query | Consensus | Top fused passage |"))
         out.append("|---|---:|---|")
         for res in results:
             primo = (res.fused_top[0][0] if res.fused_top
-                     else "(nessuno)")
+                     else T("(nessuno)", "(none)"))
             out.append("| %s | %d | %s |"
                        % (_md_cell(res.query), res.consensus,
                           _md_cell(primo[:70])))
         out.append("")
 
     if competitive:
-        out.append("## Share of voice (primi %d posti fusi)"
+        out.append(T("## Share of voice (primi %d posti fusi)",
+                     "## Share of voice (first %d fused slots)")
                    % competitive["top_n"])
         out.append("")
-        out.append("| Sito | Quota |")
+        out.append(T("| Sito | Quota |", "| Site | Share |"))
         out.append("|---|---:|")
         share = competitive["share"]
         for host in competitive["sites"]:
-            marker = " ← tuo sito" if host == competitive["main"] \
-                else ""
+            marker = (T(" ← tuo sito", " ← your site")
+                      if host == competitive["main"] else "")
             out.append("| %s%s | %.1f%% |"
                        % (_md_cell(host), marker, share[host]))
         out.append("")
@@ -5826,27 +7613,37 @@ def render_csv(base: str, pages: List[Page],
                competitive: Optional[Dict[str, object]] = None,
                market: str = DEFAULT_MARKET,
                judge: Optional[Dict[str, object]] = None,
-               delta: Optional[Dict[str, object]] = None) -> str:
+               delta: Optional[Dict[str, object]] = None,
+               lang: str = "it") -> str:
     """Export CSV dei rilievi, una riga per rilievo.
 
     Pensato per Excel/Sheets: delimitatore ';' e BOM UTF-8 in
     testa, cosi' l'apertura diretta preserva accenti e colonne.
     Sforzo e quick win sono valorizzati solo per i rilievi
-    azionabili (critici e avvertenze).
+    azionabili (critici e avvertenze). Con ``lang="en"`` le
+    intestazioni e i testi dei rilievi sono in inglese (le
+    evidenze del sito restano nella lingua del sito).
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";", lineterminator="\n")
-    writer.writerow(["sito", "area", "gravita", "peso", "titolo",
-                     "dettaglio", "correzione", "url", "sforzo",
-                     "quick_win"])
+    if lang == "en":
+        writer.writerow(["site", "area", "severity", "weight",
+                         "title", "detail", "fix", "url", "effort",
+                         "quick_win"])
+    else:
+        writer.writerow(["sito", "area", "gravita", "peso",
+                         "titolo", "dettaglio", "correzione", "url",
+                         "sforzo", "quick_win"])
     for f in findings:
         actionable = f.severity in (SEV_CRITICAL, SEV_WARNING)
         effort = estimate_effort(f) if actionable else ""
-        quick = ("si" if f.severity == SEV_CRITICAL
+        quick = (("si" if lang != "en" else "yes")
+                 if f.severity == SEV_CRITICAL
                  and effort == EFFORT_MINUTES else "")
+        texts = finding_texts(f, lang)
         writer.writerow([base, f.area, f.severity, f.weight,
-                         f.title, f.detail, f.fix, f.url, effort,
-                         quick])
+                         texts["title"], texts["detail"],
+                         texts["fix"], f.url, effort, quick])
     return "\ufeff" + buffer.getvalue()
 
 
@@ -5944,7 +7741,8 @@ def run_audit(base: str, max_pages: int, queries: List[str],
             "Sito dichiarato di propria titolarita'",
             "I Disallow del robots.txt non vengono applicati al "
             "sito auditato (--own-site); restano applicati agli "
-            "eventuali concorrenti."))
+            "eventuali concorrenti.",
+            key="tech.robots.own"))
     elif robots_mode == ROBOTS_FORCE:
         findings.append(Finding(
             AREA_TECH, SEV_INFO,
@@ -5952,7 +7750,9 @@ def run_audit(base: str, max_pages: int, queries: List[str],
             "Scansione oltre i Disallow attivata con --ignore-robots "
             "%s: la responsabilita' della scansione e' stata assunta "
             "esplicitamente dall'utente."
-            % IGNORE_ROBOTS_ACK))
+            % IGNORE_ROBOTS_ACK,
+            key="tech.robots.forced",
+            params={"ack": IGNORE_ROBOTS_ACK}))
 
     if verbose:
         print("[2/5] scoperta URL", file=sys.stderr)
@@ -5972,7 +7772,11 @@ def run_audit(base: str, max_pages: int, queries: List[str],
                 "(comportamento predefinito): %s. Usa --own-site se "
                 "il sito e' tuo."
                 % (USER_AGENT_TOKEN,
-                   ", ".join(sorted(excluded)[:5]))))
+                   ", ".join(sorted(excluded)[:5])),
+                key="tech.robots.excluded",
+                params={"n": len(excluded),
+                        "agent": USER_AGENT_TOKEN,
+                        "urls": ", ".join(sorted(excluded)[:5])}))
     urls = urls[:max_pages]
 
     if verbose:
@@ -5996,14 +7800,18 @@ def run_audit(base: str, max_pages: int, queries: List[str],
                 "Modalita' --render %s: il contenuto proviene dal "
                 "DOM renderizzato in un browser headless; stato "
                 "HTTP, redirect e tempi restano quelli della "
-                "risposta originale." % render))
+                "risposta originale." % render,
+                key="tech.render.done",
+                params={"n": n_rendered, "mode": render}))
         if n_failed:
             findings.append(Finding(
                 AREA_TECH, SEV_WARNING,
                 "Rendering non riuscito per %d pagina/e" % n_failed,
                 "Per queste pagine e' stato analizzato l'HTML "
                 "statico.",
-                "Riprova, o aumenta il timeout se il sito e' lento."))
+                "Riprova, o aumenta il timeout se il sito e' lento.",
+                key="tech.render.failed",
+                params={"n": n_failed}))
 
     pages, duplicates = dedupe_pages(pages)
     if duplicates:
@@ -6015,7 +7823,9 @@ def run_audit(base: str, max_pages: int, queries: List[str],
             "diluiscono i segnali e sprecano budget di scansione."
             % ", ".join(sorted(duplicates)[:4]),
             "Scegli un URL canonico e reindirizza gli altri con un 301.",
-            weight=1.0,
+            weight=1.0, key="tech.pages.duplicates",
+            params={"n": len(duplicates),
+                    "urls": ", ".join(sorted(duplicates)[:4])},
             example="Redirect 301 /index.html https://esempio.it/\n"
                     "e sulla pagina canonica:\n<link rel=\"canonical\""
                     " href=\"https://esempio.it/\">"))
@@ -6083,7 +7893,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Costruisce il parser degli argomenti da riga di comando."""
     parser = argparse.ArgumentParser(
         prog="seo_rrf_audit.py",
-        description="MARS Audit (Meta-fusion, Accessibility, "
+        description="MARS Beacon (Meta-fusion, Accessibility, "
                     "Ranking & Security Audit): audit SEO e "
                     "Reciprocal Rank Fusion di un sito.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -6154,6 +7964,18 @@ def build_parser() -> argparse.ArgumentParser:
                              "issue/PR, piano come task list) o "
                              "csv (rilievi per Excel/Sheets, "
                              "';' e BOM)")
+    parser.add_argument("--lang", choices=HTML_LANGS,
+                        default="it",
+                        help="lingua del referto per i formati "
+                             "html, text, md e csv: cornice E "
+                             "rilievi (titoli, dettagli, fix, "
+                             "esempi via catalogo). Le evidenze "
+                             "citate dal sito (URL, estratti) "
+                             "restano nella lingua del sito, "
+                             "dichiarato nel referto. Il JSON "
+                             "resta canonico in italiano con "
+                             "chiave e parametri di traduzione "
+                             "per rilievo (default it)")
     parser.add_argument("--output", metavar="FILE",
                         help="scrive il referto su file")
     parser.add_argument("--competitor", metavar="URL",
@@ -6182,6 +8004,13 @@ def build_parser() -> argparse.ArgumentParser:
                              "compatta per l'esecuzione corrente. "
                              "Trasforma l'audit in monitoraggio "
                              "anche da riga di comando/cron")
+    parser.add_argument("--fail-under", type=float, metavar="PUNTI",
+                        help="esce con codice 1 se il punteggio "
+                             "complessivo (0-100) e' sotto questa "
+                             "soglia: gate di regressione per gli "
+                             "audit schedulati (cron/systemd), in "
+                             "aggiunta all'uscita 1 sui rilievi "
+                             "critici")
     parser.add_argument("--judge", choices=JUDGE_MODES,
                         default=DEFAULT_JUDGE,
                         help="giudizio LLM sulla citabilita' dei "
@@ -6330,6 +8159,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               % (args.max_body, ram, max(1.0, ram * 0.1)),
               file=sys.stderr)
 
+    if args.fail_under is not None \
+            and not 0 <= args.fail_under <= 100:
+        print("--fail-under vuole una soglia fra 0 e 100.",
+              file=sys.stderr)
+        return 2
+
     if args.queries and args.queries_gsc:
         print("--queries e --queries-gsc non sono combinabili: "
               "scegli una sola sorgente di query.", file=sys.stderr)
@@ -6407,6 +8242,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "weights": list(rrf_weights),
             "chunk_words": args.chunk_words,
         }
+    if args.format in ("html", "text", "md", "csv"):
+        extra["lang"] = args.lang
     report = renderers[args.format](
         base, pages, findings, scores, results, mode, args.rrf_k,
         competitive, market=args.market, judge=judge_data,
@@ -6427,6 +8264,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                   % (args.history, exc), file=sys.stderr)
 
     critical = sum(1 for f in findings if f.severity == SEV_CRITICAL)
+    overall = overall_score(scores)
+    if args.fail_under is not None and overall < args.fail_under:
+        print("Punteggio complessivo %.1f sotto la soglia "
+              "--fail-under %g." % (overall, args.fail_under),
+              file=sys.stderr)
+        return 1
     return 1 if critical else 0
 
 

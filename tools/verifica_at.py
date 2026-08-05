@@ -7,12 +7,23 @@ all'AT: focus, annunci delle regioni di stato, etichette, stati.
 NON sostituisce la sessione umana con VoiceOver/NVDA: ne e' la
 preparazione strumentale.
 """
+import platform
 import sys
 import tempfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+# Chrome di sistema per piattaforma; se assente si ripiega sul
+# Chromium impacchettato di Playwright (playwright install chromium).
+CHROME_PATHS = {
+    "Darwin": "/Applications/Google Chrome.app/Contents/MacOS/"
+              "Google Chrome",
+    "Linux": "/usr/bin/google-chrome",
+    "Windows": r"C:\Program Files\Google\Chrome\Application"
+               r"\chrome.exe",
+}
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import seo_rrf_gui as gui  # noqa: E402
@@ -77,16 +88,19 @@ def main():
 
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            executable_path="/usr/bin/google-chrome",
-            args=["--no-sandbox"])
+        chrome = CHROME_PATHS.get(platform.system(), "")
+        if chrome and Path(chrome).exists():
+            browser = p.chromium.launch(
+                executable_path=chrome, args=["--no-sandbox"])
+        else:
+            browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(
             viewport={"width": 1280, "height": 900})
         page.goto(base)
 
         # ---- Flusso 1: orientamento iniziale ----
         check(1, "titolo pagina annunciabile",
-              "MARS Audit" in page.title(), page.title())
+              "MARS Beacon" in page.title(), page.title())
         page.keyboard.press("Tab")
         primo = page.evaluate(
             "document.activeElement.textContent.trim()")
@@ -207,6 +221,56 @@ def main():
             "'table caption')).length")
         check(5, "tabelle con didascalia", captions >= 2,
               "%d caption" % captions)
+
+        # ---- Flusso 5-bis: risultati in cinque sezioni (v2.19.0) --
+        sezioni = page.evaluate("""(() => {
+          const ids = ['results-section', 'pillar-meta-section',
+            'pillar-access-section', 'pillar-rank-section',
+            'pillar-sec-section'];
+          return ids.map((id) => {
+            const s = document.getElementById(id);
+            return s && !s.hidden;
+          });
+        })()""")
+        check(5, "cinque sezioni risultati visibili",
+              all(sezioni), "%d/5" % sum(bool(v) for v in sezioni))
+        contratti = page.evaluate("""(() => {
+          const pref = ['pillar-meta', 'pillar-access',
+                        'pillar-rank', 'pillar-sec'];
+          let rotti = 0;
+          pref.forEach((px) => {
+            const b = document.getElementById(px + '-toggle');
+            const target = b && document.getElementById(
+              (b.getAttribute('aria-controls') || ''));
+            if (!b || !target
+                || !b.hasAttribute('aria-expanded')) { rotti += 1; }
+          });
+          return rotti;
+        })()""")
+        check(5, "toggle sezioni MARS: aria-expanded/controls",
+              contratti == 0, "%d contratti rotti" % contratti)
+        aperte = page.evaluate("""(() => {
+          const ids = ['sec-results', 'sec-pillar-meta',
+            'sec-pillar-access', 'sec-pillar-rank',
+            'sec-pillar-sec'];
+          return ids.map((id) => document.getElementById(id)
+            .classList.contains('show'));
+        })()""")
+        check(5, "a fine audit aperta la sola sintesi",
+              aperte[0] and not any(aperte[1:]),
+              "aperte=%s" % aperte)
+        page.click("#scores button")  # prima area: Tecnica
+        page.wait_for_timeout(600)
+        area_focus = page.evaluate("""({
+          espansa: document.getElementById('pillar-access-toggle')
+            .getAttribute('aria-expanded'),
+          foco: (document.activeElement.closest(
+            '.accordion-header') || {}).id || ''})""")
+        check(5, "click sul punteggio apre la sezione MARS giusta",
+              area_focus["espansa"] == "true"
+              and area_focus["foco"].startswith("acc-h-access"),
+              "aria-expanded=%s focus in #%s"
+              % (area_focus["espansa"], area_focus["foco"]))
 
         # ---- Flusso 6: download negato (profilo incompleto) ----
         dl = page.evaluate(

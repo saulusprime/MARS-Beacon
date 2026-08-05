@@ -1,0 +1,22 @@
+# Pianificazione dell'audit MARS periodico: una volta a settimana.
+# (Il mercoledi' mattina, per non sovrapporsi al monitoraggio
+# citazioni del lunedi': prima si corregge, poi si misura.)
+#
+# Installazione:
+#   sudo cp deploy/seo-rrf-audit.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now seo-rrf-audit.timer
+#
+# Verifica:  systemctl list-timers seo-rrf-audit
+# Esecuzione manuale di prova:  sudo systemctl start seo-rrf-audit
+
+[Unit]
+Description=Audit MARS settimanale
+
+[Timer]
+OnCalendar=Wed 06:30
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

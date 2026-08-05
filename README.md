@@ -1,7 +1,8 @@
-# SEORRF — MARS Audit
+# MARS Beacon
 
-**MARS Audit** (*Meta-fusion, Accessibility, Ranking & Security
-Audit*) — fino al 2026-08-04 "Audit SEO + Reciprocal Rank Fusion".
+**MARS Beacon** (*Meta-fusion, Accessibility, Ranking & Security
+Audit*) — fino al 2026-08-05 "MARS Audit", prima ancora "Audit SEO +
+Reciprocal Rank Fusion".
 
 Strumento (Python 3, file singolo, ~2.000 righe, licenza MIT)
 che misura quanto un sito è **recuperabile e citabile dai motori di
@@ -95,6 +96,7 @@ python3 seo_rrf_audit.py https://esempio.it \
 | `--competitor URL` | — | sito concorrente da confrontare (ripetibile, massimo 3). Ogni concorrente viene scansionato con gli stessi limiti; i corpora vengono fusi negli stessi indici BM25+vettoriale e interrogati con le stesse query (i temi del **tuo** sito): il referto riporta la **share of voice** — quanti dei primi 5 posti fusi appartengono a ciascun sito, con soglie rispetto alla parità — e le query vinte interamente dai concorrenti |
 | `--market occidentale\|globale\|orientale` | occidentale | pesi dei **profili di citabilità per assistente IA** nell'indice composito: `occidentale` privilegia ChatGPT/Perplexity (50%) e Claude (30%), `orientale` Qwen e Kimi (35% ciascuno), `globale` pesa tutti allo stesso modo. I profili sono stime euristiche derivate dai punteggi di area — la nota di onestà è sempre inclusa nel referto |
 | `--history FILE` | — | **storico JSONL delle esecuzioni**: legge l'ultima riga dello stesso sito e riporta nei referti la sezione "Rispetto all'esecuzione precedente" (variazioni dei punteggi per area, rilievi nuovi/risolti), poi accoda una riga compatta per l'esecuzione corrente. Con un audit schedulato (cron/systemd) trasforma l'audit in monitoraggio anche senza GUI |
+| `--fail-under PUNTI` | — | **gate di regressione**: esce con codice `1` anche quando il punteggio complessivo (0–100) è sotto la soglia, dichiarandolo su stderr. Pensato per gli audit schedulati con `--history` (cron/systemd): il fallimento del servizio diventa la notifica — vedi le unit in `deploy/` |
 | `--judge auto\|on\|off` | auto | **giudizio LLM sulla citabilità**: un modello (Claude, SDK ufficiale Anthropic) valuta i passaggi migliori della simulazione RRF — max 5, una sola richiesta API per audit — con punteggio e motivazione per ciascuno e **scarto rispetto all'indice euristico**. `auto` (default) parte solo se `ANTHROPIC_API_KEY` è nell'ambiente, altrimenti viene saltato con motivo dichiarato nel referto: senza chiave l'audit resta interamente offline. `on` pretende la chiave (errore d'uso senza); `off` disattiva. I costi API sono a carico della chiave configurata |
 | `--render off\|auto\|always` | off | rendering JavaScript in browser headless (richiede Playwright; ripiega sul Chrome/Chromium di sistema). `auto` rende **solo** le pagine che l'euristica classifica come client-side; `always` tutte. Il DOM renderizzato sostituisce l'estrazione del contenuto, ma stato HTTP, redirect e tempi restano quelli della risposta reale, e il rilievo critico sul contenuto invisibile ai crawler senza JS scatta comunque. Rendering seriale, rispetta `--delay` e l'annullamento |
 | `--workers N` | 4 | richieste in parallelo durante la scansione (1–16; `1` = seriale). Il **ritmo verso il sito non cambia**: gli avvii delle richieste restano distanziati di `--delay` anche fra thread — i worker sovrappongono solo le attese di rete, quindi il tempo per pagina tende a `max(delay, latenza)` invece di `delay + latenza` |
@@ -102,15 +104,17 @@ python3 seo_rrf_audit.py https://esempio.it \
 | `--user-agent UA` | UA dello strumento | header `User-Agent` inviato con ogni richiesta. Il predefinito identifica lo strumento (`SeoRrfAudit/versione`) e rimanda alla pagina del progetto su GitHub, così chi legge i log del server sa chi è il bot |
 | *(robots.txt)* | rispetta | **dalla v1.13.0 i `Disallow` per l'agente `SeoRrfAudit` sono rispettati di default**: gli URL vietati non vengono scaricati e sono elencati nel referto. `--own-site` dichiara il sito di tua titolarità e li analizza comunque (i concorrenti restano protetti); `--ignore-robots accetto` li ignora ovunque, con accettazione **esplicita** di responsabilità (il valore letterale "accetto" è obbligatorio). `--respect-robots` resta accettato ma è deprecato (ora è il default) e non si combina con gli altri due |
 | `--max-body MB` | 10 | tetto al corpo di ogni risposta: lo scarico avviene a blocchi e si interrompe al superamento (o subito, se il `Content-Length` dichiarato eccede). Il corpo resta in RAM durante l'analisi: dimensiona il valore sulla memoria della tua macchina, di norma non oltre un decimo della RAM disponibile — lo script stesso avvisa all'avvio se il valore scelto è alto per la macchina in uso |
-| `--format text\|json\|html\|md\|csv` | text | formato del referto. Il JSON dichiara `schema_version` (oggi `1`): si incrementa solo per cambi incompatibili della struttura — è il numero su cui fare il gate nelle integrazioni. `md` è Markdown per issue/PR (il piano di remediation è una task list spuntabile); `csv` esporta i rilievi una riga ciascuno per Excel/Sheets (`;` e BOM) |
+| `--format text\|json\|html\|md\|csv` | text | formato del referto. Il JSON dichiara `schema_version` (oggi `1`): si incrementa solo per cambi incompatibili della struttura — è il numero su cui fare il gate nelle integrazioni. `md` è Markdown per issue/PR (il piano di remediation è una task list spuntabile); `csv` esporta i rilievi una riga ciascuno per Excel/Sheets (`;` e BOM). L'HTML ha un **CSS di stampa** (la stampa del browser produce un PDF pulito, con colori di verdetto e URL delle fonti) e **ancore stabili per rilievo** (`#r-…`, i conteggi nei titoli non le cambiano): Top rilievi e piano di remediation linkano il rilievo esteso, e ogni rilievo ha il suo permalink `#` |
+| `--lang it\|en` | it | lingua del referto per i formati `html`, `text`, `md` e `csv`: **cornice e rilievi** (titoli, dettagli, correzioni ed esempi tradotti via catalogo interno, ~125 rilievi). Le **evidenze citate dal sito** (URL, estratti di pagina, titoli del confronto storico) restano nella lingua del sito, dichiarato in testa al referto. Il JSON resta canonico in italiano e porta per ogni rilievo `key` e `params`, con cui le integrazioni possono tradurre da sole |
 | `--output FILE` | stdout | scrive il referto su file |
 | `--quiet` | — | sopprime l'avanzamento su stderr |
 | `--version` | — | stampa la versione |
 
 ### Codici di uscita
 
-`0` nessuna criticità · `1` almeno una criticità · `2` errore d'uso ·
-`130` interruzione utente. Adatto all'uso in CI come gate di qualità.
+`0` nessuna criticità · `1` almeno una criticità (o punteggio sotto
+`--fail-under`) · `2` errore d'uso · `130` interruzione utente.
+Adatto all'uso in CI come gate di qualità.
 
 ## Interfaccia grafica locale
 
@@ -188,6 +192,19 @@ Cosa offre:
   del vicinato al passaggio o al focus da tastiera con i dettagli in
   una regione di stato; nel referto HTML resta statico (niente
   JavaScript) ma con etichette ad alone leggibili.
+- **Risultati separati per tipologia MARS**: una sezione di
+  **sintesi** (verdetto, punteggi per area, top rilievi, confronto
+  con l'esecuzione precedente, piano di remediation e scarico dei
+  referti) seguita da quattro sezioni dedicate — **Meta-fusion**
+  (rilievi RRF, profili di citabilità, giudizio LLM, matematica del
+  problema, simulazione per query, confronto competitivo),
+  **Accessibility** (rilievi di accesso/crawling, profondità di
+  crawl, grafo dei link), **Ranking** (rilievi lessicali, semantici
+  e dati strutturati) e **Security** (HTTPS, URL in http, opt-out
+  IA via meta robots). La classificazione arriva dal core (campo
+  `pillar` di ogni rilievo nel JSON, additivo allo schema): l'area
+  tecnica si divide tra Accessibility e Security a livello di
+  singolo rilievo.
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, **profili di citabilità per assistente IA** (barre per
   profilo, indice composito col mercato scelto nel form e "top
@@ -230,6 +247,16 @@ logo e favicon.
 inclusa la unit systemd [deploy/seo-rrf-gui.service](deploy/seo-rrf-gui.service)
 (utente dinamico senza privilegi, filesystem in sola lettura, riavvio
 automatico): istruzioni di installazione nei commenti della unit.
+Per l'**audit periodico senza GUI** ci sono
+[deploy/seo-rrf-audit.service](deploy/seo-rrf-audit.service) +
+[.timer](deploy/seo-rrf-audit.timer) (settimanale, stesso hardening):
+l'audit gira con `--history` — ogni referto riporta il delta rispetto
+all'esecuzione precedente — e con `--fail-under`, così il servizio
+fallisce sulle regressioni (criticità o punteggio sotto soglia); il
+fallimento è visibile in `systemctl` e può attivare una **notifica
+webhook** (ntfy/Slack/Teams) tramite la unit modello
+[deploy/seo-rrf-notify@.service](deploy/seo-rrf-notify@.service),
+agganciabile via `OnFailure=` anche al monitoraggio citazioni.
 
 ## Monitoraggio delle citazioni IA effettive
 

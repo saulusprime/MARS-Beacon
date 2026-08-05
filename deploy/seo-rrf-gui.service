@@ -13,7 +13,7 @@
 # reverse proxy con autenticazione davanti.
 
 [Unit]
-Description=Lympha Technologies - MARS Audit (interfaccia locale)
+Description=Lympha Technologies - MARS Beacon (interfaccia locale)
 Documentation=file:///opt/seorrf/README.md
 After=network-online.target
 Wants=network-online.target

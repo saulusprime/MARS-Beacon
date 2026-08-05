@@ -68,7 +68,7 @@ from typing import Dict, List, Optional, Tuple
 
 import seo_rrf_audit as sra
 
-__version__ = "2.18.0"
+__version__ = "2.20.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 

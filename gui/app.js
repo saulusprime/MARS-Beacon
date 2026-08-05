@@ -22,6 +22,38 @@
   };
   const SEV_ORDER = { critical: 0, warning: 1, info: 2, ok: 3 };
 
+  /* Tipologie MARS: chiave = valore del campo "pillar" dei rilievi
+     (dal core), suffisso = parte finale degli id delle sezioni e
+     dei contenitori findings-acc-*. AREA_PILLAR e' il pilastro di
+     default dell'area (il core puo' deviare i singoli rilievi,
+     es. sicurezza dentro l'area tecnica). */
+  const PILLARS = [
+    { key: "meta-fusion", suffix: "meta" },
+    { key: "accessibility", suffix: "access" },
+    { key: "ranking", suffix: "rank" },
+    { key: "security", suffix: "sec" },
+  ];
+  const AREA_PILLAR = {
+    "Tecnica": "accessibility",
+    "Lessicale (BM25)": "ranking",
+    "Semantica (vettoriale)": "ranking",
+    "Dati strutturati": "ranking",
+    "Simulazione RRF": "meta-fusion",
+  };
+  const RESULT_SECTIONS = [
+    "results-section", "pillar-meta-section",
+    "pillar-access-section", "pillar-rank-section",
+    "pillar-sec-section",
+  ];
+
+  function pillarOf(finding) {
+    return finding.pillar || AREA_PILLAR[finding.area] || "ranking";
+  }
+
+  function setResultsHidden(hidden) {
+    RESULT_SECTIONS.forEach((id) => { el(id).hidden = hidden; });
+  }
+
   const PRESETS_KEY = "seo_rrf_presets";
   const PRESET_FIELDS = [
     "f-url", "f-max-pages", "f-delay", "f-max-body", "f-retries",
@@ -171,7 +203,7 @@
       el("auth-in").hidden = true;
       el("config-section").hidden = true;
       el("progress-section").hidden = true;
-      el("results-section").hidden = true;
+      setResultsHidden(true);
       el("history-section").hidden = true;
       el("citations-section").hidden = true;
       setOpen("sec-auth", true);
@@ -1095,8 +1127,11 @@
         running = true;
         lastPhase = "";
         setSubmitState(true);
-        el("results-section").hidden = true;
+        setResultsHidden(true);
         setOpen("sec-results", false);
+        PILLARS.forEach((p) => {
+          setOpen("sec-pillar-" + p.suffix, false);
+        });
         el("audit-error").hidden = true;
         el("log").textContent = "";
         el("announcer").textContent = "Audit avviato.";
@@ -1258,7 +1293,7 @@
     renderRrf(snap.rrf || []);
     renderCompetitive(snap.competitive);
 
-    el("results-section").hidden = false;
+    setResultsHidden(false);
     setOpen("sec-results", true);
   }
 
@@ -1766,10 +1801,17 @@
   }
 
   function openArea(index) {
-    const body = document.getElementById("acc-c-" + index);
+    /* Apre i rilievi dell'area nella sezione MARS di pertinenza
+       (il pilastro di default dell'area). */
+    const pillar = PILLARS.find(
+      (p) => p.key === AREA_PILLAR[AREAS[index]]);
+    if (!pillar) { return; }
+    const body = document.getElementById(
+      "acc-c-" + pillar.suffix + "-" + index);
     if (!body) { return; }
+    setOpen("sec-pillar-" + pillar.suffix, true);
     const toggle = document.querySelector(
-      "#acc-h-" + index + " button");
+      "#acc-h-" + pillar.suffix + "-" + index + " button");
     if (toggle && toggle.classList.contains("collapsed")) {
       toggle.click();
     }
@@ -1847,53 +1889,71 @@
   }
 
   function renderFindings(findings, delta) {
-    const acc = el("findings-acc");
-    acc.textContent = "";
+    /* Distribuisce i rilievi nelle quattro sezioni MARS (campo
+       "pillar" del core, con ripiego sul pilastro dell'area) e,
+       dentro ciascuna, li raggruppa per area in una fisarmonica. */
     const newKeys = new Set(
       ((delta || {}).new || []).map(normFindingKey));
 
-    AREAS.forEach((area, index) => {
-      const subset = findings
-        .filter((f) => f.area === area)
-        .sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
-      if (!subset.length) {
-        return;
+    PILLARS.forEach((pillar) => {
+      const acc = el("findings-acc-" + pillar.suffix);
+      acc.textContent = "";
+      let empty = true;
+
+      AREAS.forEach((area, index) => {
+        const subset = findings
+          .filter((f) => f.area === area
+            && pillarOf(f) === pillar.key)
+          .sort((a, b) =>
+            SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
+        if (!subset.length) {
+          return;
+        }
+        empty = false;
+
+        const item = document.createElement("div");
+        item.className = "accordion-item";
+
+        const headId = "acc-h-" + pillar.suffix + "-" + index;
+        const bodyId = "acc-c-" + pillar.suffix + "-" + index;
+
+        const header = document.createElement("h4");
+        header.className = "accordion-header";
+        header.id = headId;
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "accordion-button collapsed";
+        button.setAttribute("data-bs-toggle", "collapse");
+        button.setAttribute("data-bs-target", "#" + bodyId);
+        button.setAttribute("aria-expanded", "false");
+        button.setAttribute("aria-controls", bodyId);
+        button.textContent = area + summarizeArea(subset);
+        header.appendChild(button);
+        item.appendChild(header);
+
+        const collapse = document.createElement("div");
+        collapse.id = bodyId;
+        collapse.className = "accordion-collapse collapse";
+        collapse.setAttribute("aria-labelledby", headId);
+
+        const body = document.createElement("div");
+        body.className = "accordion-body";
+        subset.forEach((f) => body.appendChild(
+          findingNode(f, newKeys.has(normFindingKey(f)))));
+        collapse.appendChild(body);
+        item.appendChild(collapse);
+
+        acc.appendChild(item);
+      });
+
+      if (empty) {
+        const none = document.createElement("p");
+        none.className = "small text-muted";
+        none.textContent =
+          "Nessun rilievo per questa tipologia.";
+        acc.appendChild(none);
       }
-
-      const item = document.createElement("div");
-      item.className = "accordion-item";
-
-      const headId = "acc-h-" + index;
-      const bodyId = "acc-c-" + index;
-
-      const header = document.createElement("h4");
-      header.className = "accordion-header";
-      header.id = headId;
-
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "accordion-button collapsed";
-      button.setAttribute("data-bs-toggle", "collapse");
-      button.setAttribute("data-bs-target", "#" + bodyId);
-      button.setAttribute("aria-expanded", "false");
-      button.setAttribute("aria-controls", bodyId);
-      button.textContent = area + summarizeArea(subset);
-      header.appendChild(button);
-      item.appendChild(header);
-
-      const collapse = document.createElement("div");
-      collapse.id = bodyId;
-      collapse.className = "accordion-collapse collapse";
-      collapse.setAttribute("aria-labelledby", headId);
-
-      const body = document.createElement("div");
-      body.className = "accordion-body";
-      subset.forEach((f) => body.appendChild(
-        findingNode(f, newKeys.has(normFindingKey(f)))));
-      collapse.appendChild(body);
-      item.appendChild(collapse);
-
-      acc.appendChild(item);
     });
   }
 

@@ -1,0 +1,54 @@
+# Esecuzione singola dell'audit MARS periodico con storico.
+# Attivata periodicamente da seo-rrf-audit.timer.
+#
+# Prerequisiti sulla macchina:
+#   - /opt/seorrf con il progetto e venv (vedi seo-rrf-gui.service)
+#   - facoltativo /etc/seorrf/citations.env con ANTHROPIC_API_KEY:
+#     se presente, il giudizio LLM (--judge auto) parte da solo;
+#     senza chiave l'audit resta interamente offline
+#
+# Lo storico si accumula in /var/lib/seorrf/audit.jsonl: a ogni
+# esecuzione il referto riporta il delta rispetto alla precedente
+# (punteggi per area, rilievi nuovi/risolti). Il referto HTML piu'
+# recente resta in /var/lib/seorrf/referto-audit.html.
+#
+# Notifica sulle regressioni: il servizio fallisce (visibile in
+# systemctl e nei sistemi di monitoraggio) quando l'audit rileva
+# criticita' oppure il punteggio complessivo scende sotto la soglia
+# --fail-under. Per una notifica attiva (webhook ntfy/Slack/Teams)
+# decommenta OnFailure e installa seo-rrf-notify@.service.
+
+[Unit]
+Description=Lympha Technologies - audit MARS periodico
+Documentation=file:///opt/seorrf/README.md
+After=network-online.target
+Wants=network-online.target
+#OnFailure=seo-rrf-notify@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/seorrf
+EnvironmentFile=-/etc/seorrf/citations.env
+StateDirectory=seorrf
+ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/seo_rrf_audit.py \
+    https://SITO-DEL-CLIENTE.it \
+    --own-site \
+    --history /var/lib/seorrf/audit.jsonl \
+    --format html --output /var/lib/seorrf/referto-audit.html \
+    --fail-under 40 --quiet
+
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadOnlyPaths=/opt/seorrf
+
+# Con gli embedding reali (sentence-transformers) il modello viene
+# scaricato alla prima esecuzione: serve una cache scrivibile.
+# Decommenta se la libreria e' installata nel venv.
+#CacheDirectory=seorrf
+#Environment=HF_HOME=/var/cache/seorrf/hf
+
+[Install]
+WantedBy=multi-user.target

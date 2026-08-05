@@ -48,7 +48,12 @@ focus (skip link, avvio, fine audit), annunci delle regioni
 `role="status"` (registrazione, fasi dell'audit), etichette e
 obblighi dei campi, `aria-expanded`/`aria-describedby`,
 `aria-disabled` con nota, gravità come testo, didascalie delle
-tabelle, `aria-label` dei widget. 23 controlli in tutto.
+tabelle, `aria-label` dei widget e — dalla GUI v2.19.0 — il
+contratto delle **cinque sezioni risultati** (sintesi + quattro
+tipologie MARS): visibilità, `aria-expanded`/`aria-controls` dei
+toggle, apertura della sola sintesi a fine audit, click su un
+punteggio d'area che espande la sezione di pertinenza e porta il
+focus sulla fisarmonica giusta. 27 controlli in tutto.
 
 ```bash
 <venv>/bin/python tools/verifica_at.py   # richiede Chrome e playwright
@@ -59,10 +64,16 @@ tabelle, `aria-label` dei widget. 23 controlli in tutto.
 comprensibile. Va rieseguita a ogni modifica di flusso, prima
 della sessione umana.
 
-Ultimo esito: **23/23 controlli superati** (2026-08-04, Chrome di
-sistema via Playwright, GUI v2.16.0 / audit v1.37.0). Nessuna
-anomalia del contratto ARIA; tre falsi allarmi iniziali erano
-artefatti dello script (audit troppo rapido per campionare
+Ultimo esito: **27/27 controlli superati** (2026-08-05, Chrome di
+sistema via Playwright su macOS, GUI v2.19.0 / audit v1.43.0):
+riesecuzione dopo la separazione dei risultati in cinque sezioni,
+con i quattro controlli nuovi dedicati. Lo script ora individua il
+Chrome di sistema per piattaforma (macOS/Linux/Windows), con
+ripiego sul Chromium di Playwright.
+
+Esito precedente: 23/23 (2026-08-04, GUI v2.16.0 / audit v1.37.0).
+Nessuna anomalia del contratto ARIA; tre falsi allarmi iniziali
+erano artefatti dello script (audit troppo rapido per campionare
 l'avanzamento → risolto con `--delay 1.5`; confronto di stringhe
 senza normalizzare gli a-capo; id errato del bottone Annulla).
 
@@ -102,12 +113,16 @@ NVDA — `↓` per scorrere, `H` per i titoli, `B` per i pulsanti,
    annunciate dalla regione `role="status"` senza rubare il focus;
    il bottone "Annulla audit" è raggiungibile e, annullando, viene
    annunciato l'esito.
-5. **Risultati** — il focus arriva su "Risultati dell'audit e
-   referto"; i punteggi per area sono pulsanti con etichetta
-   esplicita ("...apri i rilievi di quest'area"); le gravità dei
-   rilievi sono lette come testo (Critico/Avvertenza/...), mai solo
-   colore; le tabelle (RRF, storico) hanno intestazioni e didascalie
-   annunciate.
+5. **Risultati** — il focus arriva su "Risultati dell'audit:
+   sintesi e referto"; con la navigazione per titoli si
+   raggiungono le altre quattro sezioni ("Risultati dell'audit:
+   Meta-fusion / Accessibility / Ranking / Security"), annunciate
+   come compresse; i punteggi per area sono pulsanti con etichetta
+   esplicita ("...apri i rilievi di quest'area") e attivandoli si
+   viene portati alla sezione MARS di pertinenza, che si espande;
+   le gravità dei rilievi sono lette come testo
+   (Critico/Avvertenza/...), mai solo colore; le tabelle (RRF,
+   storico) hanno intestazioni e didascalie annunciate.
 6. **Download negato** — con profilo incompleto, i pulsanti di
    scarico annunciano lo stato disabilitato (`aria-disabled`) e la
    nota esplicativa è leggibile subito dopo.
@@ -123,6 +138,7 @@ una persona con lo screen reader attivo: non è automatizzabile).
 | Data | AT + browser | Versioni | Flussi | Esito | Note / anomalie |
 |---|---|---|---|---|---|
 | 2026-08-04 | *(strumentale, non AT)* albero di accessibilità via Chrome+Playwright | GUI 2.16.0, audit 1.37.0 | 1–7 | 23/23 OK | Verifica del contratto ARIA, **non** sostituisce la sessione umana; dettagli in §1.1 |
+| 2026-08-05 | *(strumentale, non AT)* albero di accessibilità via Chrome+Playwright (macOS) | GUI 2.19.0, audit 1.43.0 | 1–7 | 27/27 OK | Riesecuzione dopo le cinque sezioni risultati (v2.19.0), con 4 controlli nuovi sul loro contratto; dettagli in §1.1 |
 | _da compilare_ | VoiceOver + Safari | | 1–7 | | |
 | _da compilare_ | NVDA + Firefox | | 1–7 | | |
 

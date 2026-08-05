@@ -149,7 +149,7 @@ def test_render_markdown_struttura():
     pages, scores, findings = _dati_render()
     md = sra.render_markdown("https://mio.it", pages, findings,
                              scores, [], "char-tfidf")
-    assert md.startswith("# MARS Audit — https://mio.it")
+    assert md.startswith("# MARS Beacon — https://mio.it")
     assert "| Area | Punteggio |" in md
     assert "- [ ] **1.** Sito non in HTTPS" in md, \
         "il piano e' una task list spuntabile"
@@ -188,7 +188,7 @@ def test_cli_formato_md(site, tmp_path):
                    "--quiet"])
     assert rc == 1
     testo = out.read_text(encoding="utf-8")
-    assert testo.startswith("# MARS Audit")
+    assert testo.startswith("# MARS Beacon")
     assert "- [ ] **1.**" in testo
 
 

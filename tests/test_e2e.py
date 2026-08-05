@@ -8,7 +8,7 @@ import seo_rrf_audit as sra
 
 def _audit(site, k=48):
     return sra.run_audit(base=site, max_pages=10, queries=[],
-                         model_name="", delay=0.0, k=k,
+                         model_name="none", delay=0.0, k=k,
                          verbose=False)
 
 
@@ -87,7 +87,7 @@ def test_renderer_coerenti_e_k_propagato(site):
 
     report_text = sra.render_text(
         site, pages, findings, scores, results, mode, 48)
-    assert "MARS AUDIT" in report_text
+    assert "MARS BEACON" in report_text
     assert "PIANO DI REMEDIATION" in report_text
     assert "MATEMATICA DEL PROBLEMA" in report_text
     assert "sforzo:" in report_text
@@ -178,3 +178,25 @@ def test_cli_max_body_non_valido(capsys):
     rc = sra.main(["https://x.invalid", "--max-body", "0"])
     capsys.readouterr()
     assert rc == 2
+
+
+def test_cli_fail_under_fuori_scala(capsys):
+    assert sra.main(["https://x.invalid", "--fail-under", "101"]) == 2
+    assert sra.main(["https://x.invalid", "--fail-under", "-1"]) == 2
+    capsys.readouterr()
+
+
+def test_cli_fail_under_gate_sul_punteggio(site, capsys):
+    # soglia massima: il gate scatta e lo dichiara su stderr
+    rc = sra.main([site, "--quiet", "--delay", "0",
+                   "--fail-under", "100"])
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "sotto la soglia" in err
+
+    # soglia minima: il gate non scatta, resta l'uscita 1 sui critici
+    rc = sra.main([site, "--quiet", "--delay", "0",
+                   "--fail-under", "0"])
+    err = capsys.readouterr().err
+    assert rc == 1, "i difetti piantati devono dare uscita 1"
+    assert "sotto la soglia" not in err

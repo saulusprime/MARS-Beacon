@@ -1,0 +1,37 @@
+# Notifica di fallimento per le unit seo-rrf-*: si aggancia con
+# OnFailure=seo-rrf-notify@%n.service (gia' predisposto, commentato,
+# in seo-rrf-audit.service e utilizzabile allo stesso modo in
+# seo-rrf-citations.service) e invia un POST al webhook configurato.
+#
+# Prerequisiti:
+#   - curl installato
+#   - /etc/seorrf/notify.env (chmod 600, root:root) con l'endpoint:
+#       NOTIFY_URL=https://ntfy.sh/il-tuo-topic
+#     Funziona con qualunque servizio che accetti un POST di testo
+#     semplice (ntfy, webhook di Slack/Teams via ponte, endpoint
+#     proprio). Per Slack in forma nativa sostituisci ExecStart con
+#     un payload JSON: curl -fsS -m 10 -H 'Content-Type:
+#     application/json' -d '{"text":"..."}' ${NOTIFY_URL}
+#
+# Installazione:
+#   sudo cp deploy/seo-rrf-notify@.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   (si attiva da sola al fallimento delle unit agganciate)
+#
+# Prova manuale:  sudo systemctl start seo-rrf-notify@test.service
+
+[Unit]
+Description=Notifica fallimento di %i
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/seorrf/notify.env
+ExecStart=/usr/bin/curl -fsS -m 10 \
+    -d "Regressione MARS Beacon su %H: l'unita' %i e' fallita. Dettagli: journalctl -u %i" \
+    ${NOTIFY_URL}
+
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes

@@ -20,6 +20,8 @@ Description=Lympha Technologies - monitoraggio citazioni IA
 Documentation=file:///opt/seorrf/README.md
 After=network-online.target
 Wants=network-online.target
+# Notifica attiva sulle regressioni: vedi seo-rrf-notify@.service
+#OnFailure=seo-rrf-notify@%n.service
 
 [Service]
 Type=oneshot

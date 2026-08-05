@@ -1,15 +1,27 @@
 # AS-IS — Stato di fatto del progetto
 
-Il prodotto si chiama **MARS Audit** (Meta-fusion, Accessibility,
-Ranking & Security Audit) dal 2026-08-04; in precedenza "Audit SEO
-& Reciprocal Rank Fusion". I nomi dei file restano `seo_rrf_*`.
+Il prodotto si chiama **MARS Beacon** (Meta-fusion, Accessibility,
+Ranking & Security Audit) dal 2026-08-05, in vista dell'integrazione
+di Lighthouse; dal 2026-08-04 al 2026-08-05 "MARS Audit", in
+precedenza "Audit SEO & Reciprocal Rank Fusion". Anche il repository
+GitHub è stato rinominato (`SEO-RRF` → `MARS-Beacon`, i vecchi URL
+sono rediretti da GitHub). I nomi dei file restano `seo_rrf_*`.
 
-Fotografia di ciò che è **già realizzato e verificato** al 2026-08-04.
+Fotografia di ciò che è **già realizzato e verificato** al 2026-08-05.
 È il complemento di [TO-DO.md](TO-DO.md), che da qui in avanti elenca
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.39.0
+## Strumento CLI — `seo_rrf_audit.py` v1.44.0
+
+- **Rename in MARS Beacon** (v1.44.0, GUI v2.20.0, 2026-08-05):
+  nome prodotto aggiornato in referti (text/html/md), docstring,
+  `--help`, GUI (header, titolo, condizioni di servizio), unit
+  systemd e URL del progetto nello User-Agent; repository GitHub
+  rinominato in `MARS-Beacon` con descrizione "MARS Beacon:
+  Meta-fusion, Accessibility, Ranking & Security Audit". Il token
+  robots.txt resta `SeoRrfAudit` per non invalidare le regole già
+  scritte dai siti auditati.
 
 - **Audit su cinque aree** con rilievi a quattro gravità e punteggio
   0–100 per area, media complessiva pesata (tecnica 1.0, lessicale 1.5,
@@ -156,6 +168,72 @@ sono nel [README.md](README.md).
   GUI (v2.11.0), i cui referti scaricati includono la stessa
   sezione. Righe malformate o file assente non impediscono mai
   l'audit; con cron/systemd l'audit diventa monitoraggio headless.
+- **Gate di regressione e audit periodico come servizio** (v1.40.0):
+  `--fail-under PUNTI` esce con codice 1 anche quando il punteggio
+  complessivo scende sotto la soglia (0–100, validata; motivo
+  dichiarato su stderr), in aggiunta all'uscita 1 sui critici — il
+  "`--fail-under`-equivalente" già in uso nel monitor citazioni. Lo
+  sfruttano le unit `deploy/seo-rrf-audit.service` + `.timer`
+  (settimanale il mercoledì, stesso hardening delle altre unit,
+  `--history` su `/var/lib/seorrf/audit.jsonl`, referto HTML
+  persistito, giudizio LLM opzionale via `citations.env`): il
+  fallimento del servizio è la notifica di regressione, e la unit
+  modello `deploy/seo-rrf-notify@.service` la trasforma in webhook
+  attivo (ntfy/Slack/Teams) agganciabile con `OnFailure=` anche al
+  monitoraggio citazioni.
+- **Chrome di sistema multipiattaforma** (v1.43.1): `CHROME_PATHS`
+  ora copre anche macOS e Windows (prima solo Linux), quindi il
+  ripiego del rendering JavaScript sul browser di sistema funziona
+  ovunque; su macOS il test di integrazione col browser reale non
+  viene più saltato (suite 285/285 senza skip con Chrome
+  presente).
+- **i18n completa dei referti** (v1.43.0): `--lang it|en` traduce
+  cornice **e rilievi** nei formati html, text, md e csv.
+  Architettura: i ~125 punti di creazione dei `Finding` mantengono
+  i testi italiani canonici (output italiano identico per
+  costruzione, storico e ancore intatti) e portano `key` +
+  `params`; il catalogo `_FINDINGS_EN` (solo inglese, ~120 voci
+  con template `%(nome)s` per title/detail/fix/example) viene
+  applicato al rendering da `finding_texts()`, con fallback
+  campo per campo sull'italiano se chiave o parametri non
+  combaciano — un template rotto non interrompe mai il referto.
+  Il piano di remediation e le top azioni propagano chiave e
+  parametri; le evidenze citate dal sito (URL, estratti, titoli
+  del confronto storico) restano nella lingua del sito, con nota
+  dichiarata in testa al referto EN. Il JSON resta canonico in
+  italiano ed espone `key`/`params` per rilievo (campi additivi,
+  schema invariato) cosi' le integrazioni traducono da sole.
+  Test in `tests/test_i18n.py`: validazione di tutti i template,
+  fallback, audit reale sul sito fixture con verifica che ogni
+  rilievo abbia chiave e traduzione effettiva, nessuna stringa di
+  cornice italiana nei referti EN (e viceversa), intestazioni CSV.
+- **Tipologie MARS sui rilievi** (v1.42.0): ogni `Finding` porta il
+  campo `pillar` (`meta-fusion` / `accessibility` / `ranking` /
+  `security`) — di default derivato dall'area (`AREA_PILLARS`:
+  Tecnica→accessibility, Lessicale/Semantica/Dati
+  strutturati→ranking, RRF→meta-fusion), con override esplicito sui
+  controlli di sicurezza dell'area tecnica (HTTPS, URL ancora in
+  http, opt-out IA Microsoft noarchive/nocache). Esposto in
+  `as_dict`/JSON come campo additivo (schema_version invariato);
+  la GUI lo usa per separare i risultati. Test in
+  `tests/test_pillars.py`.
+- **Referto HTML: stampa, ancore e cornice bilingue** (v1.41.0):
+  CSS `@media print` (palette chiara forzata, interruzioni di
+  pagina che non spezzano rilievi/righe/tile, URL delle fonti
+  esplicitati nel footer, `print-color-adjust` per i colori di
+  verdetto) — la stampa del browser produce un PDF pulito senza
+  dipendenze; **ancore stabili per rilievo** (`#r-…` derivate
+  dalla chiave storica: i conteggi nei titoli diventano "n", il
+  link resta valido fra esecuzioni; duplicati con suffisso), con
+  permalink "#" su ogni rilievo, link dai Top rilievi e dal piano
+  di remediation al rilievo esteso ed evidenziazione `:target`;
+  **`--lang it|en`** per la cornice del referto HTML (catalogo
+  `_HTML_I18N` con ~90 chiavi per lingua: sezioni, tabelle,
+  legende, aria-label, footer) — i rilievi e i testi generati
+  dall'audit restano in italiano e con `en` il referto lo dichiara
+  in testa; gli altri formati non sono toccati. Test dedicati in
+  `tests/test_report_html.py` (stabilità delle ancore, CSS di
+  stampa, parità di chiavi fra i cataloghi, cornice en con nota).
 - **Giudizio LLM sulla citabilità** (v1.18.0, "LLM as judge"),
   **attivo di default** in modalità `auto` per decisione di
   progetto: dopo l'audit un modello (SDK ufficiale Anthropic,
@@ -268,8 +346,25 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.18.0 + `gui/`
+## Interfaccia grafica locale — `seo_rrf_gui.py` v2.20.0 + `gui/`
 
+- **Risultati separati per tipologia MARS** (v2.19.0): la sezione
+  unica "Risultati dell'audit e referto" è diventata cinque
+  sezioni della fisarmonica — **"Sintesi e referto"** (meta,
+  scarico referti, hero col verdetto, top rilievi, confronto con
+  l'esecuzione precedente, punteggi per area, piano di
+  remediation) più **Meta-fusion** (rilievi RRF, profili di
+  citabilità, giudizio LLM, matematica del problema, simulazione
+  per query, confronto competitivo), **Accessibility** (rilievi di
+  accesso/crawling, profondità di crawl, grafo dei link),
+  **Ranking** (rilievi lessicali/semantici/dati strutturati) e
+  **Security** (HTTPS, http residuo, opt-out IA). Il riparto usa
+  il campo `pillar` dei rilievi (core v1.42.0, ripiego sull'area
+  in JS); i punteggi per area restano in sintesi e il click su
+  un'area apre i suoi rilievi nella sezione di pertinenza; a fine
+  audit si apre la sola sintesi, le altre sezioni sono chiuse ma
+  visibili. Le sezioni senza rilievi mostrano "Nessun rilievo per
+  questa tipologia".
 - **Grafo dei link interattivo** (v2.18.0, su feedback: la resa
   statica non era leggibile): zoom con rotella o pulsanti, pan
   trascinando lo sfondo, trascinamento dei nodi per districare,
@@ -506,9 +601,12 @@ sono nel [README.md](README.md).
   compilare a ogni sessione (la prima esecuzione umana è in TO-DO).
   Dalla sessione del 2026-08-04 esiste anche la **verifica
   strumentale del protocollo** (`tools/verifica_at.py`): i flussi
-  1–7 eseguiti in un Chrome reale con 23 controlli sul contratto
-  ARIA (focus, regioni di stato, etichette, aria-*), ultimo esito
-  23/23 — dichiaratamente non sostitutiva della sessione umana.
+  1–7 eseguiti in un Chrome reale (individuato per piattaforma,
+  con ripiego sul Chromium di Playwright) con 27 controlli sul
+  contratto ARIA (focus, regioni di stato, etichette, aria-*, e
+  dalla GUI v2.19.0 il contratto delle cinque sezioni risultati);
+  ultimo esito 27/27 il 2026-08-05 — dichiaratamente non
+  sostitutiva della sessione umana.
 
 - **Suite pytest: 258 test in ~16 secondi** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
@@ -551,7 +649,54 @@ sono nel [README.md](README.md).
   di consulenza per www.miaweb.art, curato a mano a partire dai dati
   dello strumento).
 
-## Limiti noti e accettati (dettaglio in TO-DO)
+## Convenzioni grafiche adottate (widget GUI e referto HTML)
+
+Dall'analisi dei principali tool del settore (Semrush, Ahrefs, Moz,
+Lighthouse/PageSpeed, GTmetrix, CrUX Vis, Sistrix, SE Ranking,
+Screaming Frog; per l'AI visibility: Profound, Peec, Otterly,
+Ahrefs Brand Radar), adottate in blocco nei widget v1.35.0–v1.37.0
+/ GUI v2.14.0–v2.16.0 — tutto in HTML+CSS+SVG puro, senza librerie,
+coerente col vincolo offline:
+
+- scala 0–100 con **soglie fisse e visibili** (40/70): colore per il
+  verdetto immediato, numero sempre accanto;
+- **mai solo colore**: forma geometrica o etichetta accanto al
+  semaforo; gli informativi in blu, non in verde;
+- **delta** rispetto all'esecuzione precedente accanto a ogni numero;
+- liste di problemi ordinate per **severità × diffusione**, mai
+  alfabetiche;
+- trend con **annotazioni-evento** ("qui abbiamo pubblicato le FAQ").
+
+Mockup interattivo dei nove widget con dati d'esempio: board
+"SEO-RRF · Concept widget dashboard" su claude.ai (sessione di
+analisi del 2026-08-03).
+
+## Scartato consapevolmente (per non rivalutarlo)
+
+- Lo **stack SaaS** di Features.md
+  (FastAPI/Celery/Redis/RabbitMQ/pgvector/AWS): incompatibile con la
+  filosofia locale/offline a dipendenze minime.
+- La **simulazione di User-Agent altrui** (Bravebot, Baiduspider…) e
+  i pool di proxy anti-bot: contraddicono l'UA trasparente e il
+  rispetto del robots.txt di default (v1.13.0).
+- Le **API a pagamento** Ahrefs/Semrush.
+- Il **cross-check fattuale** su Wikipedia/Wikidata: oneroso, online,
+  in parte coperto dal giudizio LLM (v1.18.0).
+- I **Core Web Vitals**: territorio di Lighthouse.
+- **Business model, pricing e KPI**: materiale commerciale, non di
+  sviluppo (il white-label resta in TO-DO).
+- Le **associazioni modello→backend** di Features.md (Claude→Brave,
+  Kimi→Baidu, …): speculative e non verificate — i profili di
+  citabilità sono presentati come euristiche dichiarate, mai come
+  comportamento documentato dei vendor.
+- L'**import da API Google Search Console** (OAuth): fuori scope per
+  la filosofia offline; resta l'import dall'export CSV
+  (`--queries-gsc`).
+- La **traduzione delle evidenze citate dal sito** nei referti
+  bilingui (v1.43.0): sono contenuti del sito, non dello strumento —
+  restano nella lingua del sito, con nota dichiarata nel referto.
+
+## Limiti noti e accettati
 
 - Il bypass dei `Disallow` del robots.txt richiede una dichiarazione:
   `--own-site` (titolarità) o `--ignore-robots accetto`

@@ -79,7 +79,7 @@ def sra_version():
 # ---------------- statici e ambiente ----------------
 
 def test_statici_con_csp_e_traversal_negato(gui_base):
-    for path, atteso in (("/", b"MARS Audit"),
+    for path, atteso in (("/", b"MARS Beacon"),
                          ("/", b"Lympha"),
                          ("/app.js", b"use strict"),
                          ("/config.js", b"__PUBLIC_PATH__"),
@@ -523,6 +523,12 @@ def test_ciclo_completo_referti_e_gating_profilo(gui_base, site):
     assert snap["summary"]["pages_ok"] >= 1
     assert snap["findings"] and snap["rrf"]
     assert snap["remediation"]
+    # Ogni rilievo porta la tipologia MARS; il sito fixture in
+    # http garantisce almeno un rilievo security.
+    pillars = {f.get("pillar") for f in snap["findings"]}
+    assert "security" in pillars
+    assert pillars <= {"meta-fusion", "accessibility", "ranking",
+                       "security"}
     riass = snap["summary"]
     assert riass["pages_clean"] + riass["pages_flagged"] \
         + riass["pages_error"] == riass["pages_total"]
@@ -556,7 +562,7 @@ def test_ciclo_completo_referti_e_gating_profilo(gui_base, site):
     assert status == 200 and json.loads(body)["scores"]
     status, body, headers = _api(
         gui_base, "/api/report/text?download=1", cookie=cookie)
-    assert status == 200 and b"AUDIT" in body
+    assert status == 200 and b"MARS BEACON" in body
     assert "attachment" in headers.get("Content-Disposition", "")
 
 
@@ -574,6 +580,21 @@ def test_limite_orario(gui_base, site):
     dati = json.loads(body)
     assert 0 < dati["retry_in_s"] <= gui.CHECK_INTERVAL_S
     assert "ora" in dati["error"]
+
+    # Il limite e' per singolo account, non complessivo: un secondo
+    # utente non e' bloccato dal check appena fatto dal primo.
+    cookie2 = _register(gui_base, email="carla@esempio.it",
+                        completo=True, nome="Carla Bruni")
+    status, body, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 2, "delay": 0.0,
+        "queries": "drenaggio linfatico"}, cookie=cookie2)
+    assert status == 202, body
+    _attendi_stato(gui_base, cookie2, ("done", "error"))
+
+    # E il 429 del primo utente resta il suo, non del secondo.
+    status, _, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 2, "delay": 0.0}, cookie=cookie)
+    assert status == 429
 
 
 def test_annullamento_audit(gui_base, site):

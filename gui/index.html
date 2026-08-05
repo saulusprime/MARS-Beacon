@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MARS Audit — Lympha Technologies</title>
+  <title>MARS Beacon — Lympha Technologies</title>
   <link rel="icon" type="image/png" href="brand/favicon.png">
   <link rel="stylesheet" href="vendor/bootstrap-italia/css/bootstrap-italia.min.css">
   <link rel="stylesheet" href="brand/lympha-brand.css">
@@ -25,8 +25,8 @@
           <span class="lt-tag d-block">technologies</span>
         </span>
       </div>
-      <span class="lt-divider d-none d-sm-block" aria-hidden="true"></span>
-      <h1 class="h5 mb-0 lt-app-title ms-sm-4">MARS Audit
+      <span class="lt-divider d-none d-sm-block mx-sm-4" aria-hidden="true"></span>
+      <h1 class="h5 mb-0 lt-app-title">MARS Beacon
         <span class="d-block small fw-normal">Meta-fusion,
           Accessibility, Ranking &amp; Security Audit</span></h1>
       <img class="lt-mars-logo ms-auto" src="brand/mars-logo.png"
@@ -593,7 +593,7 @@
                 id="results-toggle" data-bs-toggle="collapse"
                 data-bs-target="#sec-results" aria-expanded="false"
                 aria-controls="sec-results">
-          Risultati dell'audit e referto
+          Risultati dell'audit: sintesi e referto
         </button>
       </h2>
       <div id="sec-results" class="accordion-collapse collapse"
@@ -683,6 +683,45 @@
       </p>
       <div id="scores" class="mb-4"></div>
 
+      <div id="remediation-block" hidden>
+        <h3 class="h5">Piano di remediation</h3>
+        <p class="small text-muted mb-2" id="remediation-intro"></p>
+        <div id="remediation-list" class="mb-4"></div>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ========= Risultati: Meta-fusion ========= -->
+    <div class="accordion-item" id="pillar-meta-section" hidden>
+      <h2 class="accordion-header" id="pillar-meta-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="pillar-meta-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-pillar-meta"
+                aria-expanded="false"
+                aria-controls="sec-pillar-meta">
+          Risultati dell'audit: Meta-fusion
+        </button>
+      </h2>
+      <div id="sec-pillar-meta" class="accordion-collapse collapse"
+           aria-labelledby="pillar-meta-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted">
+        Il cuore della simulazione: come i tuoi contenuti si
+        comportano nella fusione RRF delle liste lessicale e
+        vettoriale, quanto sono citabili per ciascun assistente IA
+        e come ti confronti con i concorrenti.
+      </p>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc-meta"></div>
+
       <div id="citability-block" hidden>
         <h3 class="h5">Profili di citabilità per assistente IA</h3>
         <p class="small text-muted mb-2" id="citability-intro"></p>
@@ -719,13 +758,6 @@
         </div>
       </div>
 
-      <h3 class="h5">Rilievi</h3>
-      <p class="small text-muted mb-2">
-        Ogni rilievo indica gravità, dettaglio e, dove utile, la
-        correzione suggerita.
-      </p>
-      <div class="accordion mb-4" id="findings-acc"></div>
-
       <div id="surface-math-block" hidden>
         <h3 class="h5">La matematica del problema</h3>
         <p class="small text-muted mb-2">
@@ -734,44 +766,6 @@
           moltiplicatore.
         </p>
         <dl class="surface-math mb-4" id="surface-math-list"></dl>
-      </div>
-
-      <div id="depth-block" hidden>
-        <h3 class="h5">Profondità di crawl</h3>
-        <p class="small text-muted mb-2">
-          Quanti click servono dalla home per raggiungere ogni
-          pagina lungo i link interni: oltre 3 click scansione e
-          peso calano; "solo da sitemap" indica pagine senza
-          percorso di link.
-        </p>
-        <div id="depth-bars" class="mb-4"></div>
-      </div>
-
-      <div id="graph-block" hidden>
-        <h3 class="h5">Architettura dei link interni</h3>
-        <p class="small text-muted mb-2" id="graph-intro"></p>
-        <div class="mb-2" role="group"
-             aria-label="Controlli del grafo">
-          <button type="button"
-                  class="btn btn-outline-secondary btn-sm me-2"
-                  id="graph-zoom-in">Ingrandisci</button>
-          <button type="button"
-                  class="btn btn-outline-secondary btn-sm me-2"
-                  id="graph-zoom-out">Riduci</button>
-          <button type="button"
-                  class="btn btn-outline-secondary btn-sm"
-                  id="graph-reset">Reimposta vista</button>
-        </div>
-        <p class="small mb-2" id="graph-info" role="status">
-          Seleziona un nodo (mouse o Tab) per i dettagli.
-        </p>
-        <div id="graph-svg" class="mb-4"></div>
-      </div>
-
-      <div id="remediation-block" hidden>
-        <h3 class="h5">Piano di remediation</h3>
-        <p class="small text-muted mb-2" id="remediation-intro"></p>
-        <div id="remediation-list" class="mb-4"></div>
       </div>
 
       <h3 class="h5">Simulazione RRF per query</h3>
@@ -822,6 +816,135 @@
           </table>
         </div>
       </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ========= Risultati: Accessibility ========= -->
+    <div class="accordion-item" id="pillar-access-section" hidden>
+      <h2 class="accordion-header" id="pillar-access-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="pillar-access-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-pillar-access"
+                aria-expanded="false"
+                aria-controls="sec-pillar-access">
+          Risultati dell'audit: Accessibility
+        </button>
+      </h2>
+      <div id="sec-pillar-access"
+           class="accordion-collapse collapse"
+           aria-labelledby="pillar-access-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted">
+        Quanto i tuoi contenuti sono raggiungibili da crawler e
+        assistenti IA: permessi, sitemap, architettura dei link e
+        profondità di navigazione.
+      </p>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc-access"></div>
+
+      <div id="depth-block" hidden>
+        <h3 class="h5">Profondità di crawl</h3>
+        <p class="small text-muted mb-2">
+          Quanti click servono dalla home per raggiungere ogni
+          pagina lungo i link interni: oltre 3 click scansione e
+          peso calano; "solo da sitemap" indica pagine senza
+          percorso di link.
+        </p>
+        <div id="depth-bars" class="mb-4"></div>
+      </div>
+
+      <div id="graph-block" hidden>
+        <h3 class="h5">Architettura dei link interni</h3>
+        <p class="small text-muted mb-2" id="graph-intro"></p>
+        <div class="mb-2" role="group"
+             aria-label="Controlli del grafo">
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-2"
+                  id="graph-zoom-in">Ingrandisci</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-2"
+                  id="graph-zoom-out">Riduci</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  id="graph-reset">Reimposta vista</button>
+        </div>
+        <p class="small mb-2" id="graph-info" role="status">
+          Seleziona un nodo (mouse o Tab) per i dettagli.
+        </p>
+        <div id="graph-svg" class="mb-4"></div>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ========= Risultati: Ranking ========= -->
+    <div class="accordion-item" id="pillar-rank-section" hidden>
+      <h2 class="accordion-header" id="pillar-rank-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="pillar-rank-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-pillar-rank"
+                aria-expanded="false"
+                aria-controls="sec-pillar-rank">
+          Risultati dell'audit: Ranking
+        </button>
+      </h2>
+      <div id="sec-pillar-rank" class="accordion-collapse collapse"
+           aria-labelledby="pillar-rank-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted">
+        I segnali che governano il posizionamento nelle due liste:
+        qualità lessicale (BM25), qualità semantica dei passaggi e
+        dati strutturati.
+      </p>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc-rank"></div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ========= Risultati: Security ========= -->
+    <div class="accordion-item" id="pillar-sec-section" hidden>
+      <h2 class="accordion-header" id="pillar-sec-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="pillar-sec-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-pillar-sec"
+                aria-expanded="false"
+                aria-controls="sec-pillar-sec">
+          Risultati dell'audit: Security
+        </button>
+      </h2>
+      <div id="sec-pillar-sec" class="accordion-collapse collapse"
+           aria-labelledby="pillar-sec-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted">
+        I controlli di sicurezza e di governo dei contenuti:
+        HTTPS, URL ancora in http e opt-out IA via meta robots
+        (noarchive/nocache).
+      </p>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc-sec"></div>
 
       </div>
       </div>
