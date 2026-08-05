@@ -46,8 +46,6 @@ si smistano nelle quattro fisarmoniche pilastro esistenti
       il rilievo MARS resta canonico, l'audit Lighthouse equivalente
       viene soppresso o usato solo come conferma/evidenza aggiuntiva;
       serve la tabella esplicita audit-id → rilievo MARS.
-- [ ] **Licenze**: Lighthouse è Apache 2.0, il progetto è MIT —
-      compatibili, ma servono attribuzione e NOTICE se si vendorizza.
 
 ### Fork e toolchain
 
@@ -57,7 +55,9 @@ si smistano nelle quattro fisarmoniche pilastro esistenti
 - [ ] Installazione/vendorizzazione: valutare `npm ci` in una dir
       dedicata vs tarball vendorizzato; script
       `tools/update-lighthouse.sh` sul modello di
-      `tools/update-vendor.sh`.
+      `tools/update-vendor.sh`. Alla vendorizzazione aggiungere al
+      `NOTICE` l'attribuzione completa di Lighthouse (la licenza del
+      progetto è già Apache 2.0 dal 2026-08-05, vedi AS-IS).
 - [ ] Rilevamento runtime: verifica di Node (versione minima del fork)
       e riuso della logica di scoperta Chrome/Chromium già scritta per
       il rendering Playwright; esito esposto in `/api/env`.

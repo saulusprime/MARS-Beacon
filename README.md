@@ -1,10 +1,9 @@
 # MARS Beacon
 
 **MARS Beacon** (*Meta-fusion, Accessibility, Ranking & Security
-Audit*) — fino al 2026-08-05 "MARS Audit", prima ancora "Audit SEO +
-Reciprocal Rank Fusion".
+Audit*)
 
-Strumento (Python 3, file singolo, ~2.000 righe, licenza MIT)
+Strumento (Python 3, file singolo, ~2.000 righe, licenza Apache 2.0)
 che misura quanto un sito è **recuperabile e citabile dai motori di
 ricerca ibridi e dagli assistenti IA** (ChatGPT, Claude, Perplexity, Google AI
 Overviews). Oltre ai controlli SEO classici, riproduce localmente la pipeline
@@ -569,4 +568,10 @@ Dettaglio completo in [mars_audit.md](mars_audit.md).
 
 ## Licenza
 
-MIT — vedi [LICENSE](LICENSE).
+Apache License 2.0 — vedi [LICENSE](LICENSE) e [NOTICE](NOTICE)
+(fino al 2026-08-05 MIT; il titolare del copyright è Lympha
+Technologies S.r.l.). La scelta allinea il progetto alla licenza del
+fork di Lighthouse in corso di integrazione ed è adatta all'uso B2B
+enterprise: rispetto alla MIT aggiunge la concessione esplicita dei
+diritti di brevetto (art. 3) e la clausola di difesa che revoca la
+licenza a chi avvia contenziosi brevettuali sul software.

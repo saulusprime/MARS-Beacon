@@ -61,7 +61,7 @@ Uso:
     python3 mars_audit.py https://example.com --queries q.txt \\
         --embeddings sentence-transformers/all-MiniLM-L6-v2
 
-Licenza: MIT.
+Licenza: Apache 2.0.
 """
 
 from __future__ import annotations

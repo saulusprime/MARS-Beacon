@@ -44,7 +44,7 @@ vendorizzati in ``gui/vendor`` e funziona anche senza rete.
 Uso:
     python3 mars_gui.py [--host 127.0.0.1] [--port 8765]
 
-Licenza: MIT.
+Licenza: Apache 2.0.
 """
 
 from __future__ import annotations

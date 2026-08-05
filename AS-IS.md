@@ -356,7 +356,7 @@ sono nel [README.md](README.md).
 - Fetcher con user agent esplicito e configurabile (`--user-agent`;
   il predefinito identifica lo strumento e rimanda alla pagina del
   progetto su GitHub), throttle configurabile (`--delay`), timeout
-  20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
+  20 s; PEP8, `flake8` pulito, licenza dichiarata nel modulo.
 
 ## Interfaccia grafica locale — `mars_gui.py` v2.21.0 + `gui/`
 
@@ -648,8 +648,16 @@ sono nel [README.md](README.md).
 
 - `requirements.txt` (esecuzione) e `requirements-dev.txt`
   (pytest + flake8 + SDK anthropic per i test), `pytest.ini`.
-- File `LICENSE` (MIT) alla radice del repository, coerente con la
-  licenza dichiarata nei moduli.
+- File `LICENSE` (**Apache License 2.0** dal 2026-08-05, prima MIT)
+  e `NOTICE` alla radice del repository, coerenti con la licenza
+  dichiarata nei moduli. Il cambio — deciso dal titolare del
+  copyright, Lympha Technologies S.r.l. — allinea il progetto alla
+  licenza del fork di Lighthouse in corso di integrazione e serve
+  l'uso B2B enterprise (concessione esplicita di brevetti e clausola
+  di ritorsione dell'art. 3, assenti nella MIT). Il NOTICE elenca i
+  componenti di terze parti (Bootstrap Italia vendorizzato; alla
+  vendorizzazione del fork Lighthouse andrà aggiunta la sua
+  attribuzione completa).
 - **Repository git** inizializzato su branch `main` con `.gitignore`
   (esclusi bytecode, venv, referti e storici generati a runtime;
   vendorizzati Bootstrap Italia e asset brand inclusi nel

@@ -29,7 +29,7 @@ Uso:
 Codici di uscita: 0 ok; 1 tasso di citazione sotto --fail-under;
 2 errore d'uso o provider non configurato.
 
-Licenza: MIT.
+Licenza: Apache 2.0.
 """
 
 from __future__ import annotations

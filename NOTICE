@@ -1,0 +1,11 @@
+MARS Beacon
+Copyright 2026 Lympha Technologies S.r.l.
+
+Questo prodotto include componenti di terze parti:
+
+- Bootstrap Italia (gui/vendor/), distribuito con la propria licenza
+  BSD-3-Clause; i file vendorizzati conservano le rispettive note.
+- Il progetto prevede l'integrazione di un fork di Google Lighthouse
+  (https://github.com/GoogleChrome/lighthouse), Copyright Google LLC,
+  licenza Apache License 2.0: alla vendorizzazione del fork questo
+  file NOTICE ne riporterà l'attribuzione completa.

@@ -2,7 +2,9 @@
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
 di un sito. Consegnato in chat il 2026-08-03. Versione 1.38.0, ~6420
-righe (~6430), licenza MIT. Dal 2026-08-05 il prodotto si chiama
+righe (~6430), licenza Apache 2.0 (MIT fino al 2026-08-05, cambiata
+in vista dell'integrazione del fork di Lighthouse e dell'uso B2B
+enterprise). Dal 2026-08-05 il prodotto si chiama
 **MARS Beacon** (Meta-fusion, Accessibility, Ranking & Security
 Audit); dal 2026-08-04 al 2026-08-05 si chiamava "MARS Audit".
 
