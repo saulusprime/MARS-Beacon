@@ -1,6 +1,6 @@
-From 424096a8bfbaafba056253a930ecb068d2625a98 Mon Sep 17 00:00:00 2001
-From: Paolo <lymphalab@outlook.it>
-Date: Wed, 5 Aug 2026 09:59:09 +0200
+From 95475c1dfcac09d168630b87a85b2ac3e297726c Mon Sep 17 00:00:00 2001
+From: saulusprime <saulusprime@users.noreply.github.com>
+Date: Wed, 5 Aug 2026 17:26:47 +0200
 Subject: [PATCH] mars: disable Sentry error reporting entirely
 
 No interactive prompt, no cached consent (Configstore), no telemetry
