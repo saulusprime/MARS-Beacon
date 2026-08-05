@@ -4,6 +4,23 @@
 import mars_audit as sra
 
 
+def _patch(monkeypatch, name, value):
+    """Monkeypatch sulla facciata e su ogni modulo marsbeacon che
+    espone il nome: dopo la scomposizione (v1.58.0) conta il
+    namespace del consumatore, non solo quello pubblico."""
+    import mars_audit
+    import marsbeacon.audits
+    import marsbeacon.base
+    import marsbeacon.crawler
+    import marsbeacon.indexes
+    import marsbeacon.render
+    for modulo in (mars_audit, marsbeacon.base, marsbeacon.crawler,
+                   marsbeacon.indexes, marsbeacon.audits,
+                   marsbeacon.render):
+        if name in vars(modulo):
+            monkeypatch.setattr(modulo, name, value)
+
+
 def test_tokenize_rimuove_stopword_e_minuscolizza():
     assert sra.tokenize("Il gatto NERO dorme") == \
         ["gatto", "nero", "dorme"]
@@ -51,23 +68,23 @@ def test_is_question():
 # ---------------- auto-rilevamento sentence-transformers ----------------
 
 def test_embeddings_auto_rilevati(monkeypatch):
-    monkeypatch.setattr(sra, "embeddings_available", lambda: True)
+    _patch(monkeypatch, "embeddings_available", lambda: True)
     assert sra.resolve_model_name("") == sra.DEFAULT_EMBEDDINGS_MODEL
     assert sra.resolve_model_name("  ") == sra.DEFAULT_EMBEDDINGS_MODEL
 
 
 def test_embeddings_modello_esplicito_vince(monkeypatch):
-    monkeypatch.setattr(sra, "embeddings_available", lambda: True)
+    _patch(monkeypatch, "embeddings_available", lambda: True)
     assert sra.resolve_model_name("mio/modello") == "mio/modello"
 
 
 def test_embeddings_none_forza_il_proxy(monkeypatch):
-    monkeypatch.setattr(sra, "embeddings_available", lambda: True)
+    _patch(monkeypatch, "embeddings_available", lambda: True)
     for spento in ("none", "NONE", "off", "char-tfidf"):
         assert sra.resolve_model_name(spento) == ""
 
 
 def test_embeddings_senza_libreria_resta_proxy(monkeypatch):
-    monkeypatch.setattr(sra, "embeddings_available", lambda: False)
+    _patch(monkeypatch, "embeddings_available", lambda: False)
     assert sra.resolve_model_name("") == ""
     assert sra.resolve_model_name("mio/modello") == "mio/modello"

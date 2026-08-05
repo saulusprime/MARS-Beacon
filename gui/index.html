@@ -378,6 +378,80 @@
             </div>
           </div>
 
+          <div class="row">
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-lighthouse" class="active">Audit
+                  Lighthouse</label>
+                <select class="form-select" id="f-lighthouse"
+                        name="lighthouse"
+                        aria-describedby="h-lighthouse">
+                  <option value="off" selected>Spento</option>
+                  <option value="auto">Auto: se Node e Chrome ci
+                    sono</option>
+                  <option value="always">Obbligatorio</option>
+                </select>
+                <small id="h-lighthouse" class="form-text">
+                  Performance, accessibilità, SEO e best practice
+                  col fork di Lighthouse. Richiede Node e
+                  Chrome/Chromium sul server.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-lighthouse-device"
+                       class="active">Dispositivo Lighthouse</label>
+                <select class="form-select" id="f-lighthouse-device"
+                        name="lighthouse_device"
+                        aria-describedby="h-lighthouse-device">
+                  <option value="mobile" selected>Mobile</option>
+                  <option value="desktop">Desktop</option>
+                </select>
+                <small id="h-lighthouse-device" class="form-text">
+                  Emulazione e throttling: mobile è il
+                  predefinito, come PageSpeed.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-lighthouse-pages" class="active">Pagine
+                  Lighthouse oltre la home</label>
+                <input type="number" class="form-control"
+                       id="f-lighthouse-pages"
+                       name="lighthouse_pages" value="3" min="0"
+                       max="9" step="1" inputmode="numeric"
+                       aria-describedby="h-lighthouse-pages">
+                <small id="h-lighthouse-pages" class="form-text">
+                  Da 0 a 9 (predefinito 3): pagine
+                  rappresentative, ~10–30 s ciascuna.
+                </small>
+                <div class="invalid-feedback"
+                     id="e-lighthouse-pages"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-search-check" class="active">Ancora di
+                  realtà (Brave)</label>
+                <select class="form-select" id="f-search-check"
+                        name="search_check"
+                        aria-describedby="h-search-check">
+                  <option value="auto" selected>Auto: se la chiave
+                    è presente</option>
+                  <option value="on">Obbligatoria</option>
+                  <option value="off">Spenta</option>
+                </select>
+                <small id="h-search-check" class="form-text">
+                  Posizione reale del sito sulle query dell'audit
+                  (Brave Search). Richiede BRAVE_API_KEY sul
+                  server.
+                </small>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="f-competitors" class="active">Siti concorrenti
               (facoltativi)</label>
@@ -682,6 +756,7 @@
         sotto 40. Seleziona un'area per aprire i suoi rilievi.
       </p>
       <div id="scores" class="mb-4"></div>
+      <div id="lighthouse-summary" class="mb-4"></div>
 
       <div id="remediation-block" hidden>
         <h3 class="h5">Piano di remediation</h3>
@@ -788,6 +863,27 @@
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+
+      <div id="search-check-block" hidden>
+        <h3 class="h5">Ancora di realtà (Brave Search)</h3>
+        <p class="small text-muted mb-2" id="search-check-intro"></p>
+        <div class="table-responsive mb-4" tabindex="0" role="group"
+             aria-label="Tabella dell'ancora di realtà, area
+                         scorrevole">
+          <table class="table table-striped align-middle"
+                 id="search-check-table">
+            <caption class="small" id="search-check-note"></caption>
+            <thead>
+              <tr>
+                <th scope="col">Query</th>
+                <th scope="col">Posizione reale</th>
+                <th scope="col">Consenso RRF</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
 
       <div id="competitive-block" hidden>

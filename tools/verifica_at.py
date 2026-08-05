@@ -65,6 +65,46 @@ class SiteHandler(BaseHTTPRequestHandler):
 ESITI = []
 
 
+def _lighthouse_finto(base, pages, mode="off", n_pages=3,
+                      device="mobile", delay=0.5, verbose=False,
+                      stop_event=None, timeout_s=120):
+    """Stub di run_lighthouse: popola le viste Lighthouse della GUI
+    (badge, chip di categoria, pannello CWV) senza richiedere Node,
+    Chrome extra ne' il fork installato — la verifica resta
+    indipendente dalla macchina, come il sito fixture."""
+    sra = gui.sra
+    rilievi = [
+        sra.Finding(sra.AREA_LIGHTHOUSE, sra.SEV_WARNING,
+                    "Lighthouse: contrasto insufficiente",
+                    "Pagine: %s" % base,
+                    pillar=sra.PILLAR_ACCESS,
+                    key="lh.accessibility.color-contrast",
+                    params={"audit": "color-contrast",
+                            "score": 0.3}),
+        sra.Finding(sra.AREA_LIGHTHOUSE, sra.SEV_WARNING,
+                    "Lighthouse: Il documento non ha una meta "
+                    "descrizione",
+                    pillar=sra.PILLAR_RANK,
+                    key="lh.seo.meta-description",
+                    params={"audit": "meta-description",
+                            "score": 0.0}),
+    ]
+    return {"status": "ok", "mode": mode, "device": device,
+            "results": [{"url": base, "lhr": {
+                "categories": {
+                    "performance": {"title": "Prestazioni",
+                                    "score": 0.95},
+                    "seo": {"title": "SEO", "score": 0.45}},
+                "audits": {
+                    "largest-contentful-paint": {
+                        "numericValue": 1800.0,
+                        "displayValue": "1,8 s"},
+                    "cumulative-layout-shift": {
+                        "numericValue": 0.4,
+                        "displayValue": "0,4"}}}}],
+            "errors": [], "findings": rilievi}
+
+
 def check(flusso, nome, ok, dettaglio=""):
     ESITI.append((flusso, nome, bool(ok), dettaglio))
     stato = "OK " if ok else "FAIL"
@@ -74,6 +114,7 @@ def check(flusso, nome, ok, dettaglio=""):
 
 
 def main():
+    gui.sra.run_lighthouse = _lighthouse_finto
     site_srv = ThreadingHTTPServer(("127.0.0.1", 0), SiteHandler)
     threading.Thread(target=site_srv.serve_forever,
                      daemon=True).start()
@@ -170,11 +211,21 @@ def main():
               descr_ok["rotti"] == 0 and descr_ok["tot"] > 10,
               "%d campi, %d riferimenti rotti"
               % (descr_ok["tot"], descr_ok["rotti"]))
+        lh_labels = page.evaluate("""(() => {
+          const ids = ['f-lighthouse', 'f-lighthouse-device',
+                       'f-lighthouse-pages'];
+          return ids.map((id) =>
+            (document.querySelector('label[for="' + id + '"]')
+             ?.textContent || '').trim()).filter(Boolean).length;
+        })()""")
+        check(3, "campi Lighthouse etichettati", lh_labels == 3,
+              "%d/3 etichette" % lh_labels)
 
         # ---- Flusso 4: avvio e avanzamento ----
         page.fill("#f-url", site)
         page.fill("#f-max-pages", "3")
         page.fill("#f-delay", "1.5")
+        page.select_option("#f-lighthouse", "auto")
         page.click("#submit-btn")
         page.wait_for_timeout(700)
         focus_id = page.evaluate("document.activeElement.id")
@@ -271,6 +322,32 @@ def main():
               and area_focus["foco"].startswith("acc-h-access"),
               "aria-expanded=%s focus in #%s"
               % (area_focus["espansa"], area_focus["foco"]))
+        chips = page.evaluate(
+            "Array.from(document.querySelectorAll('.lh-cat'))"
+            ".map(e => e.textContent.trim())")
+        check(5, "sintesi Lighthouse: chip con testo e simbolo",
+              len(chips) == 2 and all(
+                  c[0] in "✓!✕" and "/100" in c for c in chips),
+              "; ".join(chips))
+        cwv = page.evaluate("""(() => {
+          const v = Array.from(document.querySelectorAll(
+            '.cwv-verdict')).map(e => e.textContent.trim());
+          const nota = (document.getElementById(
+            'lighthouse-summary')?.textContent || '');
+          return {v: v, lab: nota.includes('laboratorio')};
+        })()""")
+        check(5, "pannello CWV: verdetti testuali e nota lab",
+              len(cwv["v"]) == 2 and cwv["lab"] and all(
+                  x and x[0] in "✓!✕" and len(x) > 2
+                  for x in cwv["v"]),
+              "; ".join(cwv["v"]))
+        badges = page.evaluate(
+            "Array.from(document.querySelectorAll('.badge-lh'))"
+            ".map(e => e.textContent.trim())")
+        check(5, "badge Lighthouse come testo (origine e conferma)",
+              "Lighthouse" in badges
+              and "confermato da Lighthouse" in badges,
+              "; ".join(sorted(set(badges))))
 
         # ---- Flusso 6: download negato (profilo incompleto) ----
         dl = page.evaluate(

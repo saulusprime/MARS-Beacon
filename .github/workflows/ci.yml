@@ -23,9 +23,32 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
       - name: Lint
-        run: flake8 mars_audit.py mars_gui.py mars_citations.py tests/
+        run: flake8 mars_audit.py marsbeacon/ mars_gui.py mars_citations.py tests/
       - name: Test
         run: pytest -q
+
+  lighthouse:
+    name: Integrazione Lighthouse (Node + Chrome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Dipendenze Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Fork Lighthouse (tag dal PIN, build inclusa)
+        run: tools/update-lighthouse.sh
+      - name: Test Lighthouse (unit + integrazione reale)
+        # Chrome e' preinstallato sui runner ubuntu-latest: il test
+        # d'integrazione non viene saltato e usa il fork appena
+        # installato contro il sito fixture locale.
+        run: pytest -q tests/test_lighthouse.py
 
   a11y:
     name: Accessibilita (Pa11y, WCAG 2 AA)

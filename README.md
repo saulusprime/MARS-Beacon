@@ -24,12 +24,15 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 
 | File | Descrizione |
 |---|---|
-| [mars_audit.py](mars_audit.py) | Lo strumento: CLI autonoma, PEP8, `flake8` pulito |
+| [mars_audit.py](mars_audit.py) | Lo strumento: facciata con la CLI (`python3 mars_audit.py URL`), PEP8, `flake8` pulito |
+| [marsbeacon/](marsbeacon/) | Il codice dello strumento, scomposto in moduli: `base`, `crawler`, `indexes`, `audits`, `render` |
 | [mars_gui.py](mars_gui.py) | Interfaccia web locale: server stdlib che pilota lo script ed espone i referti |
 | [mars_citations.py](mars_citations.py) | Monitoraggio periodico delle citazioni IA effettive (Claude, Perplexity) con storico e soglie |
 | [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies |
 | [deploy/](deploy/) | Unit systemd per l'esecuzione come servizio automatico sulle macchine dei clienti |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI GitHub Actions: flake8 + pytest multi-Python + audit accessibilità Pa11y |
+| [tools/update-lighthouse.sh](tools/update-lighthouse.sh) | Installa il fork di Google Lighthouse in `lighthouse/` (tag pinnato, build inclusa, mai nel repo) |
+| [docs/LIGHTHOUSE-FORK.md](docs/LIGHTHOUSE-FORK.md) | Strategia di manutenzione del fork: pin alla release, patch-set versionato, procedura di sync |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI GitHub Actions: flake8 + pytest multi-Python, job d'integrazione Lighthouse (Node + Chrome) e audit accessibilità Pa11y |
 | [tests/](tests/) | Suite pytest: unit test del nucleo numerico, fixture site locale, end-to-end CLI e GUI |
 | [AS-IS.md](AS-IS.md) | Stato di fatto: tutto ciò che è già realizzato e verificato |
 | [TO-DO.md](TO-DO.md) | Ciò che resta da fare: bug noti, sviluppi e idee di miglioramento |
@@ -42,7 +45,18 @@ pip install -r requirements.txt                 # requests, bs4, lxml
 pip install sentence-transformers numpy         # opzionali: embedding reali
 pip install playwright                          # opzionale: rendering JS
 playwright install chromium                     # (o usa Chrome di sistema)
+tools/update-lighthouse.sh                      # opzionale: audit Lighthouse
 ```
+
+> **Nota su Lighthouse (opzionale).** L'audit Lighthouse usa un
+> fork di Google Lighthouse installato da
+> `tools/update-lighthouse.sh` nella directory `lighthouse/` (mai
+> nel repository) e richiede **Node ≥ 22.19** e un Chrome/Chromium
+> di sistema. Sono dipendenze **opzionali dichiarate**, come
+> Playwright per `--render`: senza, l'audit resta interamente
+> offline e il referto dichiara il salto con il motivo. Strategia
+> del fork (pin, patch anti-telemetria, sync) in
+> [docs/LIGHTHOUSE-FORK.md](docs/LIGHTHOUSE-FORK.md).
 
 > **Nota per macOS Intel (x86_64).** PyTorch per macOS x86 si ferma alla
 > 2.2.2, quindi le versioni recenti di transformers/sentence-transformers
@@ -95,6 +109,10 @@ python3 mars_audit.py https://esempio.it \
 | `--history FILE` | — | **storico JSONL delle esecuzioni**: legge l'ultima riga dello stesso sito e riporta nei referti la sezione "Rispetto all'esecuzione precedente" (variazioni dei punteggi per area, rilievi nuovi/risolti), poi accoda una riga compatta per l'esecuzione corrente. Con un audit schedulato (cron/systemd) trasforma l'audit in monitoraggio anche senza GUI |
 | `--fail-under PUNTI` | — | **gate di regressione**: esce con codice `1` anche quando il punteggio complessivo (0–100) è sotto la soglia, dichiarandolo su stderr. Pensato per gli audit schedulati con `--history` (cron/systemd): il fallimento del servizio diventa la notifica — vedi le unit in `deploy/` |
 | `--judge auto\|on\|off` | auto | **giudizio LLM sulla citabilità**: un modello (Claude, SDK ufficiale Anthropic) valuta i passaggi migliori della simulazione RRF — max 5, una sola richiesta API per audit — con punteggio e motivazione per ciascuno e **scarto rispetto all'indice euristico**. `auto` (default) parte solo se `ANTHROPIC_API_KEY` è nell'ambiente, altrimenti viene saltato con motivo dichiarato nel referto: senza chiave l'audit resta interamente offline. `on` pretende la chiave (errore d'uso senza); `off` disattiva. I costi API sono a carico della chiave configurata |
+| `--search-check auto\|on\|off` | auto | **ancora di realtà**: cerca il sito sulle query dell'audit con la [Brave Search API](https://brave.com/search/api/) (chiave **solo** da `BRAVE_API_KEY`) e affianca al consenso RRF simulato la posizione reale nei primi 20 risultati — o l'assenza. `auto` parte solo con la chiave presente (senza: salto dichiarato, audit offline), `on` la pretende, `off` disattiva. Max 10 query, una richiesta al secondo, costi a carico della chiave. Complementare a `--queries-gsc`: quello porta le domande vere, questo il ranking vero. Nota di onestà sempre inclusa: il ranking dipende anche da personalizzazione, località e freschezza — confronto direzionale, non una validazione |
+| `--lighthouse off\|auto\|always` | off | **audit Lighthouse** col fork installato da `tools/update-lighthouse.sh` (Performance, Accessibilità, SEO, Best Practices, Agentic Browsing): `auto` lo esegue se Node ≥ 22.19 e Chrome ci sono, altrimenti **salto dichiarato** nel referto; `always` li pretende (errore d'uso senza). Gli audit sotto soglia diventano rilievi MARS (gravità dai bucket ufficiali 0,5/0,9, testi in italiano dal LHR, pilastri dalla mappatura di progetto), i punteggi di categoria formano la **sesta area** (peso 1.0; senza Lighthouse i pesi si rinormalizzano e gli storici restano confrontabili), gli audit che duplicano controlli MARS si fondono come evidenza ("Conferma Lighthouse") |
+| `--lighthouse-pages N` | 3 | pagine rappresentative sottoposte a Lighthouse oltre alla home (0–9), scelte per link interni in ingresso e vicinanza alla home; ~10–30 s a pagina |
+| `--lighthouse-device mobile\|desktop` | mobile | dispositivo emulato da Lighthouse, con throttling corrispondente (mobile come PageSpeed) |
 | `--render off\|auto\|always` | off | rendering JavaScript in browser headless (richiede Playwright; ripiega sul Chrome/Chromium di sistema). `auto` rende **solo** le pagine che l'euristica classifica come client-side; `always` tutte. Il DOM renderizzato sostituisce l'estrazione del contenuto, ma stato HTTP, redirect e tempi restano quelli della risposta reale, e il rilievo critico sul contenuto invisibile ai crawler senza JS scatta comunque. Rendering seriale, rispetta `--delay` e l'annullamento |
 | `--workers N` | 4 | richieste in parallelo durante la scansione (1–16; `1` = seriale). Il **ritmo verso il sito non cambia**: gli avvii delle richieste restano distanziati di `--delay` anche fra thread — i worker sovrappongono solo le attese di rete, quindi il tempo per pagina tende a `max(delay, latenza)` invece di `delay + latenza` |
 | `--retries N` | 2 | tentativi aggiuntivi con backoff esponenziale (0,5 s → 1 s → 2 s, tetto 8 s) su errori di rete e HTTP 429/500/502/503/504, rispettando l'header `Retry-After`. Gli altri stati (404, 403…) non vengono ritentati: sono segnali diagnostici dell'audit. `0` disattiva |
@@ -187,8 +205,12 @@ Cosa offre:
   pagine oltre 3 click o senza percorso. Nella GUI è **interattivo**:
   zoom, pan, trascinamento dei nodi per districare, evidenziazione
   del vicinato al passaggio o al focus da tastiera con i dettagli in
-  una regione di stato; nel referto HTML resta statico (niente
-  JavaScript) ma con etichette ad alone leggibili.
+  una regione di stato; dalla v1.53.0 lo è **anche nel referto
+  HTML** (JavaScript inline autonomo, nessuna origine esterna:
+  senza JavaScript resta il disegno statico stampabile), insieme
+  alla **treemap interattiva della superficie contenutistica**
+  (pagine × parole indicizzabili, colore dalla gravità dei
+  rilievi, con tabella dei dati di fallback).
 - **Risultati separati per tipologia MARS**: una sezione di
   **sintesi** (verdetto, punteggi per area, top rilievi, confronto
   con l'esecuzione precedente, piano di remediation e scarico dei
@@ -202,6 +224,22 @@ Cosa offre:
   `pillar` di ogni rilievo nel JSON, additivo allo schema): l'area
   tecnica si divide tra Accessibility e Security a livello di
   singolo rilievo.
+- **Ancora di realtà dalla GUI**: select nel form (avviso di
+  disponibilità quando `BRAVE_API_KEY` manca sul server) e sezione
+  nei risultati subito dopo la tabella del consenso RRF — query,
+  posizione reale nei primi 20 risultati Brave (o assenza) e
+  consenso simulato fianco a fianco, con la nota di onestà.
+- **Audit Lighthouse dalla GUI**: gruppo di opzioni nel form
+  (attivazione, dispositivo, pagine) con **avviso di disponibilità**
+  da `/api/env` quando Node o Chrome mancano sul server; fase
+  annunciata nell'avanzamento e "Annulla audit" che uccide anche il
+  processo Node; **badge "Lighthouse"** sui rilievi del fork e
+  **"confermato da Lighthouse"** su quelli MARS arricchiti dalla
+  deduplica; in sintesi le **chip delle categorie** e il **pannello
+  Core Web Vitals** (LCP, CLS, TBT come proxy dell'INP, FCP, Speed
+  Index) con soglie ufficiali, verdetti testo + simbolo e la nota
+  di onestà sui dati di laboratorio; delta dei punteggi di
+  categoria nello storico e nel confronto fra audit.
 - **Risultati nella pagina**: punteggi per area con barre e valori
   testuali, **profili di citabilità per assistente IA** (barre per
   profilo, indice composito col mercato scelto nel form e "top
@@ -235,10 +273,13 @@ palette `--lt-*` del sito con i contrasti AA documentati) più un tema
 applicativo (`gui/theme.css`) che replica header bianco con marchio,
 bottoni teal, footer teal scuro e focus arancione. Logo
 (`lympha-mark.svg`) e favicon sono vendorizzati in `gui/brand/`; anche
-il referto HTML generato dallo script adotta la palette del brand e
-riporta la firma "Lympha Technologies S.r.l." nel footer. Per un
-re-brand basta ridefinire i token in `lympha-brand.css` e sostituire
-logo e favicon.
+il referto HTML generato dallo script adotta la palette del brand e —
+dalla v1.57.0 — **incorpora marchio SVG e font Titillium Web**
+(regular e bold, come data URI: la resa offline non dipende dai font
+di sistema; senza gli asset accanto allo script restano firma
+testuale e font di sistema), con la firma "Lympha Technologies
+S.r.l." nel footer. Per un re-brand basta ridefinire i token in
+`lympha-brand.css` e sostituire logo e favicon.
 
 **Esecuzione come servizio.** Per le installazioni presso i clienti è
 inclusa la unit systemd [deploy/mars-gui.service](deploy/mars-gui.service)
@@ -309,11 +350,14 @@ API esposte (usate dal frontend, utilizzabili anche da script):
 `GET /api/report/{html,json,text}` (referti, `?download=1` per lo
 scarico).
 
-## Le cinque aree misurate
+## Le aree misurate
 
 Ogni area produce rilievi (`critical` / `warning` / `ok` / `info`) con
 punteggio 0–100; il complessivo è la media pesata (tecnica 1.0, lessicale 1.5,
-semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5). I rilievi
+semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5 e — quando
+l'audit Lighthouse è attivo — Performance (Lighthouse) 1.0: senza,
+l'area non esiste e i pesi si rinormalizzano da soli, così gli
+storici restano confrontabili). I rilievi
 riportano evidenze concrete (URL, query verificate, esempi dei testi
 problematici) e i referti includono un **piano di remediation**: critici e
 avvertenze ordinati per gravità e, dalla v1.17.0, per **guadagno di
@@ -403,6 +447,20 @@ riproducibile.
    alcun risultato sono un rilievo critico a sé. Con `--competitor` l'area
    include anche il **confronto competitivo** (share of voice sul corpus
    fuso, con rilievi pesati che concorrono al punteggio dell'area).
+6. **Performance (Lighthouse)** — presente solo con `--lighthouse`:
+   home + N pagine rappresentative passano nel fork di Google
+   Lighthouse (un processo Node per pagina, `--locale=it`, timeout e
+   annullamento cooperativo). I punteggi delle categorie
+   (Performance, Accessibilità, SEO, Best Practices, Agentic
+   Browsing) mediati sulle pagine formano il punteggio dell'area;
+   gli audit sotto soglia diventano rilievi MARS coi pilastri della
+   mappatura di progetto (la velocità è accesso), e i 15 audit che
+   duplicano controlli MARS esistenti (title, meta description,
+   alt, HTTPS, llms.txt…) non generano doppioni: diventano
+   **evidenza di conferma** sul rilievo MARS canonico. Nei referti:
+   sezione "Audit Lighthouse" in sintesi (o **salto dichiarato**
+   col motivo), blocco `lighthouse` additivo nel JSON, ancore
+   stabili anche per i rilievi nuovi.
 
 ## Infrastruttura
 
@@ -466,6 +524,11 @@ flowchart TD
     SC --> RT & RJ & RH --> EX
 ```
 
+L'audit Lighthouse (`run_lighthouse()`) e il giudizio LLM
+(`run_judge()`) sono **passi separati dopo `run_audit()`**: l'audit
+in sé non avvia mai processi Node né contatta API, e i loro esiti
+(rilievi, sesta area, verdetti) vengono fusi a valle.
+
 L'interfaccia grafica si appoggia allo stesso nucleo: il server importa
 lo script ed esegue `run_audit()` in un thread, catturandone il log.
 
@@ -487,7 +550,8 @@ URL → robots.txt → scoperta URL (sitemap | crawl BFS) → fetch pagine (thro
     → parsing HTML → deduplica → chunking per heading (~220 parole)
     → [tecnica | lessicale | semantica | dati strutturati]
     → BM25 + vettoriale → fusione RRF → consenso fra le liste
-    → punteggi pesati → referto text/json/html → exit code
+    → (opzionale) Lighthouse: home + N pagine → rilievi + sesta area
+    → punteggi pesati → referto text/json/html/md/csv → exit code
 ```
 
 Tutto gira in un unico processo locale, senza servizi esterni: le uniche
@@ -509,7 +573,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 277 test, ~2 minuti, nessun accesso alla rete esterna
+pytest            # 342 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
@@ -529,7 +593,12 @@ quick win, "matematica del problema", profili di citabilità per
 assistente IA (pesi e ancoraggi calcolati a mano, rinormalizzazione
 con aree mancanti, mercati), coerenza dei tre renderer,
 codici di uscita CLI, API della GUI (account, limite orario, SSE,
-storico, CSP, path traversal, annullamento), giudizio LLM contro un
+storico, CSP, path traversal, annullamento), **integrazione
+Lighthouse offline per costruzione** (LHR finti e `subprocess.Popen`
+finto: rilevamento runtime, runner con timeout e annullamento,
+parser con le soglie esatte dei bucket, deduplica, sesta area,
+metriche CWV, i18n dai locale del fork, coerenza dei cinque
+renderer), giudizio LLM contro un
 server API finto (verdetti, refusal, JSON malformato, salto senza
 chiave — una fixture autouse rimuove le chiavi dall'ambiente, quindi
 la suite è offline per costruzione) e monitoraggio citazioni

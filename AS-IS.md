@@ -16,8 +16,239 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-05.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `mars_audit.py` v1.45.0
+## Strumento CLI — `mars_audit.py` v1.58.0 (+ package `marsbeacon/`)
 
+- **Scomposizione in moduli** (v1.58.0, 2026-08-05, dal P3): le
+  10.050 righe del file singolo vivono ora nel package
+  **`marsbeacon/`** — `base` (costanti, regex, modelli dati),
+  `crawler` (fetch, robots, scoperta, parsing, rendering JS,
+  chunking, deduplica), `indexes` (BM25, vettoriale, RRF, grafo,
+  treemap), `audits` (controlli per area, punteggi, citabilità,
+  storico, giudizio, Lighthouse, ancora di realtà), `render`
+  (cinque renderer, cataloghi i18n, CSS/JS del referto, brand) —
+  con **`mars_audit.py` ridotto a facciata** (~1.100 righe):
+  docstring, riesportazione esplicita di ogni nome (pubblici e
+  `_privati`), `run_audit`, `build_parser`, `main`.
+  **`python3 mars_audit.py URL`, la GUI (`import mars_audit`) e le
+  unit systemd restano identici**; il deploy copia anche
+  `marsbeacon/`. Metodo: split meccanico assistito da AST
+  (segmenti contigui, import per modulo calcolati sui riferimenti
+  reali, tre sole ricollocazioni imposte dai riferimenti in
+  avanti: `build_remediation`, blocco Lighthouse, `dedupe_pages`);
+  nei test l'helper `_patch` applica i monkeypatch sulla facciata
+  **e** su ogni modulo che espone il nome — dopo lo split conta il
+  namespace del consumatore. Percorsi da `__file__` (fork
+  Lighthouse, brand) rebasati alla radice del repository. Suite
+  completa verde e AT 31/31 sul codice scomposto; flake8 pulito su
+  facciata e package (lint CI esteso a `marsbeacon/`).
+
+- **Brand incorporato nel referto HTML** (v1.57.0, 2026-08-05, dal
+  P2): il footer porta il **marchio SVG inline** (25,6 KB,
+  vettoriale, `aria-label` preservata, tile con angoli
+  arrotondati) e il `<style>` incorpora i font **Titillium Web
+  regular e bold** come data URI woff2 (~47 KB in base64): la resa
+  offline non dipende più dai font di sistema. Valutazione
+  dichiarata: i pesi 600/800 usati dal CSS ripiegano sul 700 per
+  la regola di font-matching CSS — incorporarli sarebbe costato
+  altri ~25 KB per una resa quasi identica; il referto passa da
+  ~62 a ~129 KB (example.com), accettabile per un deliverable di
+  consulenza. **Fallback pulito e dichiarato**: senza gli asset
+  accanto allo script (distribuito senza gli asset della GUI) restano
+  firma testuale e font di sistema — mai incorpori parziali. Test
+  dedicato su incorporo e fallback.
+
+- **Ancora di realtà** (v1.56.0, 2026-08-05, dal P2):
+  `--search-check auto|on|off` (default `auto`) — `run_search_check`,
+  passo separato dopo `run_audit()` col pattern del giudizio LLM:
+  interroga la **Brave Search API** (chiave solo da `BRAVE_API_KEY`,
+  endpoint sovrascrivibile con `BRAVE_BASE_URL` per i test) sulle
+  query della simulazione e cerca il sito nei **primi 20 risultati**
+  (host normalizzato, `www.` incluso), affiancando al consenso RRF
+  simulato la posizione reale o l'assenza. Max 10 query, una
+  richiesta al secondo (rate limit Brave), errori per query che non
+  fermano le altre, salto dichiarato senza chiave (`on` la pretende:
+  errore d'uso). Sezione nei referti text/html/md (con la **nota di
+  onestà sempre inclusa**: il ranking dipende anche da
+  personalizzazione, località e freschezza — confronto direzionale,
+  non validazione), blocco additivo `search_check` nel JSON. 6 test
+  col **server Brave finto locale** (posizioni e confronto RRF,
+  errori, salto, renderer, CLI) e chiavi rimosse dall'ambiente in
+  conftest: suite offline per costruzione. Complementare a
+  `--queries-gsc` (domande vere ↔ ranking vero). Dalla GUI v2.29.0
+  l'opzione è anche nel form, con sezione nei risultati.
+
+- **Delta Lighthouse fra esecuzioni** (v1.55.0, GUI v2.27.0,
+  2026-08-05): `history_payload` accetta il blocco `lighthouse` e
+  scrive nella riga compatta dello storico i **punteggi di
+  categoria** (solo con Lighthouse eseguito); `compute_delta`
+  restituisce la chiave additiva `lighthouse` — delta per
+  categoria, per le categorie presenti in entrambe le esecuzioni —
+  normalizzando le due forme (blocco del referto JSON completo e
+  lista compatta dello storico). Il delta della **sesta area** era
+  già automatico (confronto generico sulle chiavi di `scores`).
+  Nella GUI il blocco "Rispetto all'esecuzione precedente" e il
+  confronto fra due audit scelti mostrano i delta di categoria
+  accanto a quelli d'area ("Lighthouse Prestazioni: ▲ +5", frecce
+  testuali del meccanismo esistente); vale anche per il
+  monitoraggio CLI con `--history`. 2 test dedicati (riga di
+  storico con/senza Lighthouse; delta fra le due forme, categoria
+  assente esclusa).
+- **Metriche CWV nel blocco `lighthouse`** (v1.54.0, 2026-08-05):
+  `lighthouse_report_data` estrae LCP, CLS, TBT (proxy dell'INP),
+  FCP e Speed Index dai LHR — **valore peggiore fra le pagine
+  esaminate**, `displayValue` già localizzato, verdetto
+  buono/da migliorare/scarso dalle **soglie ufficiali
+  Lighthouse/web.dev** dichiarate in `LIGHTHOUSE_CWV`; metriche
+  assenti dal LHR: nessuna voce, mai valori inventati. Campo
+  `metrics` additivo (JSON e sintesi GUI); i referti non lo
+  rendono — la decisione di accantonare la sezione metriche nei
+  referti resta valida, il pannello vive in GUI.
+
+- **JavaScript inline nel referto HTML: treemap e grafo
+  interattivi** (v1.53.0, GUI v2.23.0, 2026-08-05 — decisione che
+  **ribalta il vincolo "referto senza JavaScript"**): il referto
+  resta un file unico senza origini esterne e il JS è progressive
+  enhancement puro — legge il DOM (attributi `data-*`, `<title>`),
+  nessun payload proprio; senza JavaScript o in stampa resta l'SVG
+  statico (controlli nascosti dal CSS di stampa). **Treemap della
+  superficie contenutistica**, widget nuovo: rettangoli = pagine,
+  area ∝ parole indicizzabili, colore dalla gravità dei rilievi
+  che citano la pagina; layout squarified deterministico calcolato
+  nel core (`_squarify`, Bruls-Huizing-van Wijk; `treemap_data`,
+  max 40 pagine), rettangoli focusabili da tastiera con dettagli
+  in regione di stato e **tabella di fallback** in un `<details>`.
+  **Grafo dei link interattivo anche nel referto**, in parità con
+  la GUI: zoom con rotella o pulsanti, pan, trascinamento dei
+  nodi, evidenziazione del vicinato al passaggio o al focus con
+  dettagli in regione di stato. Catalogo `_HTML_I18N` esteso
+  (`tm.*`, `lg.*`, it+en). La GUI serve il referto HTML con una
+  **CSP dedicata** (`REPORT_CSP`: `script-src 'unsafe-inline'`
+  solo su `/api/report/html`; le pagine della GUI restano sotto la
+  CSP stretta). Test: squarify (area, limiti, proporzioni),
+  gravità della treemap, markup del referto, CSP del referto
+  contro quella standard; JS validato con `node --check` e referto
+  reale multi-pagina verificato.
+- **i18n dei rilievi Lighthouse: il catalogo è Lighthouse stesso**
+  (v1.52.0, 2026-08-05 — decisione del bullet i18n P1): niente
+  catalogo interno da ~160 voci. Nei referti EN i testi inglesi
+  arrivano dai **file di locale del fork installato**
+  (`shared/localization/locales/en-US.json`, caricato pigramente e
+  una sola volta), risalendo per ogni audit al messaggio che ne ha
+  prodotto titolo e description tramite `i18n.icuMessagePaths` del
+  LHR (mappa inversa percorso → id messaggio). Il parser salva
+  `title_en`/`fix_en`/`cat_title_en` nei params (additivi, con
+  `display` ed `evidence` strutturati) e `finding_texts()` li
+  ricompone per le chiavi `lh.*` con la cornice inglese
+  (Pages/Evidence/Score). **Fallback dichiarato campo per campo**
+  come per `_FINDINGS_EN`: senza file di locale, senza mappatura o
+  con placeholder ICU residui resta l'italiano (oggi accade al
+  titolo della categoria agentic-browsing, non ancora localizzato
+  da upstream). Il canonico italiano resta intatto per storico e
+  ancore. 4 test dedicati (traduzione, fallback, scarto ICU,
+  OK/errori); verificato dal vivo su example.com — "Document does
+  not have a main landmark", "Lighthouse Performance: no findings"
+  nel referto EN.
+- **Lighthouse nei referti di tutti i formati** (v1.51.0,
+  2026-08-05): sezione "Audit Lighthouse" nella sintesi di text,
+  html e md — quando eseguito: pagine, device, tag del fork e
+  punteggi di categoria (tabella HTML con soglie 90/50, valore
+  sempre testuale); quando saltato: **salto dichiarato col
+  motivo** nel referto, pattern del giudizio LLM; quando spento:
+  nessuna menzione. Il JSON porta il blocco additivo `lighthouse`
+  (status, mode, device, fork, pagine, errori, categorie con
+  medie 0–100) — `schema_version` invariato. Il CSV non cambia:
+  l'origine è già dichiarata da area e chiavi `lh.*`. Le ancore
+  `#r-…` restano stabili anche per i rilievi Lighthouse (conteggi
+  normalizzati dal meccanismo esistente, verificato). Catalogo
+  `_HTML_I18N` esteso con le chiavi `lh.*` in it e en (parità
+  verificata dai test esistenti). 3 test in più ed estensioni
+  agli e2e: blocco JSON in ok e in salto, dichiarazione nei tre
+  formati di prosa, stabilità delle ancore.
+- **Deduplica e sesta area pesata** (v1.50.0, 2026-08-05): i
+  rilievi Lighthouse entrano nei referti. **Deduplica** con la
+  tabella esplicita `LIGHTHOUSE_DEDUP` (15 audit: title, meta
+  description, alt, lang, viewport, charset, HTTPS, hreflang,
+  canonical, robots.txt, noindex, status code, link descrittivi,
+  llms.txt): il rilievo MARS resta canonico e la conferma
+  Lighthouse si aggiunge come **evidenza** al dettaglio
+  ("Conferma Lighthouse: … (punteggio N/100)", `lh_confirm` nei
+  params per il futuro badge GUI); se MARS non ha un rilievo
+  corrispondente — o ha solo un OK: divergenza fra i due
+  strumenti — il rilievo Lighthouse resta perché porta
+  informazione nuova; gli audit fuori tabella (contrasto,
+  landmark…) restano sempre (`merge_lighthouse_findings`).
+  **Sesta area** `AREA_LIGHTHOUSE` con peso 1.0 in
+  `overall_score()` (`lighthouse_area_score`: media semplice
+  delle categorie, ognuna mediata sulle pagine); senza Lighthouse
+  l'area non esiste e i pesi si rinormalizzano da soli — gli
+  storici restano confrontabili. I quattro renderer iterano
+  `ALL_AREAS` (aree vuote saltate): rilievi Lighthouse in tutti i
+  formati, nel piano di remediation (sforzo classificato) e nel
+  gate `--fail-under`/exit code. 8 test in piu' (merge,
+  divergenza, fuori tabella, media area, rinormalizzazione del
+  complessivo, e2e col referto JSON su sito fixture); verificato
+  dal vivo su example.com — conferme su charset e meta
+  description, divergenza conservata sui link non descrittivi.
+- **Parser LHR → Finding** (v1.49.0, 2026-08-05):
+  `lighthouse_findings()` converte i LHR del runner in rilievi
+  MARS della **sesta area** `AREA_LIGHTHOUSE` ("Performance
+  (Lighthouse)"). Un rilievo per audit, aggregato su tutte le
+  pagine (punteggio peggiore, peso massimo, URL riuniti); gravità
+  dai **bucket ufficiali Lighthouse**: sotto 0,9 il rilievo
+  esiste, sotto 0,5 con peso ≥ 3 nel punteggio di categoria è
+  critico, peso 0 è informativo; gli audit senza punteggio
+  (informative/manual/notApplicable/error) non generano rilievi.
+  `pillar` dalla mappatura di progetto `LIGHTHOUSE_PILLARS`
+  (Performance/Accessibilità/Agentic → accessibility, SEO →
+  ranking, Best Practices → security); chiave di catalogo
+  `lh.<categoria>.<audit-id>` con `params` (audit, categoria,
+  score, peso, URL) pronti per deduplica e i18n. Evidenze dagli
+  `items` dei details (URL, selettore/snippet del nodo,
+  etichetta), `displayValue` nel dettaglio, description del LHR
+  senza i link Markdown come correzione. Il runner passa
+  **`--locale=it`** alla CLI del fork: titoli e description
+  arrivano già in italiano dal LHR (niente inglese nel referto
+  canonico). Categorie senza audit sotto soglia → un solo rilievo
+  OK con la media; errori del runner → rilievo informativo. I
+  rilievi viaggiano in `run_lighthouse()["findings"]`; l'ingresso
+  nei referti e nei punteggi è il prossimo passo (deduplica +
+  sesta area pesata). 7 test dedicati con LHR finti; verificato
+  end-to-end reale su example.com (rilievi in italiano, gravità e
+  pilastri coerenti).
+- **Runner Lighthouse** (v1.48.0, 2026-08-05): `run_lighthouse()`,
+  passo separato dopo `run_audit()` col pattern del giudizio LLM
+  (None con off; dict con status "ok" oppure "skipped" col motivo
+  dichiarato). Selezione pagine `select_lighthouse_pages()`: home +
+  N rappresentative con euristica dichiarata — link interni in
+  ingresso, poi vicinanza alla home (riusa il grafo dei link
+  dell'audit; i dati di traffico non esistono offline). Un processo
+  Node per pagina (`--output=json --quiet`, `--preset=desktop` col
+  device desktop, `CHROME_PATH` dal rilevamento runtime), attesa a
+  piccoli passi con **timeout per pagina** (120 s: kill e
+  fallimento dichiarato), pausa `--delay` fra le pagine e
+  **annullamento cooperativo** che uccide il processo Node
+  (terminate, poi kill); gli errori di una pagina — avvio, uscita
+  non zero, LHR malformato — non fermano mai le altre né l'audit.
+  Log con la sintesi dei punteggi per categoria. 8 test col
+  processo finto al posto di `subprocess.Popen` (comando e
+  ambiente, preset, timeout, annullamento, errori per pagina,
+  selezione): la suite non richiede Node; verificato anche
+  end-to-end reale su example.com. I LHR raccolti alimenteranno il
+  parser LHR → `Finding` (prossimo passo P1).
+- **Flag Lighthouse nella CLI** (v1.47.0, 2026-08-05):
+  `--lighthouse off|auto|always` (default `off`; `auto` esegue solo
+  se fork, Node ≥ 22.19 e Chrome ci sono, altrimenti **salto
+  dichiarato** nel log; `always` li pretende — errore d'uso col
+  motivo, pattern di `--judge on`), `--lighthouse-pages N` (pagine
+  rappresentative oltre la home, 0–9, default 3) e
+  `--lighthouse-device mobile|desktop` (emulazione e throttling,
+  default mobile). Parametri validati in `main`; dalla v1.48.0 la
+  risoluzione vive nel passo separato `run_lighthouse()`. Test CLI
+  in `tests/test_lighthouse.py` (5 in più:
+  default, scelte invalide, intervallo pagine, `always` senza
+  requisiti, salto dichiarato end-to-end sul sito fixture).
+- **Rilevamento runtime Lighthouse** (v1.46.0, GUI v2.22.0,
+  2026-08-05): dettaglio nella sezione "Fork Lighthouse" più sotto.
 - **File rinominati `mars_*`** (v1.45.0, GUI v2.21.0, citations
   v1.2.0, 2026-08-05): script, nota tecnica e unit systemd coerenti
   col nome MARS Beacon (`git mv`, riferimenti aggiornati in codice,
@@ -358,7 +589,126 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza dichiarata nel modulo.
 
-## Interfaccia grafica locale — `mars_gui.py` v2.21.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.29.0 + `gui/`
+
+- **Ancora di realtà nella GUI** (v2.29.0, 2026-08-05): select nel
+  form (Auto / Obbligatoria / Spenta, quarta colonna della riga
+  Lighthouse) con **avviso di disponibilità da `/api/env`**
+  (`search_check_available`/`search_check_reason`, pattern del
+  giudizio LLM: senza chiave il suggerimento dichiara il motivo e
+  in auto il passo si salta); `on` validata lato server contro la
+  disponibilità reale; campo nelle preimpostazioni. Il job esegue
+  `run_search_check` dopo il giudizio (log in streaming), il blocco
+  va in sintesi e ai cinque referti scaricabili. Nei risultati la
+  sezione "Ancora di realtà (Brave Search)" **subito dopo la
+  tabella del consenso RRF**: intro col conteggio, tabella query →
+  posizione reale (o assenza dai primi 20, o errore) → consenso
+  RRF, nota di onestà nella caption, area scorrevole focalizzabile
+  come le altre tabelle. 3 test nuovi (validazione, e2e col passo
+  finto fino ai referti, chiavi in `/api/env`); AT 31/31
+  riconfermata col campo nuovo, `app.js` validato con
+  `node --check`.
+
+- **Unit systemd riviste per Lighthouse** (v2.28.0, 2026-08-05,
+  chiude "Documentazione e deploy" della P1): `mars-audit.service`
+  ora esegue l'audit periodico con `--lighthouse auto` (senza
+  requisiti: salto dichiarato, il servizio non fallisce per
+  questo) e documenta i prerequisiti — Node ≥ 22.19 **di sistema**
+  (il PATH di systemd non vede nvm e `ProtectHome` blocca /home;
+  `Environment=PATH` di esempio commentato), Chrome/Chromium,
+  `tools/update-lighthouse.sh` da `/opt/seorrf` (il checkout resta
+  in sola lettura), sysctl per gli user namespace su Debian.
+  Entrambe le unit hanno `Environment=HOME=%S/seorrf` (Chrome
+  headless con l'utente dinamico non ha una home) e la **nota di
+  hardening motivata**: mai `MemoryDenyWriteExecute` (JIT di
+  Node/V8) né `RestrictNamespaces` (la sandbox di Chrome richiede
+  user/pid/net namespace; `--no-sandbox` sarebbe un hardening
+  peggiore). Sistemato anche un **difetto latente**: il database
+  della GUI era fisso accanto allo script, illeggibile in
+  scrittura sotto `ReadOnlyPaths=/opt/seorrf` — ora `MARS_GUI_DB`
+  lo sposta (unit: `StateDirectory=seorrf` +
+  `MARS_GUI_DB=%S/seorrf/mars_gui.db`), con test dedicato. Unit
+  validate con `systemd-analyze verify` (unico rilievo: i percorsi
+  `/opt/seorrf` assenti sulla macchina di sviluppo, atteso).
+- **Accessibilità delle viste Lighthouse verificata**
+  (2026-08-05, chiude la sezione GUI della P1): il lint di
+  struttura/contratto ARIA (`tools/verifica_at.py`) copre le viste
+  nuove — etichette dei tre campi del form, chip di categoria e
+  pannello CWV con verdetti testo + simbolo e nota "laboratorio",
+  badge di origine e di conferma — popolate da uno **stub di
+  `run_lighthouse`** (nessuna dipendenza da Node/fork: verifica
+  indipendente dalla macchina). **31/31 controlli superati**;
+  contrasti dei colori nuovi verificati a calcolo (6,48–10,24:1,
+  soglia AA 4,5:1). `docs/ACCESSIBILITA.md` aggiornato: §1.1,
+  flussi 3 e 5 estesi, nuovo flusso 8 per il referto HTML
+  interattivo (treemap e grafo: focus da tastiera, regioni di
+  stato, tabella di fallback, resa statica senza JS), registro
+  degli esiti.
+- **Delta Lighthouse nello storico** (v2.27.0, 2026-08-05): vedi
+  la voce v1.55.0 dello strumento CLI — il job passa il blocco
+  `lighthouse` a `history_payload` e i due confronti della GUI
+  (esecuzione precedente e audit scelti) mostrano i delta di
+  categoria.
+
+- **Fase Lighthouse annunciata** (v2.26.1, 2026-08-05): la regione
+  di stato dell'avanzamento annuncia anche le righe di testa di
+  Lighthouse — avvio ("Lighthouse: N pagine (mobile), timeout…"),
+  salto dichiarato ed esito — oltre alle fasi numerate `[N/5]`; le
+  righe per pagina sono indentate e non generano annunci (annunci
+  solo ai cambi di fase, come da protocollo). Con questo il bullet
+  "Avanzamento" della P1 è completo: le righe di log arrivavano
+  già via SSE e "Annulla audit" uccide già il processo Node
+  (`stop_event` propagato dalla v2.24.0). AT 27/27.
+- **Sintesi Lighthouse: categorie e pannello Core Web Vitals**
+  (v2.26.0, 2026-08-05): sotto i punteggi per area il blocco
+  "Audit Lighthouse" mostra le **chip delle categorie** (titolo +
+  punteggio con simbolo ✓/!/✕ alle soglie 90/50 — mai solo
+  colore) e il **pannello CWV**: una tile per metrica (LCP, CLS,
+  TBT proxy INP, FCP, Speed Index) con valore `displayValue`,
+  verdetto testuale dalle soglie ufficiali e **nota di onestà
+  sempre visibile** (valore peggiore fra le pagine; dati lab, non
+  CrUX; l'INP reale non è misurabile in laboratorio). Con salto
+  dichiarato la sintesi mostra "Non eseguito: <motivo>"; con
+  Lighthouse spento nessuna menzione, e la riga "n/d" spuria
+  della sesta area sparisce dai punteggi (le aree assenti non
+  generano righe; l'indice d'area per l'apertura dei rilievi
+  resta corretto). Verifica strumentale AT 27/27; `app.js`
+  validato con `node --check`.
+- **Gruppo Lighthouse nel form** (v2.25.0, 2026-08-05): riga
+  dedicata nel modulo con select di attivazione (Spento / Auto: se
+  Node e Chrome ci sono / Obbligatorio), select del dispositivo
+  (mobile/desktop) e campo numerico delle pagine oltre la home
+  (0–9, default 3, validato client e server). **Avviso di
+  disponibilità da `/api/env`** col pattern sentence-transformers:
+  senza i requisiti il suggerimento diventa "Non disponibile sul
+  server: <motivo>. In auto l'audit viene semplicemente saltato";
+  coi requisiti mostra il tag del fork installato. Campi nelle
+  preimpostazioni (`PRESET_FIELDS`) e nella validazione numerica
+  client (`NUMERIC_FIELDS`); label, hint `aria-describedby` e
+  `invalid-feedback` come gli altri campi. Verifica strumentale AT
+  27/27 con Chrome reale, `app.js` validato con `node --check`.
+- **Lighthouse nei risultati** (v2.24.0, 2026-08-05): il server
+  accetta e valida `lighthouse`, `lighthouse_pages` e
+  `lighthouse_device` in `POST /api/audit` (messaggi in italiano;
+  `always` validato contro la disponibilità reale, pattern del
+  giudizio obbligatorio) ed esegue `run_lighthouse` nel job — le
+  righe di log arrivano in streaming nella GUI via redirect dello
+  stderr e **"Annulla audit" uccide anche il processo Node**
+  (`stop_event` propagato) — poi fonde i rilievi (deduplica del
+  core) e la sesta area nei punteggi; il blocco `lighthouse` va ai
+  cinque referti scaricabili e nella sintesi di `/api/status`.
+  Frontend: sesta area nelle fisarmoniche, rilievi smistati nei
+  quattro pilastri via campo `pillar` (meccanismo esistente,
+  nessun accordion di primo livello nuovo), **badge di origine
+  "Lighthouse"** sui rilievi del fork (chiavi `lh.*`) e badge
+  **"confermato da Lighthouse"** sui rilievi MARS arricchiti dalla
+  deduplica (`lh_confirm` nei params); contrasto AA
+  (`.badge-lh`). Il form non espone ancora le opzioni (prossimo
+  passo del TO-DO): via API sono già utilizzabili. 2 test nuovi
+  (validazione dei tre campi e di `always` non disponibile; e2e
+  con `run_lighthouse` finto: pillar, area, sesta area nei
+  punteggi e blocco in sintesi); `app.js` validato con
+  `node --check`.
 
 - **Risultati separati per tipologia MARS** (v2.19.0): la sezione
   unica "Risultati dell'audit e referto" è diventata cinque
@@ -598,7 +948,119 @@ sono nel [README.md](README.md).
 - Testato senza chiamate reali: server API finti locali per entrambi i
   provider (8 test dedicati).
 
+## Fork Lighthouse — strategia di manutenzione (P1, 2026-08-05)
+
+- **P1 — Integrazione Lighthouse: COMPLETATA** (2026-08-05, in
+  un'unica giornata di lavoro, v1.46.0→v1.55.0 / GUI
+  v2.22.0→v2.28.0): fork (pin, patch anti-telemetria,
+  installazione), core (rilevamento runtime, flag, runner, parser,
+  deduplica, sesta area, referti nei cinque formati, i18n dai
+  locale del fork), GUI (form, risultati coi badge, sintesi con
+  CWV, fase annunciata, storico, accessibilità 31/31), test/CI
+  (offline per costruzione + integrazione reale) e deploy (unit
+  systemd riviste). Le **quattro decisioni preliminari** del
+  2026-08-05, qui per memoria: *mappatura*
+  Performance/Accessibilità/Agentic Browsing → Accessibility, SEO
+  → Ranking, Best Practices → Security (PWA non esiste più nella
+  13.x; l'alternativa Performance → Ranking è scartata per ora,
+  rivalutabile a integrazione rodata); *punteggi* come sesta area
+  a peso 1.0 con rinormalizzazione quando assente; *pagine* home +
+  3 rappresentative; *deduplica* col rilievo MARS canonico e la
+  conferma Lighthouse come evidenza aggiuntiva.
+
+- Primo passo dell'integrazione Lighthouse (P1 del TO-DO): strategia
+  di manutenzione del fork
+  <https://github.com/saulusprime/lighthouse> impostata e documentata
+  in [docs/LIGHTHOUSE-FORK.md](docs/LIGHTHOUSE-FORK.md). **Pin alla
+  release upstream v13.4.1** (verificato che il fork fosse uno
+  specchio esatto di upstream `main`, senza patch proprie né tag);
+  modello di branch: `main` specchio di upstream, `mars` = release
+  pinnata + patch-set, tag `vX.Y.Z-mars.N` come unico riferimento di
+  installazione per MARS.
+- **Patch-set versionato in questo repo**
+  (`tools/lighthouse-patches/`, col file `PIN` macchina-leggibile
+  della release corrente): una sola patch, che disattiva del tutto
+  l'error reporting Sentry — niente prompt interattivo, niente
+  consenso memorizzato in Configstore (un "sì" dato una volta a mano
+  resterebbe attivo per sempre, anche nei run lanciati da MARS),
+  niente traffico verso sentry.io, per ogni punto d'ingresso (CLI e
+  API Node). L'`update-notifier` non esiste più nelle 13.x: nessuna
+  patch necessaria. Il branch `mars` è ricostruibile da zero con
+  `git am` (procedura nel doc); branch e tag `v13.4.1-mars.1` sono
+  pubblicati sul fork (push del 2026-08-05, dopo la concessione
+  dell'accesso in scrittura alla chiave LymphaTechnologies).
+- **Verificato con smoke test end-to-end** su questa macchina (Node
+  22.22.1, Chrome 151): branch `mars` costruito, dipendenze con
+  yarn/corepack, `yarn build-report` (necessario: `dist/report` è
+  importato anche con output solo JSON), audit reale su example.com →
+  exit 0, LHR `13.4.1`, 160 audit, punteggi per categoria, nessun
+  prompt né telemetria.
+- Scoperte recepite nelle decisioni P1 del TO-DO: la categoria **PWA
+  non esiste più** nella 13.x; la nuova categoria
+  **`agentic-browsing`** (albero di accessibilità per gli agenti IA,
+  WebMCP, CLS, llms.txt — dichiarata in sviluppo da upstream) è
+  mappata sul pilastro **Accessibility**, e il suo audit `llms-txt`
+  andrà in tabella di deduplica col controllo MARS esistente.
+- **Rilevamento runtime nel core e in `/api/env`** (v1.46.0, GUI
+  v2.22.0, 2026-08-05): `lighthouse_unavailable()` nel core verifica
+  fork installato (`lighthouse/cli/index.js`), Node ≥ 22.19
+  (`node_version()`) e browser (`find_system_chrome()`, che riusa i
+  `CHROME_PATHS` del rendering JavaScript), con motivo dichiarato in
+  italiano per ogni requisito mancante; `lighthouse_version()` legge
+  il tag installato da `lighthouse/VERSIONE`. La GUI espone l'esito
+  in `GET /api/env` (`lighthouse_available`, `lighthouse_reason`,
+  `lighthouse_version`), stesso pattern di embeddings, rendering e
+  giudizio LLM. Test dedicati in `tests/test_lighthouse.py` (11,
+  tutto simulato con monkeypatch: la suite resta offline e
+  indipendente dalla macchina) più le asserzioni in
+  `test_gui.test_env`.
+- **Installazione in directory dedicata** (2026-08-05, scelta di
+  progetto: "`npm ci` in una dir dedicata", niente tarball nel
+  repo): script `tools/update-lighthouse.sh` sul modello di
+  `update-vendor.sh`. Il fork usa yarn (nessun `package-lock.json`),
+  quindi l'equivalente di `npm ci` è clone shallow del tag del PIN
+  + `yarn install --frozen-lockfile` via corepack; lo script
+  costruisce `dist/report`, pota le devDependencies, **rifiuta i
+  tag privi della patch anti-telemetria**, sostituisce `lighthouse/`
+  in modo atomico e scrive `lighthouse/VERSIONE`. La directory
+  (343 MB, 12.281 file) è in `.gitignore`; il `PIN` dichiara ora il
+  tag del fork (`v13.4.1-mars.1`); attribuzione completa di
+  Lighthouse nel `NOTICE`. Verificato end-to-end: installazione
+  reale da GitHub e audit su example.com eseguito dall'artefatto
+  installato (LHR 13.4.1, 160 audit, cinque categorie).
+
 ## Qualità e verifica
+
+- **Test d'integrazione con Lighthouse vero e job CI dedicato**
+  (2026-08-05, ultimo bullet della P1):
+  `test_integrazione_lighthouse_reale` esegue il runner vero —
+  processo Node, fork installato — contro il sito fixture locale
+  (nessuna rete oltre 127.0.0.1) e verifica l'intera catena: LHR
+  13.x, rilievi dal parser, punteggi di categoria, metriche CWV e
+  punteggio della sesta area; **saltato con motivo** se
+  fork/Node/Chrome mancano (pattern del test di rendering con
+  browser reale). In CI il job **"Integrazione Lighthouse (Node +
+  Chrome)"**: setup-node 22, `tools/update-lighthouse.sh`
+  (installazione reale del fork al tag del PIN, con build) e
+  `pytest tests/test_lighthouse.py` — sui runner ubuntu Chrome è
+  preinstallato, quindi l'integrazione gira sempre.
+- **Copertura di test dell'integrazione Lighthouse** (2026-08-05,
+  chiude i primi due bullet "Test e CI" della P1): 48 test in
+  `tests/test_lighthouse.py` — rilevamento runtime, flag CLI,
+  runner (comando/ambiente, preset, timeout, annullamento, errori
+  per pagina, selezione pagine), parser (mappatura
+  audit→pillar/gravità con le **soglie esatte dei bucket** 0.5 e
+  0.9, aggregazione multi-pagina, evidenze), deduplica (conferma,
+  divergenza, fuori tabella), sesta area e rinormalizzazione,
+  metriche CWV, i18n dai locale del fork, storico/delta, ancore,
+  **coerenza dei cinque renderer** su uno stesso dataset (rilievo,
+  sesta area, sezione di sintesi e salto dichiarato in
+  text/json/html/md/csv) — più i test GUI (validazione API, e2e
+  col runner finto, CSP del referto) e del referto HTML. La suite
+  resta **offline per costruzione**: LHR JSON finti e un
+  `subprocess.Popen` finto al posto dell'eseguibile (niente Node
+  richiesto, nessun file su disco), pattern del server API finto
+  del giudizio LLM.
 
 - **CI su GitHub Actions** (`.github/workflows/ci.yml`): a ogni push
   e pull request, `flake8` + `pytest` su Python 3.10 e 3.12 e
@@ -614,13 +1076,15 @@ sono nel [README.md](README.md).
   Dalla sessione del 2026-08-04 esiste anche la **verifica
   strumentale del protocollo** (`tools/verifica_at.py`): i flussi
   1–7 eseguiti in un Chrome reale (individuato per piattaforma,
-  con ripiego sul Chromium di Playwright) con 27 controlli sul
-  contratto ARIA (focus, regioni di stato, etichette, aria-*, e
-  dalla GUI v2.19.0 il contratto delle cinque sezioni risultati);
-  ultimo esito 27/27 il 2026-08-05 — dichiaratamente non
-  sostitutiva della sessione umana.
+  con ripiego sul Chromium di Playwright) con 31 controlli sul
+  contratto ARIA (focus, regioni di stato, etichette, aria-*, il
+  contratto delle cinque sezioni risultati dalla GUI v2.19.0 e le
+  viste Lighthouse dalla v2.27.0, popolate da uno stub di
+  run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
+  dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 277 test in ~2 minuti** (`tests/`), senza rete
+- **Suite pytest: 342 test in ~30 secondi** (inclusa
+  l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query
@@ -662,6 +1126,19 @@ sono nel [README.md](README.md).
   (esclusi bytecode, venv, referti e storici generati a runtime;
   vendorizzati Bootstrap Italia e asset brand inclusi nel
   versionamento perché necessari all'esecuzione offline).
+- **Documentazione dell'integrazione Lighthouse completata**
+  (2026-08-05): README con la nuova capacità — riga di
+  installazione opzionale con la nota sui requisiti Node ≥
+  22.19/Chrome (dipendenza opzionale dichiarata, pattern
+  Playwright), le tre opzioni `--lighthouse*` nella tabella, la
+  sesta area in "Le aree misurate", il bullet GUI, il flusso
+  aggiornato e le righe di `tools/update-lighthouse.sh` e
+  `docs/LIGHTHOUSE-FORK.md` nella tabella del repository; nota
+  tecnica [mars_audit.md](mars_audit.md) aggiornata (uso, sesta
+  area, avvertenza di onestà su dipendenza opzionale/lab vs
+  field/fork pinnato, fonti Lighthouse e web.dev — corretto anche
+  l'elenco dei formati fermo a tre). AS-IS mantenuto passo-passo a
+  ogni versione durante tutta la P1.
 - [README.md](README.md) con diagrammi dell'infrastruttura (pipeline
   CLI e architettura GUI), [mars_audit.md](mars_audit.md) (nota
   tecnica di consegna con changelog). L'esempio di referto di
@@ -676,7 +1153,9 @@ Lighthouse/PageSpeed, GTmetrix, CrUX Vis, Sistrix, SE Ranking,
 Screaming Frog; per l'AI visibility: Profound, Peec, Otterly,
 Ahrefs Brand Radar), adottate in blocco nei widget v1.35.0–v1.37.0
 / GUI v2.14.0–v2.16.0 — tutto in HTML+CSS+SVG puro, senza librerie,
-coerente col vincolo offline:
+coerente col vincolo offline (dal 2026-08-05 il referto HTML ammette
+**JavaScript inline autonomo** come progressive enhancement — mai
+librerie o origini esterne, e senza JS resta la resa statica):
 
 - scala 0–100 con **soglie fisse e visibili** (40/70): colore per il
   verdetto immediato, numero sempre accanto;
@@ -715,6 +1194,19 @@ analisi del 2026-08-03).
 - La **traduzione delle evidenze citate dal sito** nei referti
   bilingui (v1.43.0): sono contenuti del sito, non dello strumento —
   restano nella lingua del sito, con nota dichiarata nel referto.
+- Il **branding del referto HTML di Lighthouse** (2026-08-05): MARS
+  consuma solo il LHR JSON e presenta i rilievi nei propri referti —
+  il referto HTML di Lighthouse non arriva mai al cliente; meno
+  patch sul fork, sync più semplici.
+- Le **metriche di laboratorio nei referti** (LCP, FCP, TBT, CLS,
+  Speed Index con le soglie Lighthouse) — accantonate il
+  2026-08-05 **per i soli referti**: lì i punteggi di categoria
+  nella sezione "Audit Lighthouse" e i singoli rilievi coprono già
+  il segnale utile. Il pannello CWV vive invece nella **sintesi
+  della GUI** (v2.26.0), con la nota di onestà obbligatoria lab vs
+  field (dati simulati, non CrUX; l'INP reale non è misurabile in
+  lab, TBT è il proxy); l'eventuale sezione nei referti si
+  rivaluta a integrazione rodata.
 
 ## Limiti noti e accettati
 

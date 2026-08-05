@@ -1,11 +1,17 @@
 # Unit systemd per l'interfaccia locale dell'audit SEO + RRF.
 #
 # Installazione sulla macchina del cliente:
-#   1. Copia il progetto in /opt/seorrf (script, gui/, requirements.txt)
+#   1. Copia il progetto in /opt/seorrf (script, marsbeacon/, gui/,
+#      requirements.txt)
 #   2. python3 -m venv /opt/seorrf/venv
 #      /opt/seorrf/venv/bin/pip install -r /opt/seorrf/requirements.txt
-#   3. sudo cp deploy/mars-gui.service /etc/systemd/system/
-#   4. sudo systemctl daemon-reload
+#   3. facoltativo, per l'audit Lighthouse dalla GUI: Node >= 22.19
+#      e Chrome/Chromium installati a livello di sistema, poi da
+#      /opt/seorrf esegui tools/update-lighthouse.sh (vedi le note
+#      sui prerequisiti in mars-audit.service; senza requisiti la
+#      GUI mostra il motivo nel form e l'audit salta con dichiarazione)
+#   4. sudo cp deploy/mars-gui.service /etc/systemd/system/
+#   5. sudo systemctl daemon-reload
 #      sudo systemctl enable --now mars-gui
 #
 # L'interfaccia resta raggiungibile solo dalla macchina stessa su
@@ -33,6 +39,21 @@ ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
 ReadOnlyPaths=/opt/seorrf
+
+# Dati persistenti (utenti/sessioni, referti degli audit) in
+# /var/lib/seorrf: /opt/seorrf resta in sola lettura, il database
+# va nella StateDirectory via MARS_GUI_DB (GUI >= 2.28.0). HOME
+# scrivibile per Chrome headless dell'audit Lighthouse.
+StateDirectory=seorrf
+Environment=MARS_GUI_DB=%S/seorrf/mars_gui.db
+Environment=HOME=%S/seorrf
+# Node fuori dal PATH standard di systemd? Decommenta e adegua.
+#Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+# Nota di hardening (revisione 2026-08-05, integrazione Lighthouse):
+# NON aggiungere MemoryDenyWriteExecute (JIT di Node/V8 e Chrome)
+# ne' RestrictNamespaces (la sandbox di Chrome richiede user/pid/net
+# namespace; --no-sandbox sarebbe un hardening peggiore).
 
 [Install]
 WantedBy=multi-user.target

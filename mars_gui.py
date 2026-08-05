@@ -55,6 +55,7 @@ import importlib.util
 import hashlib
 import hmac
 import json
+import os
 import re
 import secrets
 import sqlite3
@@ -68,12 +69,16 @@ from typing import Dict, List, Optional, Tuple
 
 import mars_audit as sra
 
-__version__ = "2.21.0"
+__version__ = "2.29.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
 # Utenti e sessioni su SQLite accanto allo script (nel .gitignore).
-DB_PATH = Path(__file__).resolve().parent / "mars_gui.db"
+# MARS_GUI_DB sposta il database altrove: serve al deploy systemd,
+# dove /opt/seorrf e' in sola lettura e il DB vive nella
+# StateDirectory (/var/lib/seorrf).
+DB_PATH = Path(os.environ.get("MARS_GUI_DB")
+               or Path(__file__).resolve().parent / "mars_gui.db")
 
 # Storico del monitor citazioni (una riga JSON per esecuzione,
 # scritto da mars_citations.py --history). Il default e' il file
@@ -102,6 +107,11 @@ CONTENT_TYPES: Dict[str, str] = {
 CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; "
        "img-src 'self' data:; object-src 'none'; "
        "frame-ancestors 'self'; base-uri 'self'")
+# Il referto HTML autonomo porta il proprio JavaScript inline
+# (treemap e grafo interattivi, v1.53.0 del core): solo per quella
+# risposta lo script inline e' ammesso — niente file esterni,
+# le pagine della GUI restano sotto la CSP stretta.
+REPORT_CSP = CSP + "; script-src 'unsafe-inline'"
 
 
 class LineBuffer:
@@ -449,9 +459,33 @@ class Job:
                     chunk_words=int(cfg.get(
                         "chunk_words", sra.DEFAULT_CHUNK_WORDS)),
                     stop_event=self.stop_event)
+                lighthouse = sra.run_lighthouse(
+                    str(cfg["url"]), pages,
+                    mode=str(cfg.get("lighthouse",
+                                     sra.LIGHTHOUSE_OFF)),
+                    n_pages=int(cfg.get(
+                        "lighthouse_pages",
+                        sra.DEFAULT_LIGHTHOUSE_PAGES)),
+                    device=str(cfg.get(
+                        "lighthouse_device",
+                        sra.LIGHTHOUSE_DEVICE_MOBILE)),
+                    delay=float(cfg["delay"]),
+                    verbose=True,
+                    stop_event=self.stop_event)
                 judge = sra.run_judge(results, pages, judge_mode,
                                       verbose=True)
+                search = sra.run_search_check(
+                    str(cfg["url"]), results,
+                    str(cfg.get("search_check",
+                                sra.SEARCH_CHECK_AUTO)),
+                    verbose=True)
             buf.flush()
+            findings = sra.merge_lighthouse_findings(findings,
+                                                     lighthouse)
+            lighthouse_score = sra.lighthouse_area_score(lighthouse)
+            if lighthouse_score is not None:
+                scores[sra.AREA_LIGHTHOUSE] = lighthouse_score
+            lighthouse_block = sra.lighthouse_report_data(lighthouse)
         except sra.AuditCancelled:
             buf.flush()
             if self.user_id:
@@ -478,7 +512,9 @@ class Job:
                 try:
                     delta = compute_delta(
                         json.loads(str(previous["report_json"])),
-                        sra.history_payload(base, findings, scores),
+                        sra.history_payload(
+                            base, findings, scores,
+                            lighthouse=lighthouse_block),
                         float(str(previous["created_at"])))
                 except (ValueError, KeyError, TypeError):
                     delta = None  # referto vecchio illeggibile
@@ -486,11 +522,15 @@ class Job:
             "html": sra.render_html(base, pages, findings, scores,
                                     results, mode, k, competitive,
                                     market=market, judge=judge,
-                                    delta=delta),
+                                    delta=delta,
+                                    lighthouse=lighthouse_block,
+                                    search_check=search),
             "json": sra.render_json(base, pages, findings, scores,
                                     results, mode, k, competitive,
                                     market=market, judge=judge,
                                     delta=delta,
+                                    lighthouse=lighthouse_block,
+                                    search_check=search,
                                     rrf_params={
                                         "top_n": int(cfg.get(
                                             "top_n",
@@ -506,15 +546,21 @@ class Job:
             "text": sra.render_text(base, pages, findings, scores,
                                     results, mode, k, competitive,
                                     market=market, judge=judge,
-                                    delta=delta),
+                                    delta=delta,
+                                    lighthouse=lighthouse_block,
+                                    search_check=search),
             "md": sra.render_markdown(base, pages, findings,
                                       scores, results, mode, k,
                                       competitive, market=market,
-                                      judge=judge, delta=delta),
+                                      judge=judge, delta=delta,
+                                      lighthouse=lighthouse_block,
+                                      search_check=search),
             "csv": sra.render_csv(base, pages, findings, scores,
                                   results, mode, k, competitive,
                                   market=market, judge=judge,
-                                  delta=delta),
+                                  delta=delta,
+                                  lighthouse=lighthouse_block,
+                                  search_check=search),
         }
         severities = [f.severity for f in findings]
         clean, flagged, broken = sra.page_status_counts(pages,
@@ -540,6 +586,8 @@ class Job:
             "citability_actions": sra.citability_top_actions(
                 findings, pages, scores, market),
             "judge": judge,
+            "lighthouse": lighthouse_block,
+            "search_check": search,
             "delta": delta,
             "critical": severities.count(sra.SEV_CRITICAL),
             "warning": severities.count(sra.SEV_WARNING),
@@ -693,6 +741,37 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
                           "disponibile sul server: %s."
                           % judge_reason)
 
+    lighthouse = str(raw.get("lighthouse",
+                             sra.LIGHTHOUSE_OFF)).strip().lower()
+    if lighthouse not in sra.LIGHTHOUSE_MODES:
+        return None, "Valore non valido per 'lighthouse'."
+    if lighthouse == sra.LIGHTHOUSE_ALWAYS:
+        lighthouse_reason = sra.lighthouse_unavailable()
+        if lighthouse_reason:
+            return None, ("Audit Lighthouse obbligatorio ma non "
+                          "disponibile sul server: %s."
+                          % lighthouse_reason)
+    lighthouse_pages = number("lighthouse_pages",
+                              sra.DEFAULT_LIGHTHOUSE_PAGES,
+                              sra.LIGHTHOUSE_PAGES_MIN,
+                              sra.LIGHTHOUSE_PAGES_MAX)
+    lighthouse_device = str(raw.get(
+        "lighthouse_device",
+        sra.LIGHTHOUSE_DEVICE_MOBILE)).strip().lower()
+    if lighthouse_device not in sra.LIGHTHOUSE_DEVICES:
+        return None, "Valore non valido per 'lighthouse_device'."
+
+    search_check = str(raw.get(
+        "search_check", sra.SEARCH_CHECK_AUTO)).strip().lower()
+    if search_check not in sra.SEARCH_CHECK_MODES:
+        return None, "Valore non valido per 'search_check'."
+    if search_check == sra.SEARCH_CHECK_ON:
+        search_reason = sra.search_check_unavailable()
+        if search_reason:
+            return None, ("Ancora di realta' obbligatoria ma non "
+                          "disponibile sul server: %s."
+                          % search_reason)
+
     # Predefinito "own": la registrazione include la dichiarazione di
     # titolarita' dei siti auditati (condizioni di servizio).
     robots = str(raw.get("robots", sra.ROBOTS_OWN)).strip().lower()
@@ -706,7 +785,8 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
               ("delay", delay), ("max_body", max_body),
               ("retries", retries), ("workers", workers),
               ("top_n", top_n), ("chunk_words", chunk_words),
-              ("w_lex", w_lex), ("w_vec", w_vec))
+              ("w_lex", w_lex), ("w_vec", w_vec),
+              ("lighthouse_pages", lighthouse_pages))
     for name, value in checks:
         if value is None:
             return None, "Valore non valido per '%s'." % name
@@ -736,6 +816,10 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
         "robots": robots,
         "market": market,
         "judge": judge,
+        "lighthouse": lighthouse,
+        "lighthouse_pages": int(lighthouse_pages),
+        "lighthouse_device": lighthouse_device,
+        "search_check": search_check,
         "top_n": int(top_n),
         "chunk_words": int(chunk_words),
         "rrf_weights": (float(w_lex), float(w_vec)),
@@ -751,12 +835,13 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "SeoRrfGui/%s" % __version__
 
     def _send(self, status: int, body: bytes, ctype: str,
-              download: str = "", cookie: str = "") -> None:
+              download: str = "", cookie: str = "",
+              csp: str = "") -> None:
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", CSP)
+        self.send_header("Content-Security-Policy", csp or CSP)
         self.send_header("Cache-Control", "no-store")
         if cookie:
             self.send_header("Set-Cookie", cookie)
@@ -854,6 +939,8 @@ class Handler(BaseHTTPRequestHandler):
             ram = sra.available_ram_mb()
             suggested = (max(1, round(ram * 0.1))
                          if ram is not None else None)
+            lighthouse_reason = sra.lighthouse_unavailable()
+            search_reason = sra.search_check_unavailable()
             self._send_json(200, {
                 "tool_version": sra.__version__,
                 "gui_version": __version__,
@@ -867,6 +954,11 @@ class Handler(BaseHTTPRequestHandler):
                 "judge_available":
                     sra.judge_unavailable() is None,
                 "judge_reason": sra.judge_unavailable() or "",
+                "lighthouse_available": lighthouse_reason is None,
+                "lighthouse_reason": lighthouse_reason or "",
+                "lighthouse_version": sra.lighthouse_version() or "",
+                "search_check_available": search_reason is None,
+                "search_check_reason": search_reason or "",
                 "default_embeddings_model":
                     sra.DEFAULT_EMBEDDINGS_MODEL,
             })
@@ -1013,7 +1105,8 @@ class Handler(BaseHTTPRequestHandler):
                         else "referto-mars")
                 download = "%s.%s" % (nome, ext[fmt])
             self._send(200, report.encode("utf-8"), ctypes[fmt],
-                       download=download)
+                       download=download,
+                       csp=REPORT_CSP if fmt == "html" else "")
         elif path.startswith("/api/"):
             self._send_json(404, {"error": "endpoint sconosciuto"})
         else:

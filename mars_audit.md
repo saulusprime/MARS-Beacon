@@ -702,17 +702,27 @@ JavaScript con Playwright/Chrome), `--own-site` / `--ignore-robots accetto`
 voice), `--market occidentale|globale|orientale` (pesi dell'indice di
 citabilità composito), `--judge auto|on|off` (giudizio LLM sui passaggi
 migliori via API Anthropic; `auto`, il default, parte solo con
-ANTHROPIC_API_KEY presente), `--history FILE` (storico JSONL: delta nei
-referti e riga compatta accodata a ogni esecuzione), `--format
-text|json|html`, `--output`, `--quiet`, `--version`.
+ANTHROPIC_API_KEY presente), `--search-check auto|on|off` (ancora di
+realtà: posizione reale del sito sulle query dell'audit via Brave
+Search API, chiave solo da BRAVE_API_KEY; confronto direzionale col
+consenso RRF, nota di onestà inclusa), `--lighthouse off|auto|always` con
+`--lighthouse-pages N` e `--lighthouse-device mobile|desktop` (audit
+Lighthouse col fork installato da `tools/update-lighthouse.sh`;
+richiede Node ≥ 22.19 e Chrome — `auto` salta con motivo dichiarato
+se mancano, `always` li pretende), `--history FILE` (storico JSONL:
+delta nei referti e riga compatta accodata a ogni esecuzione),
+`--format text|json|html|md|csv`, `--lang it|en`, `--output`,
+`--quiet`, `--version`.
 
 Codici di uscita: `0` nessuna criticità, `1` almeno una criticità, `2` errore
 d'uso, `130` interruzione.
 
 ## Cosa misura
 
-Cinque aree con punteggio 0–100 e punteggio complessivo pesato (tecnica 1.0,
-lessicale 1.5, semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5):
+Cinque aree con punteggio 0–100 — più una sesta opzionale — e punteggio
+complessivo pesato (tecnica 1.0, lessicale 1.5, semantica 1.5, dati
+strutturati 1.0, simulazione RRF 1.5, Performance (Lighthouse) 1.0
+quando attiva; senza, i pesi si rinormalizzano):
 
 1. **Tecnica** — HTTPS, `robots.txt` e permessi per i crawler IA (GPTBot,
    OAI-SearchBot, ClaudeBot, PerplexityBot, Google-Extended, CCBot,
@@ -729,6 +739,14 @@ lessicale 1.5, semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5):
    esegue le query, fonde le liste con `score(d) = Σ 1/(k + rank_i(d))` e
    misura la **sovrapposizione fra le due liste** (il "consenso"), che è il
    segnale operativo vero.
+6. **Performance (Lighthouse)**, opzionale (`--lighthouse`) — home + N
+   pagine rappresentative nel fork di Google Lighthouse (un processo
+   Node per pagina, `--locale=it`, timeout per pagina, annullamento
+   cooperativo): i punteggi di categoria mediati formano l'area, gli
+   audit sotto soglia diventano rilievi MARS (gravità dai bucket
+   ufficiali 0,5/0,9, pilastri dalla mappatura di progetto) e i 15
+   audit che duplicano controlli MARS si fondono come **evidenza di
+   conferma** sul rilievo canonico, senza doppioni.
 
 ## Avvertenze di onestà incorporate nello script
 
@@ -740,6 +758,18 @@ lessicale 1.5, semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5):
   interna di un motore specifico: pesi, `k` e re-ranking li decide il motore.
   Il valore diagnostico sta nel confronto fra le due liste, non nel punteggio
   assoluto.
+- L'audit Lighthouse è una **dipendenza opzionale dichiarata**: senza
+  Node/Chrome o senza il fork installato l'audit resta interamente
+  offline e il referto dichiara il salto con il motivo (`auto`), o
+  l'avvio fallisce con errore d'uso (`always`). I rilievi Lighthouse
+  riportano i giudizi del fork (titoli e correzioni dal LHR, già
+  localizzati), non una rivalutazione dello script; le metriche di
+  laboratorio mostrate in GUI sono dati *lab* (ambiente simulato),
+  non dati *field* (CrUX), e l'INP reale non è misurabile in lab: il
+  TBT è il suo proxy — la nota accompagna sempre il pannello. Il
+  fork è pinnato a una release upstream con un'unica patch
+  (telemetria Sentry disattivata): strategia e procedura di sync in
+  [docs/LIGHTHOUSE-FORK.md](docs/LIGHTHOUSE-FORK.md).
 
 ## Verifiche eseguite prima della consegna
 
@@ -776,6 +806,11 @@ lessicale 1.5, semantica 1.5, dati strutturati 1.0, simulazione RRF 1.5):
   https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion
 - OpenSearch — Introducing RRF for hybrid search:
   https://opensearch.org/blog/introducing-reciprocal-rank-fusion-hybrid-search/
+- Google Lighthouse (upstream del fork integrato):
+  https://github.com/GoogleChrome/lighthouse — fork MARS:
+  https://github.com/saulusprime/lighthouse
+- web.dev — soglie Core Web Vitals (LCP, CLS; TBT/FCP/Speed Index da
+  Lighthouse): https://web.dev/articles/vitals
 - Robertson & Zaragoza — *The Probabilistic Relevance Framework: BM25 and
   Beyond*, 2009.
 - Schema.org: https://schema.org/

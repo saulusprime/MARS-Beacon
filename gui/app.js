@@ -12,6 +12,7 @@
     "Semantica (vettoriale)",
     "Dati strutturati",
     "Simulazione RRF",
+    "Performance (Lighthouse)",
   ];
 
   const SEVERITIES = {
@@ -58,6 +59,8 @@
   const PRESET_FIELDS = [
     "f-url", "f-max-pages", "f-delay", "f-max-body", "f-retries",
     "f-workers", "f-render", "f-market", "f-judge",
+    "f-search-check",
+    "f-lighthouse", "f-lighthouse-device", "f-lighthouse-pages",
     "f-competitors", "f-robots", "f-robots-ack", "f-queries",
     "f-embeddings", "f-rrf-k", "f-top-n", "f-chunk-words",
     "f-w-lex", "f-w-vec",
@@ -74,6 +77,7 @@
     ["f-chunk-words", "e-chunk-words"],
     ["f-w-lex", "e-w-lex"],
     ["f-w-vec", "e-w-vec"],
+    ["f-lighthouse-pages", "e-lighthouse-pages"],
   ];
 
   const el = (id) => document.getElementById(id);
@@ -456,16 +460,19 @@
 
     const scores = el("cmp-scores");
     scores.textContent = "";
-    Object.entries(delta.scores || {}).forEach(
-      ([area, value], index) => {
-        if (index) {
-          scores.appendChild(document.createTextNode(" · "));
-        }
-        const label = document.createElement("strong");
-        label.textContent = area + ": ";
-        scores.appendChild(label);
-        scores.appendChild(deltaNode(value));
-      });
+    const voci = Object.entries(delta.scores || {});
+    (delta.lighthouse || []).forEach((c) => {
+      voci.push(["Lighthouse " + c.title, c.delta]);
+    });
+    voci.forEach(([area, value], index) => {
+      if (index) {
+        scores.appendChild(document.createTextNode(" · "));
+      }
+      const label = document.createElement("strong");
+      label.textContent = area + ": ";
+      scores.appendChild(label);
+      scores.appendChild(deltaNode(value));
+    });
 
     const fill = (listId, titleId, items, titolo, vuoto) => {
       const list = el(listId);
@@ -988,6 +995,23 @@
             "Non disponibile sul server: " + env.judge_reason +
             ". In auto il giudizio viene semplicemente saltato.";
         }
+        if (env.search_check_available === false) {
+          el("h-search-check").textContent =
+            "Non disponibile sul server: " +
+            env.search_check_reason + ". In auto l'ancora di " +
+            "realtà viene semplicemente saltata.";
+        }
+        if (env.lighthouse_available === false) {
+          el("h-lighthouse").textContent =
+            "Non disponibile sul server: " +
+            env.lighthouse_reason + ". In auto l'audit " +
+            "Lighthouse viene semplicemente saltato.";
+        } else if (env.lighthouse_version) {
+          el("h-lighthouse").textContent =
+            "Fork installato: " + env.lighthouse_version +
+            ". Performance, accessibilità, SEO e best practice " +
+            "nelle sezioni MARS.";
+        }
         if (!env.embeddings_available) {
           el("h-embeddings").textContent =
             "Libreria sentence-transformers non installata: il " +
@@ -1097,6 +1121,10 @@
       render: el("f-render").value,
       market: el("f-market").value,
       judge: el("f-judge").value,
+      lighthouse: el("f-lighthouse").value,
+      lighthouse_device: el("f-lighthouse-device").value,
+      lighthouse_pages: el("f-lighthouse-pages").valueAsNumber,
+      search_check: el("f-search-check").value,
       rrf_k: el("f-rrf-k").valueAsNumber,
       top_n: el("f-top-n").valueAsNumber,
       chunk_words: el("f-chunk-words").valueAsNumber,
@@ -1230,10 +1258,15 @@
     box.scrollTop = box.scrollHeight;
 
     for (let i = lines.length - 1; i >= 0; i -= 1) {
-      if (/^\[\d+\/\d+\]/.test(lines[i])) {
-        if (lines[i] !== lastPhase) {
-          lastPhase = lines[i];
-          el("announcer").textContent = "Fase " + lines[i];
+      const riga = lines[i];
+      /* Fasi numerate dell'audit piu' le righe di testa di
+         Lighthouse (avvio, salto dichiarato, esito): quelle
+         per pagina sono indentate e non vengono annunciate. */
+      if (/^(\[\d+\/\d+\]|Lighthouse: )/.test(riga)) {
+        if (riga !== lastPhase) {
+          lastPhase = riga;
+          el("announcer").textContent =
+            riga.charAt(0) === "[" ? "Fase " + riga : riga;
         }
         break;
       }
@@ -1280,6 +1313,7 @@
     renderHero(snap.summary);
     renderDelta((snap.summary || {}).delta);
     renderScores(snap.summary);
+    renderLighthouseSummary(snap.summary);
     renderTopRilievi(snap.remediation || []);
     renderCitability(snap.summary || {});
     renderJudge((snap.summary || {}).judge,
@@ -1291,6 +1325,7 @@
     renderLinkGraph((snap.summary || {}).link_graph);
     renderRemediation(snap.remediation || []);
     renderRrf(snap.rrf || []);
+    renderSearchCheck(snap.summary);
     renderCompetitive(snap.competitive);
 
     setResultsHidden(false);
@@ -1563,16 +1598,19 @@
 
     const scores = el("delta-scores");
     scores.textContent = "";
-    Object.entries(delta.scores || {}).forEach(
-      ([area, value], index) => {
-        if (index) {
-          scores.appendChild(document.createTextNode(" · "));
-        }
-        const label = document.createElement("strong");
-        label.textContent = area + ": ";
-        scores.appendChild(label);
-        scores.appendChild(deltaNode(value));
-      });
+    const voci = Object.entries(delta.scores || {});
+    (delta.lighthouse || []).forEach((c) => {
+      voci.push(["Lighthouse " + c.title, c.delta]);
+    });
+    voci.forEach(([area, value], index) => {
+      if (index) {
+        scores.appendChild(document.createTextNode(" · "));
+      }
+      const label = document.createElement("strong");
+      label.textContent = area + ": ";
+      scores.appendChild(label);
+      scores.appendChild(deltaNode(value));
+    });
 
     const fill = (listId, titleId, items, titolo, vuoto) => {
       const list = el(listId);
@@ -1607,11 +1645,17 @@
   function renderScores(summary) {
     const wrap = el("scores");
     wrap.textContent = "";
-    const rows = AREAS.map((area) => [area, summary.scores[area]]);
-    rows.push(["Punteggio complessivo", summary.overall]);
+    /* Le aree assenti dai punteggi (es. Lighthouse spento) non
+       generano righe: "n/d" resta per le aree analizzate senza
+       punteggio. */
+    const rows = AREAS
+      .map((area, areaIndex) =>
+        [area, summary.scores[area], areaIndex])
+      .filter((riga) => riga[1] !== undefined);
+    rows.push(["Punteggio complessivo", summary.overall, -1]);
 
-    rows.forEach(([label, value], index) => {
-      const isArea = index < AREAS.length;
+    rows.forEach(([label, value, areaIndex], index) => {
+      const isArea = areaIndex >= 0;
       const row = document.createElement("div");
       row.className = "score-row" +
         (index === rows.length - 1 ? " score-overall" : "");
@@ -1624,7 +1668,7 @@
         name.classList.add("score-link");
         name.setAttribute("aria-label",
           label + ": apri i rilievi di quest'area");
-        name.addEventListener("click", () => openArea(index));
+        name.addEventListener("click", () => openArea(areaIndex));
       }
       row.appendChild(name);
 
@@ -1648,6 +1692,86 @@
 
       wrap.appendChild(row);
     });
+  }
+
+  /* Sintesi Lighthouse: categorie accanto ai punteggi di area e
+     pannello Core Web Vitals con soglie — sempre testo + simbolo,
+     mai solo colore; la nota dichiara che sono dati di
+     laboratorio, non dati reali degli utenti. */
+  function renderLighthouseSummary(summary) {
+    const box = el("lighthouse-summary");
+    box.textContent = "";
+    const lh = summary.lighthouse;
+    if (!lh) { return; }
+
+    const head = document.createElement("h4");
+    head.className = "h6";
+    head.textContent = "Audit Lighthouse";
+    box.appendChild(head);
+
+    if (lh.status !== "ok") {
+      const skip = document.createElement("p");
+      skip.className = "small text-muted mb-0";
+      skip.textContent = "Non eseguito: " + (lh.reason || "");
+      box.appendChild(skip);
+      return;
+    }
+
+    const meta = document.createElement("p");
+    meta.className = "small text-muted mb-2";
+    meta.textContent = "Eseguito su " +
+      (lh.pages || []).length + " pagina/e (" + lh.device + ")" +
+      (lh.fork ? ", fork " + lh.fork : "") + ".";
+    box.appendChild(meta);
+
+    const cats = document.createElement("ul");
+    cats.className = "lh-cats";
+    (lh.categories || []).forEach((c) => {
+      const tono = c.score >= 90 ? "good"
+        : (c.score >= 50 ? "mid" : "bad");
+      const mark = c.score >= 90 ? "✓"
+        : (c.score >= 50 ? "!" : "✕");
+      const li = document.createElement("li");
+      li.className = "lh-cat lh-" + tono;
+      li.textContent = mark + " " + c.title + " " +
+        c.score + "/100";
+      cats.appendChild(li);
+    });
+    box.appendChild(cats);
+
+    if ((lh.metrics || []).length) {
+      const panel = document.createElement("div");
+      panel.className = "cwv-panel";
+      lh.metrics.forEach((m) => {
+        const tono = m.verdict === "buono" ? "good"
+          : (m.verdict === "scarso" ? "bad" : "mid");
+        const mark = m.verdict === "buono" ? "✓"
+          : (m.verdict === "scarso" ? "✕" : "!");
+        const tile = document.createElement("div");
+        tile.className = "cwv-tile cwv-" + tono;
+        const label = document.createElement("span");
+        label.className = "cwv-label";
+        label.textContent = m.label;
+        tile.appendChild(label);
+        const value = document.createElement("b");
+        value.textContent = m.display || String(m.value);
+        tile.appendChild(value);
+        const verdict = document.createElement("span");
+        verdict.className = "cwv-verdict";
+        verdict.textContent = mark + " " + m.verdict;
+        tile.appendChild(verdict);
+        panel.appendChild(tile);
+      });
+      box.appendChild(panel);
+
+      const nota = document.createElement("p");
+      nota.className = "small text-muted mb-0";
+      nota.textContent = "Valore peggiore fra le pagine " +
+        "esaminate. Dati di laboratorio (ambiente simulato), " +
+        "non dati reali degli utenti (CrUX); l'INP reale non è " +
+        "misurabile in laboratorio: il TBT è il suo proxy.";
+      box.appendChild(nota);
+    }
   }
 
   function renderCitability(summary) {
@@ -1851,6 +1975,20 @@
       nuovo.className = "badge badge-new ms-2";
       nuovo.textContent = "NUOVO";
       head.appendChild(nuovo);
+    }
+    /* Origine dichiarata: i rilievi del fork Lighthouse portano il
+       badge; i rilievi MARS confermati dalla deduplica (params
+       lh_confirm) portano la conferma incrociata. */
+    if ((finding.key || "").indexOf("lh.") === 0) {
+      const origine = document.createElement("span");
+      origine.className = "badge badge-lh ms-2";
+      origine.textContent = "Lighthouse";
+      head.appendChild(origine);
+    } else if ((finding.params || {}).lh_confirm) {
+      const conferma = document.createElement("span");
+      conferma.className = "badge badge-lh ms-2";
+      conferma.textContent = "confermato da Lighthouse";
+      head.appendChild(conferma);
     }
     box.appendChild(head);
 
@@ -2485,6 +2623,57 @@
       row.appendChild(top);
 
       tbody.appendChild(row);
+    });
+  }
+
+  /* Ancora di realta' (Brave Search): posizione reale del sito
+     sulle query dell'audit, accanto al consenso RRF simulato.
+     Con salto dichiarato mostra il motivo; senza dati (spenta)
+     il blocco resta nascosto. */
+  function renderSearchCheck(summary) {
+    const block = el("search-check-block");
+    const sc = (summary || {}).search_check;
+    if (!sc) {
+      block.hidden = true;
+      return;
+    }
+    block.hidden = false;
+    const intro = el("search-check-intro");
+    const tbody = el("search-check-table").querySelector("tbody");
+    tbody.textContent = "";
+    el("search-check-note").textContent = sc.note || "";
+    if (sc.status !== "ok") {
+      intro.textContent = "Non eseguita: " + (sc.reason || "");
+      return;
+    }
+    const interrogate = sc.queries || [];
+    intro.textContent = "Sito trovato per " + (sc.found || 0) +
+      " query su " + interrogate.length + ": posizione reale nei " +
+      "primi " + sc.top_n + " risultati, accanto al consenso " +
+      "della simulazione RRF.";
+    interrogate.forEach((q) => {
+      const tr = document.createElement("tr");
+      const th = document.createElement("th");
+      th.scope = "row";
+      th.className = "fw-normal";
+      th.textContent = q.query;
+      tr.appendChild(th);
+      const pos = document.createElement("td");
+      if (q.error) {
+        pos.textContent = "errore: " + q.error;
+      } else if (q.position) {
+        const forte = document.createElement("b");
+        forte.textContent = "#" + q.position;
+        pos.appendChild(forte);
+      } else {
+        pos.textContent = "assente dai primi " + sc.top_n;
+      }
+      tr.appendChild(pos);
+      const rrf = document.createElement("td");
+      rrf.textContent = String(q.rrf_consensus) +
+        (q.rrf_covered ? "" : " (query non coperta)");
+      tr.appendChild(rrf);
+      tbody.appendChild(tr);
     });
   }
 })();

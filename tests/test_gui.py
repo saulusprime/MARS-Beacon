@@ -13,6 +13,23 @@ import pytest
 import mars_gui as gui
 
 
+def _patch(monkeypatch, name, value):
+    """Monkeypatch sulla facciata e su ogni modulo marsbeacon che
+    espone il nome: dopo la scomposizione (v1.58.0) conta il
+    namespace del consumatore, non solo quello pubblico."""
+    import mars_audit
+    import marsbeacon.audits
+    import marsbeacon.base
+    import marsbeacon.crawler
+    import marsbeacon.indexes
+    import marsbeacon.render
+    for modulo in (mars_audit, marsbeacon.base, marsbeacon.crawler,
+                   marsbeacon.indexes, marsbeacon.audits,
+                   marsbeacon.render):
+        if name in vars(modulo):
+            monkeypatch.setattr(modulo, name, value)
+
+
 @pytest.fixture(scope="module")
 def gui_base():
     server = ThreadingHTTPServer(("127.0.0.1", 0), gui.Handler)
@@ -105,6 +122,13 @@ def test_env(gui_base):
     assert env["default_max_body_mb"] == 10
     assert "embeddings_available" in env
     assert env["default_embeddings_model"]
+    assert isinstance(env["lighthouse_available"], bool)
+    assert isinstance(env["lighthouse_reason"], str)
+    if env["lighthouse_available"]:
+        assert env["lighthouse_reason"] == ""
+    else:
+        assert env["lighthouse_reason"]
+    assert "lighthouse_version" in env
 
 
 # ---------------- validazione della configurazione ----------------
@@ -554,9 +578,14 @@ def test_ciclo_completo_referti_e_gating_profilo(gui_base, site):
         "azienda": "Centro Esempio", "telefono": "0521 123456"},
         cookie=cookie)
     assert status == 200
-    status, body, _ = _api(gui_base, "/api/report/html",
-                           cookie=cookie)
+    status, body, headers = _api(gui_base, "/api/report/html",
+                                 cookie=cookie)
     assert status == 200 and body.startswith(b"<!DOCTYPE html>")
+    # Il referto HTML porta JavaScript inline (treemap e grafo
+    # interattivi): solo per questa risposta la CSP lo ammette.
+    assert "script-src 'unsafe-inline'" \
+        in headers.get("Content-Security-Policy", "")
+    assert b"<script>" in body
     status, body, _ = _api(gui_base, "/api/report/json",
                            cookie=cookie)
     assert status == 200 and json.loads(body)["scores"]
@@ -564,6 +593,8 @@ def test_ciclo_completo_referti_e_gating_profilo(gui_base, site):
         gui_base, "/api/report/text?download=1", cookie=cookie)
     assert status == 200 and b"MARS BEACON" in body
     assert "attachment" in headers.get("Content-Disposition", "")
+    assert "script-src" not in headers.get(
+        "Content-Security-Policy", "")
 
 
 def test_limite_orario(gui_base, site):
@@ -776,3 +807,152 @@ def test_aggiunta_evento_via_api(gui_base, tmp_path, monkeypatch):
     data = json.loads(body)
     assert data["events"][0]["label"] == "Pubblicate le FAQ"
     assert data["events"][0]["site"] == "mio.it"
+
+
+# ---------------- Lighthouse nella GUI (v2.24.0) ------------------
+
+def test_validazione_lighthouse(gui_base, monkeypatch):
+    cookie = _register(gui_base, email="lhval@esempio.it")
+    status, body, _ = _api(gui_base, "/api/audit",
+                           {"url": "https://x.it",
+                            "lighthouse": "forse"}, cookie=cookie)
+    assert status == 400 and b"lighthouse" in body
+    status, body, _ = _api(gui_base, "/api/audit",
+                           {"url": "https://x.it",
+                            "lighthouse_pages": 99}, cookie=cookie)
+    assert status == 400 and b"lighthouse_pages" in body
+    status, body, _ = _api(gui_base, "/api/audit",
+                           {"url": "https://x.it",
+                            "lighthouse_device": "tablet"},
+                           cookie=cookie)
+    assert status == 400 and b"lighthouse_device" in body
+    _patch(monkeypatch, "lighthouse_unavailable",
+                        lambda: "Node assente (finto)")
+    status, body, _ = _api(gui_base, "/api/audit",
+                           {"url": "https://x.it",
+                            "lighthouse": "always"}, cookie=cookie)
+    assert status == 400 and b"finto" in body
+
+
+def test_lighthouse_nei_risultati_gui(gui_base, site, monkeypatch):
+    import mars_audit as sra
+
+    def lighthouse_finto(base, pages, mode="off", n_pages=3,
+                         device="mobile", delay=0.5,
+                         verbose=False, stop_event=None,
+                         timeout_s=120):
+        rilievo = sra.Finding(
+            sra.AREA_LIGHTHOUSE, sra.SEV_WARNING,
+            "Lighthouse: rilievo finto",
+            pillar=sra.PILLAR_SEC,
+            key="lh.best-practices.finto",
+            params={"audit": "finto", "score": 0.3})
+        return {"status": "ok", "mode": mode, "device": device,
+                "results": [{"url": base, "lhr": {
+                    "categories": {"performance": {
+                        "title": "Prestazioni", "score": 0.8}},
+                    "audits": {"largest-contentful-paint": {
+                        "numericValue": 2000.0,
+                        "displayValue": "2,0 s"}}}}],
+                "errors": [], "findings": [rilievo]}
+
+    _patch(monkeypatch, "run_lighthouse", lighthouse_finto)
+    cookie = _register(gui_base, email="lhgui@esempio.it",
+                       completo=True)
+    status, _, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 2, "delay": 0.0,
+        "queries": "drenaggio linfatico",
+        "lighthouse": "auto"}, cookie=cookie)
+    assert status == 202
+    snap = _attendi_stato(gui_base, cookie, ("done", "error"))
+    assert snap["state"] == "done"
+    # Il rilievo Lighthouse arriva col suo pillar per lo
+    # smistamento nelle fisarmoniche (badge via chiave lh.*).
+    lh = [f for f in snap["findings"]
+          if str(f.get("key", "")).startswith("lh.")]
+    assert lh and lh[0]["pillar"] == sra.PILLAR_SEC
+    assert lh[0]["area"] == sra.AREA_LIGHTHOUSE
+    # Sesta area nei punteggi e blocco lighthouse in sintesi.
+    assert snap["summary"]["scores"][sra.AREA_LIGHTHOUSE] == 80.0
+    assert snap["summary"]["lighthouse"]["status"] == "ok"
+    assert snap["summary"]["lighthouse"]["device"] == "mobile"
+    # Pannello CWV in sintesi: metrica col verdetto dalle soglie.
+    metrica = snap["summary"]["lighthouse"]["metrics"][0]
+    assert metrica["label"] == "LCP"
+    assert metrica["verdict"] == "buono"
+    assert metrica["display"] == "2,0 s"
+
+
+def test_db_path_da_ambiente(tmp_path):
+    """MARS_GUI_DB sposta il database (deploy systemd: /opt in
+    sola lettura, DB nella StateDirectory)."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    destinazione = tmp_path / "altrove.db"
+    esito = subprocess.run(
+        [sys.executable, "-c",
+         "import mars_gui; print(mars_gui.DB_PATH)"],
+        env={**os.environ, "MARS_GUI_DB": str(destinazione)},
+        capture_output=True, text=True,
+        cwd=str(Path(gui.__file__).resolve().parent))
+    assert esito.returncode == 0, esito.stderr
+    assert esito.stdout.strip() == str(destinazione)
+
+
+# ------------- ancora di realta' nella GUI (v2.29.0) --------------
+
+def test_validazione_search_check(gui_base):
+    cookie = _register(gui_base, email="scval@esempio.it")
+    status, body, _ = _api(gui_base, "/api/audit",
+                           {"url": "https://x.it",
+                            "search_check": "forse"},
+                           cookie=cookie)
+    assert status == 400 and b"search_check" in body
+    # 'on' senza chiave (il conftest la rimuove): motivo dichiarato.
+    status, body, _ = _api(gui_base, "/api/audit",
+                           {"url": "https://x.it",
+                            "search_check": "on"}, cookie=cookie)
+    assert status == 400 and b"BRAVE_API_KEY" in body
+
+
+def test_search_check_nei_risultati_gui(gui_base, site,
+                                        monkeypatch):
+    import mars_audit as sra
+
+    def ancora_finta(base, results, mode="auto", verbose=False):
+        return {"status": "ok", "engine": "brave", "site": "x",
+                "top_n": 20, "found": 1,
+                "note": sra.SEARCH_CHECK_NOTE,
+                "queries": [{"query": "drenaggio",
+                             "rrf_covered": True,
+                             "rrf_consensus": 3,
+                             "position": 4, "url": "u"}]}
+
+    _patch(monkeypatch, "run_search_check", ancora_finta)
+    cookie = _register(gui_base, email="scgui@esempio.it",
+                       completo=True)
+    status, _, _ = _api(gui_base, "/api/audit", {
+        "url": site, "max_pages": 2, "delay": 0.0,
+        "queries": "drenaggio linfatico"}, cookie=cookie)
+    assert status == 202
+    snap = _attendi_stato(gui_base, cookie, ("done", "error"))
+    assert snap["state"] == "done"
+    blocco = snap["summary"]["search_check"]
+    assert blocco["status"] == "ok" and blocco["found"] == 1
+    assert blocco["queries"][0]["position"] == 4
+    # La sezione arriva anche nei referti scaricabili.
+    status, body, _ = _api(gui_base, "/api/report/text",
+                           cookie=cookie)
+    assert status == 200 and b"ANCORA DI REALTA'" in body
+
+
+def test_env_search_check(gui_base):
+    _, body, _ = _api(gui_base, "/api/env")
+    env = json.loads(body)
+    assert isinstance(env["search_check_available"], bool)
+    if env["search_check_available"]:
+        assert env["search_check_reason"] == ""
+    else:
+        assert "BRAVE_API_KEY" in env["search_check_reason"]

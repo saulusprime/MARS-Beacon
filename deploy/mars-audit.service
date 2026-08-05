@@ -6,6 +6,21 @@
 #   - facoltativo /etc/seorrf/citations.env con ANTHROPIC_API_KEY:
 #     se presente, il giudizio LLM (--judge auto) parte da solo;
 #     senza chiave l'audit resta interamente offline
+#   - facoltativo, per l'audit Lighthouse (--lighthouse auto, gia'
+#     nell'ExecStart: senza requisiti viene saltato con motivo
+#     dichiarato nel referto):
+#       * Node >= 22.19 installato A LIVELLO DI SISTEMA (apt/
+#         NodeSource, in /usr/bin o /usr/local/bin): il PATH di
+#         systemd non vede le installazioni per-utente (nvm), e
+#         ProtectHome=yes blocca comunque /home. Per un percorso
+#         diverso decommenta Environment=PATH qui sotto.
+#       * Chrome/Chromium di sistema (google-chrome o chromium).
+#       * fork Lighthouse installato: da /opt/seorrf esegui
+#         tools/update-lighthouse.sh (crea /opt/seorrf/lighthouse,
+#         che resta in sola lettura: in esecuzione si legge solo).
+#       * sandbox di Chrome: con NoNewPrivileges=yes Chrome usa gli
+#         user namespace non privilegiati — su Debian vanno
+#         abilitati (sysctl kernel.unprivileged_userns_clone=1).
 #
 # Lo storico si accumula in /var/lib/seorrf/audit.jsonl: a ogni
 # esecuzione il referto riporta il delta rispetto alla precedente
@@ -33,6 +48,7 @@ StateDirectory=seorrf
 ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/mars_audit.py \
     https://SITO-DEL-CLIENTE.it \
     --own-site \
+    --lighthouse auto \
     --history /var/lib/seorrf/audit.jsonl \
     --format html --output /var/lib/seorrf/referto-audit.html \
     --fail-under 40 --quiet
@@ -43,6 +59,19 @@ ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
 ReadOnlyPaths=/opt/seorrf
+
+# HOME scrivibile per Chrome headless (profilo e cache vanno in
+# /tmp privato e nella StateDirectory: l'utente dinamico non ha
+# una home reale).
+Environment=HOME=%S/seorrf
+# Node fuori dal PATH standard di systemd? Decommenta e adegua.
+#Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+# Nota di hardening (revisione 2026-08-05, integrazione Lighthouse):
+# NON aggiungere MemoryDenyWriteExecute (il JIT di Node/V8 e Chrome
+# smetterebbero di funzionare) ne' RestrictNamespaces (la sandbox di
+# Chrome richiede user/pid/net namespace; l'alternativa --no-sandbox
+# sarebbe un hardening peggiore, non migliore).
 
 # Con gli embedding reali (sentence-transformers) il modello viene
 # scaricato alla prima esecuzione: serve una cache scrivibile.

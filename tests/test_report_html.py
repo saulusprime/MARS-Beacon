@@ -4,6 +4,23 @@
 import mars_audit as sra
 
 
+def _patch(monkeypatch, name, value):
+    """Monkeypatch sulla facciata e su ogni modulo marsbeacon che
+    espone il nome: dopo la scomposizione (v1.58.0) conta il
+    namespace del consumatore, non solo quello pubblico."""
+    import mars_audit
+    import marsbeacon.audits
+    import marsbeacon.base
+    import marsbeacon.crawler
+    import marsbeacon.indexes
+    import marsbeacon.render
+    for modulo in (mars_audit, marsbeacon.base, marsbeacon.crawler,
+                   marsbeacon.indexes, marsbeacon.audits,
+                   marsbeacon.render):
+        if name in vars(modulo):
+            monkeypatch.setattr(modulo, name, value)
+
+
 def _findings():
     return [
         sra.Finding(sra.AREA_TECH, sra.SEV_CRITICAL,
@@ -83,3 +100,85 @@ def test_cli_lang_scelte():
     parser = sra.build_parser()
     assert parser.parse_args(["x.it"]).lang == "it"
     assert parser.parse_args(["x.it", "--lang", "en"]).lang == "en"
+
+
+# ------------- treemap e interattivita' (v1.53.0) -----------------
+
+def test_squarify_riempie_l_area():
+    rects = sra._squarify([6.0, 3.0, 1.0], 0, 0, 100, 50)
+    assert len(rects) == 3
+    area = sum(w * h for _x, _y, w, h in rects)
+    assert abs(area - 5000) < 0.01
+    for x, y, w, h in rects:
+        assert x >= -0.01 and y >= -0.01
+        assert x + w <= 100.01 and y + h <= 50.01
+    x, y, w, h = rects[0]  # proporzionalita': 6/10 dell'area
+    assert abs(w * h - 3000) < 0.01
+    assert sra._squarify([], 0, 0, 10, 10) == []
+
+
+def test_treemap_data_gravita_e_soglie():
+    pages = [
+        sra.Page(url="https://x.it/", status=200, word_count=600),
+        sra.Page(url="https://x.it/a", status=200, word_count=300),
+        sra.Page(url="https://x.it/b", status=200, word_count=100),
+    ]
+    findings = [
+        sra.Finding(sra.AREA_LEX, sra.SEV_CRITICAL, "t",
+                    url="https://x.it/a"),
+        sra.Finding(sra.AREA_LEX, sra.SEV_WARNING, "t2",
+                    url="https://x.it/b"),
+        sra.Finding(sra.AREA_TECH, sra.SEV_CRITICAL, "di sito"),
+    ]
+    tmap = sra.treemap_data(pages, findings)
+    per_url = {i["url"]: i for i in tmap["items"]}
+    assert per_url["https://x.it/"]["severity"] == "ok"
+    assert per_url["https://x.it/a"]["severity"] == "critical"
+    assert per_url["https://x.it/b"]["severity"] == "warning"
+    assert tmap["shown"] == 3 and tmap["total"] == 3
+    # con una sola pagina il widget non esiste
+    assert sra.treemap_data([pages[0]], []) is None
+
+
+def test_referto_con_treemap_grafo_e_script():
+    home = sra.Page(url="https://x.it/", status=200,
+                    word_count=500)
+    a = sra.Page(url="https://x.it/a", status=200, word_count=300)
+    b = sra.Page(url="https://x.it/b", status=200, word_count=200)
+    home.internal_targets = [sra.norm_url("https://x.it/a"),
+                             sra.norm_url("https://x.it/b")]
+    a.internal_targets = [sra.norm_url("https://x.it/b")]
+    out = sra.render_html("https://x.it/", [home, a, b], [], {},
+                          [], "char-tfidf")
+    # treemap: svg, rettangoli focusabili, tabella di fallback
+    assert "tm-svg" in out and "tm-rect" in out
+    assert "tabindex=\"0\"" in out
+    assert "<details>" in out
+    # grafo: id, attributi data-* e controlli zoom
+    assert "lg-svg" in out and "data-s=" in out
+    assert "class=\"lg-node\"" in out and "data-i=" in out
+    assert "id=\"lg-zin\"" in out
+    # script inline autonomo in coda, prima di </body>
+    assert "<script>" in out and "querySelectorAll" in out
+    assert out.rstrip().endswith("</html>")
+
+
+# ------------- brand incorporato nel referto (v1.57.0) ------------
+
+def test_brand_incorporato_e_fallback(monkeypatch):
+    out = sra.render_html("https://x.it/", [], [], {}, [],
+                          "char-tfidf")
+    # Font e logo incorporati quando gli asset del repo ci sono.
+    assert "@font-face" in out
+    assert out.count("data:font/woff2;base64,") == 2
+    assert "<svg class=\"logo-mark\"" in out
+    assert "Lympha Technologies S.r.l." in out
+    # Script distribuito da solo (asset assenti): fallback pulito,
+    # firma testuale e font di sistema, mai un incorporo parziale.
+    _patch(monkeypatch, "BRAND_DIR", "/non/esiste")
+    _patch(monkeypatch, "FONTS_DIR", "/non/esiste")
+    solo = sra.render_html("https://x.it/", [], [], {}, [],
+                           "char-tfidf")
+    assert "@font-face" not in solo
+    assert "<svg class=\"logo-mark\"" not in solo
+    assert "Lympha Technologies S.r.l." in solo

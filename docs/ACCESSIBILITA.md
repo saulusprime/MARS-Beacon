@@ -53,7 +53,13 @@ contratto delle **cinque sezioni risultati** (sintesi + quattro
 tipologie MARS): visibilità, `aria-expanded`/`aria-controls` dei
 toggle, apertura della sola sintesi a fine audit, click su un
 punteggio d'area che espande la sezione di pertinenza e porta il
-focus sulla fisarmonica giusta. 27 controlli in tutto.
+focus sulla fisarmonica giusta. Dal 2026-08-05 lo script verifica
+anche le **viste Lighthouse** (GUI v2.24.0–v2.27.0): etichette dei
+tre campi del form, chip di categoria e pannello Core Web Vitals
+con verdetti testo + simbolo e nota "laboratorio", badge di
+origine e di conferma sui rilievi — popolate da uno **stub di
+`run_lighthouse`** (la verifica resta indipendente dalla macchina:
+niente Node né fork richiesti). 31 controlli in tutto.
 
 ```bash
 <venv>/bin/python tools/verifica_at.py   # richiede Chrome e playwright
@@ -64,12 +70,18 @@ focus sulla fisarmonica giusta. 27 controlli in tutto.
 comprensibile. Va rieseguita a ogni modifica di flusso, prima
 della sessione umana.
 
-Ultimo esito: **27/27 controlli superati** (2026-08-05, Chrome di
-sistema via Playwright su macOS, GUI v2.19.0 / audit v1.43.0):
-riesecuzione dopo la separazione dei risultati in cinque sezioni,
-con i quattro controlli nuovi dedicati. Lo script ora individua il
-Chrome di sistema per piattaforma (macOS/Linux/Windows), con
-ripiego sul Chromium di Playwright.
+Ultimo esito: **31/31 controlli superati** (2026-08-05, Chrome di
+sistema via Playwright su Linux, GUI v2.27.0 / audit v1.55.0):
+riesecuzione dopo l'integrazione Lighthouse, con i quattro
+controlli nuovi sulle sue viste. I contrasti dei colori introdotti
+(badge `.badge-lh`, chip `.lh-*`, pannello `.cwv-*`) sono stati
+verificati a calcolo: tutti fra 6,48:1 e 10,24:1, sopra la soglia
+AA di 4,5:1.
+
+Esito precedente: 27/27 (2026-08-05, macOS, GUI v2.19.0 / audit
+v1.43.0), dopo la separazione dei risultati in cinque sezioni. Lo
+script individua il Chrome di sistema per piattaforma
+(macOS/Linux/Windows), con ripiego sul Chromium di Playwright.
 
 Esito precedente: 23/23 (2026-08-04, GUI v2.16.0 / audit v1.37.0).
 Nessuna anomalia del contratto ARIA; tre falsi allarmi iniziali
@@ -107,7 +119,10 @@ NVDA — `↓` per scorrere, `H` per i titoli, `B` per i pulsanti,
 3. **Configurazione** — le sezioni collassabili annunciano
    espanso/compresso (`aria-expanded` dei bottoni accordion); i
    suggerimenti sotto i campi sono letti insieme al campo
-   (`aria-describedby`).
+   (`aria-describedby`); i tre campi del gruppo Lighthouse
+   (attivazione, dispositivo, pagine) annunciano etichetta e
+   suggerimento — che dichiara il motivo quando i requisiti
+   mancano sul server ("Non disponibile sul server: …").
 4. **Avvio e avanzamento** — premuto "Avvia audit", il focus va
    sull'intestazione "Avanzamento"; le fasi ("Fase [1/5]...") sono
    annunciate dalla regione `role="status"` senza rubare il focus;
@@ -122,13 +137,29 @@ NVDA — `↓` per scorrere, `H` per i titoli, `B` per i pulsanti,
    viene portati alla sezione MARS di pertinenza, che si espande;
    le gravità dei rilievi sono lette come testo
    (Critico/Avvertenza/...), mai solo colore; le tabelle (RRF,
-   storico) hanno intestazioni e didascalie annunciate.
+   storico) hanno intestazioni e didascalie annunciate. Con
+   Lighthouse eseguito: i badge "Lighthouse" e "confermato da
+   Lighthouse" sui rilievi sono testo leggibile; nella sintesi le
+   chip di categoria e le tile Core Web Vitals annunciano
+   punteggio e verdetto come testo con simbolo (✓/!/✕), e la nota
+   sui dati di laboratorio è leggibile subito dopo il pannello;
+   i delta ("Lighthouse Prestazioni: ▲ +5") usano le frecce
+   testuali del confronto.
 6. **Download negato** — con profilo incompleto, i pulsanti di
    scarico annunciano lo stato disabilitato (`aria-disabled`) e la
    nota esplicativa è leggibile subito dopo.
 7. **Widget grafici** — anello, donut e trend hanno un
    `aria-label` con il dato completo ("Punteggio complessivo 66 su
    100: da migliorare"); i dettagli decorativi sono `aria-hidden`.
+8. **Referto HTML interattivo** (aperto in una nuova scheda) — la
+   treemap della superficie contenutistica ha rettangoli
+   raggiungibili con Tab che annunciano pagina, parole, chunk e
+   gravità; i dettagli compaiono anche in una regione
+   `role="status"` e la **tabella di fallback** (in un `<details>`)
+   contiene tutti i dati; il grafo dei link ha nodi focusabili con
+   `<title>` parlante, pulsanti di zoom etichettati e dettagli in
+   regione di stato; senza JavaScript e in stampa resta la resa
+   statica completa.
 
 ### Registro degli esiti
 
@@ -139,8 +170,9 @@ una persona con lo screen reader attivo: non è automatizzabile).
 |---|---|---|---|---|---|
 | 2026-08-04 | *(strumentale, non AT)* albero di accessibilità via Chrome+Playwright | GUI 2.16.0, audit 1.37.0 | 1–7 | 23/23 OK | Verifica del contratto ARIA, **non** sostituisce la sessione umana; dettagli in §1.1 |
 | 2026-08-05 | *(strumentale, non AT)* albero di accessibilità via Chrome+Playwright (macOS) | GUI 2.19.0, audit 1.43.0 | 1–7 | 27/27 OK | Riesecuzione dopo le cinque sezioni risultati (v2.19.0), con 4 controlli nuovi sul loro contratto; dettagli in §1.1 |
-| _da compilare_ | VoiceOver + Safari | | 1–7 | | |
-| _da compilare_ | NVDA + Firefox | | 1–7 | | |
+| 2026-08-05 | *(strumentale, non AT)* albero di accessibilità via Chrome+Playwright (Linux) | GUI 2.27.0, audit 1.55.0 | 1–7 | 31/31 OK | Riesecuzione dopo l'integrazione Lighthouse, con 4 controlli nuovi sulle sue viste (stub di run_lighthouse); contrasti nuovi verificati a calcolo (≥ 6,48:1); dettagli in §1.1 |
+| _da compilare_ | VoiceOver + Safari | | 1–8 | | |
+| _da compilare_ | NVDA + Firefox | | 1–8 | | |
 
 Anomalie rilevate → aprire una voce in [TO-DO.md](../TO-DO.md) con
 il flusso, il comando AT usato e il comportamento atteso/ottenuto.

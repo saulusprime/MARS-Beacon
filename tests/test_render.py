@@ -15,6 +15,23 @@ drenaggio linfatico manuale, adesso visibile all'analisi.</p>
 </body></html>"""
 
 
+def _patch(monkeypatch, name, value):
+    """Monkeypatch sulla facciata e su ogni modulo marsbeacon che
+    espone il nome: dopo la scomposizione (v1.58.0) conta il
+    namespace del consumatore, non solo quello pubblico."""
+    import mars_audit
+    import marsbeacon.audits
+    import marsbeacon.base
+    import marsbeacon.crawler
+    import marsbeacon.indexes
+    import marsbeacon.render
+    for modulo in (mars_audit, marsbeacon.base, marsbeacon.crawler,
+                   marsbeacon.indexes, marsbeacon.audits,
+                   marsbeacon.render):
+        if name in vars(modulo):
+            monkeypatch.setattr(modulo, name, value)
+
+
 class StubRenderer:
     """Sostituto di PageRenderer: nessun browser, HTML canned."""
 
@@ -49,7 +66,7 @@ def test_is_js_heavy():
 
 
 def test_auto_rende_solo_le_pagine_client_side(monkeypatch):
-    monkeypatch.setattr(sra, "PageRenderer", StubRenderer)
+    _patch(monkeypatch, "PageRenderer", StubRenderer)
     normale = _page("http://x/normale", 500, 0.1)
     spa = _page("http://x/spa", 10, 0.8)
     pages, rese, fallite = sra.apply_rendering(
@@ -64,7 +81,7 @@ def test_auto_rende_solo_le_pagine_client_side(monkeypatch):
 
 
 def test_always_rende_tutte_le_pagine_ok(monkeypatch):
-    monkeypatch.setattr(sra, "PageRenderer", StubRenderer)
+    _patch(monkeypatch, "PageRenderer", StubRenderer)
     rotta = sra.Page(url="http://x/errore", error="richiesta fallita")
     pages, rese, _ = sra.apply_rendering(
         [_page("http://x/a", 500, 0.1), rotta,
@@ -81,7 +98,7 @@ def test_rendering_fallito_conserva_html_statico(monkeypatch):
         def render(self, url):
             return None
 
-    monkeypatch.setattr(sra, "PageRenderer", StubRotto)
+    _patch(monkeypatch, "PageRenderer", StubRotto)
     spa = _page("http://x/spa", 10, 0.8)
     pages, rese, fallite = sra.apply_rendering(
         [spa], sra.RENDER_AUTO, delay=0, verbose=False)
@@ -93,7 +110,7 @@ def test_off_non_tocca_nulla(monkeypatch):
     def esplode(**kwargs):
         raise AssertionError("PageRenderer non va istanziato con off")
 
-    monkeypatch.setattr(sra, "PageRenderer", esplode)
+    _patch(monkeypatch, "PageRenderer", esplode)
     spa = _page("http://x/spa", 10, 0.8)
     pages, rese, fallite = sra.apply_rendering(
         [spa], sra.RENDER_OFF, delay=0, verbose=False)
