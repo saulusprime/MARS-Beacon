@@ -3,13 +3,12 @@
 **MARS Beacon** (*Meta-fusion, Accessibility, Ranking & Security
 Audit*)
 
-Strumento (Python 3, file singolo, ~8.300 righe, licenza Apache 2.0)
-che misura quanto un sito è **recuperabile e citabile dai motori di
-ricerca ibridi e dagli assistenti IA** (ChatGPT, Claude, Perplexity, Google AI
-Overviews). Oltre ai controlli SEO classici, riproduce localmente la pipeline
-di recupero che questi motori usano davvero: due recuperatori indipendenti
-(lessicale BM25 e vettoriale) fusi con la formula del **Reciprocal Rank
-Fusion**:
+Strumento scritto in Python 3, licenza Apache 2.0, che misura quanto un sito è
+**recuperabile e citabile dai motori di ricerca ibridi e dagli assistenti IA** 
+(ChatGPT, Claude, Perplexity, Google AI Overviews). Oltre ai controlli SEO classici, 
+riproduce localmente la pipeline di recupero che questi motori usano davvero: 
+due recuperatori indipendenti (lessicale BM25 e vettoriale) fusi con la formula del 
+**Reciprocal Rank Fusion**:
 
 ```
 score(d) = Σᵢ 1 / (k + rankᵢ(d))        con k = 60 di default
