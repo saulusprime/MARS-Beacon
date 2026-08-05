@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 
 class FlakyHandler(BaseHTTPRequestHandler):

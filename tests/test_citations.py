@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-import seo_rrf_citations as src
+import mars_citations as src
 
 FAKE_MESSAGE = {
     "id": "msg_test",

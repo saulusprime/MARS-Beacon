@@ -20,8 +20,8 @@ Le chiavi API si passano SOLO via variabili d'ambiente, mai da
 riga di comando.
 
 Uso:
-    python3 seo_rrf_citations.py https://miosito.it --queries q.txt
-    python3 seo_rrf_citations.py https://miosito.it \\
+    python3 mars_citations.py https://miosito.it --queries q.txt
+    python3 mars_citations.py https://miosito.it \\
         --from-audit referto.json --provider anthropic \\
         --competitor concorrente.it --history storico.jsonl \\
         --fail-under 30
@@ -45,7 +45,7 @@ from urllib.parse import urlparse
 
 import requests
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 DEFAULT_MODEL = "claude-opus-5"
 OPENAI_MODEL = "gpt-5.6"
@@ -331,7 +331,7 @@ def run_monitor(site: str, queries: Sequence[str],
     site_host = norm_host(site)
     competitor_hosts = [norm_host(c) for c in competitors]
     payload: Dict[str, object] = {
-        "tool": "seo_rrf_citations.py",
+        "tool": "mars_citations.py",
         "version": __version__,
         "site": site_host,
         "competitors": competitor_hosts,
@@ -506,7 +506,7 @@ def load_queries(args: argparse.Namespace) -> Tuple[List[str], str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="seo_rrf_citations.py",
+        prog="mars_citations.py",
         description="Monitoraggio delle citazioni IA effettive di un "
                     "sito nelle risposte degli assistenti con ricerca "
                     "web.")
@@ -514,7 +514,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--queries", metavar="FILE",
                         help="file con una query per riga")
     parser.add_argument("--from-audit", metavar="REFERTO",
-                        help="referto JSON di seo_rrf_audit.py da cui "
+                        help="referto JSON di mars_audit.py da cui "
                              "riusare le query della simulazione RRF")
     parser.add_argument("--provider", action="append",
                         dest="providers", default=[],

@@ -23,6 +23,7 @@ citazioni*.jsonl
 .DS_Store
 
 # Utenti e sessioni della GUI (dati locali, mai nel repo)
+mars_gui.db
 seo_rrf_gui.db
 
 # Sorgente originale del logo MARS (1,7 MB): nel repo va solo la

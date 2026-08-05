@@ -3,12 +3,12 @@
 # citazioni del lunedi': prima si corregge, poi si misura.)
 #
 # Installazione:
-#   sudo cp deploy/seo-rrf-audit.{service,timer} /etc/systemd/system/
+#   sudo cp deploy/mars-audit.{service,timer} /etc/systemd/system/
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now seo-rrf-audit.timer
+#   sudo systemctl enable --now mars-audit.timer
 #
-# Verifica:  systemctl list-timers seo-rrf-audit
-# Esecuzione manuale di prova:  sudo systemctl start seo-rrf-audit
+# Verifica:  systemctl list-timers mars-audit
+# Esecuzione manuale di prova:  sudo systemctl start mars-audit
 
 [Unit]
 Description=Audit MARS settimanale

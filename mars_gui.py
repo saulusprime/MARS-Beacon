@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Interfaccia web locale per seo_rrf_audit.py.
+"""Interfaccia web locale per mars_audit.py.
 
 Avvia un server HTTP sulla macchina locale (default 127.0.0.1:8765)
 che serve una interfaccia grafica in Bootstrap Italia (cartella
@@ -19,7 +19,7 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
     GET  /api/history/compare?a=N&b=N  delta fra due audit salvati
                             dello stesso sito
     GET  /api/citations     storico del monitoraggio citazioni IA
-                            (JSONL di seo_rrf_citations.py)
+                            (JSONL di mars_citations.py)
     POST /api/citations/events  aggiunge un evento-annotazione al
                             grafico citazioni (eventi.jsonl)
     GET  /api/events        avanzamento push (Server-Sent Events)
@@ -32,17 +32,17 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
     GET  /api/report/text   referto testuale (richiede profilo
                             completo)
 
-Gli utenti sono su SQLite (seo_rrf_gui.db accanto allo script):
+Gli utenti sono su SQLite (mars_gui.db accanto allo script):
 la registrazione richiede l'accettazione delle condizioni di
 servizio con dichiarazione di proprieta' del sito analizzato.
 
-L'audit viene eseguito in-process (import di ``seo_rrf_audit``): una
+L'audit viene eseguito in-process (import di ``mars_audit``): una
 sola scansione del sito produce tutti e tre i formati di referto.
 Nessuna dipendenza oltre a quelle dello script; il frontend usa asset
 vendorizzati in ``gui/vendor`` e funziona anche senza rete.
 
 Uso:
-    python3 seo_rrf_gui.py [--host 127.0.0.1] [--port 8765]
+    python3 mars_gui.py [--host 127.0.0.1] [--port 8765]
 
 Licenza: MIT.
 """
@@ -66,24 +66,24 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
-__version__ = "2.20.0"
+__version__ = "2.21.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
 # Utenti e sessioni su SQLite accanto allo script (nel .gitignore).
-DB_PATH = Path(__file__).resolve().parent / "seo_rrf_gui.db"
+DB_PATH = Path(__file__).resolve().parent / "mars_gui.db"
 
 # Storico del monitor citazioni (una riga JSON per esecuzione,
-# scritto da seo_rrf_citations.py --history). Il default e' il file
+# scritto da mars_citations.py --history). Il default e' il file
 # accanto agli script; sovrascrivibile con --citations-history, ad
 # esempio /var/lib/seorrf/citazioni.jsonl nel deploy systemd.
 CITATIONS_HISTORY = Path(__file__).resolve().parent \
     / "citazioni.jsonl"
 SESSION_TTL_S = 7 * 24 * 3600
 CHECK_INTERVAL_S = 3600  # un check per utente ogni ora
-SESSION_COOKIE = "seo_rrf_session"
+SESSION_COOKIE = "mars_session"
 EMAIL_RE = re.compile(r"^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$")
 PBKDF2_ROUNDS = 200_000
 
@@ -609,7 +609,7 @@ def read_citations_events(path: str) -> List[Dict[str, str]]:
 def read_citations_history(path: str) -> List[Dict[str, object]]:
     """Storico del monitor citazioni raggruppato per sito.
 
-    Legge il JSONL scritto da seo_rrf_citations.py (una riga per
+    Legge il JSONL scritto da mars_citations.py (una riga per
     esecuzione: generated_at, site, overall_rate, providers) e
     restituisce [{"site": host, "runs": [...]}] nell'ordine di
     prima apparizione, con al massimo le ultime 50 esecuzioni per
@@ -1009,8 +1009,8 @@ class Handler(BaseHTTPRequestHandler):
             if "download" in self.path:
                 ext = {"html": "html", "json": "json",
                        "text": "txt", "md": "md", "csv": "csv"}
-                nome = ("rilievi-seo-rrf" if fmt == "csv"
-                        else "referto-seo-rrf")
+                nome = ("rilievi-mars" if fmt == "csv"
+                        else "referto-mars")
                 download = "%s.%s" % (nome, ext[fmt])
             self._send(200, report.encode("utf-8"), ctypes[fmt],
                        download=download)
@@ -1185,8 +1185,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     """Punto di ingresso da riga di comando."""
     global CITATIONS_HISTORY
     parser = argparse.ArgumentParser(
-        prog="seo_rrf_gui.py",
-        description="Interfaccia web locale per seo_rrf_audit.py.")
+        prog="mars_gui.py",
+        description="Interfaccia web locale per mars_audit.py.")
     parser.add_argument("--host", default="127.0.0.1",
                         help="indirizzo di ascolto (default 127.0.0.1; "
                              "non esporre su reti non fidate)")

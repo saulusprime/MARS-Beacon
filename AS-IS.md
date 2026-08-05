@@ -5,15 +5,27 @@ Ranking & Security Audit) dal 2026-08-05, in vista dell'integrazione
 di Lighthouse; dal 2026-08-04 al 2026-08-05 "MARS Audit", in
 precedenza "Audit SEO & Reciprocal Rank Fusion". Anche il repository
 GitHub è stato rinominato (`SEO-RRF` → `MARS-Beacon`, i vecchi URL
-sono rediretti da GitHub). I nomi dei file restano `seo_rrf_*`.
+sono rediretti da GitHub). Dal 2026-08-05 anche i file sono
+rinominati: `seo_rrf_audit.py` → `mars_audit.py`, `seo_rrf_gui.py` →
+`mars_gui.py`, `seo_rrf_citations.py` → `mars_citations.py`,
+`seo_rrf_audit.md` → `mars_audit.md`, unit systemd `seo-rrf-*` →
+`mars-*`.
 
 Fotografia di ciò che è **già realizzato e verificato** al 2026-08-05.
 È il complemento di [TO-DO.md](TO-DO.md), che da qui in avanti elenca
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `seo_rrf_audit.py` v1.44.0
+## Strumento CLI — `mars_audit.py` v1.45.0
 
+- **File rinominati `mars_*`** (v1.45.0, GUI v2.21.0, citations
+  v1.2.0, 2026-08-05): script, nota tecnica e unit systemd coerenti
+  col nome MARS Beacon (`git mv`, riferimenti aggiornati in codice,
+  test, CI, docs e deploy). Cookie di sessione ora `mars_session` e
+  download rinominati `referto-mars`/`rilievi-mars`; la chiave
+  localStorage dei preset resta `seo_rrf_presets` per non perdere le
+  preimpostazioni già salvate, e il token robots.txt resta
+  `SeoRrfAudit` (le regole già scritte dai siti restano valide).
 - **Rename in MARS Beacon** (v1.44.0, GUI v2.20.0, 2026-08-05):
   nome prodotto aggiornato in referti (text/html/md), docstring,
   `--help`, GUI (header, titolo, condizioni di servizio), unit
@@ -173,12 +185,12 @@ sono nel [README.md](README.md).
   complessivo scende sotto la soglia (0–100, validata; motivo
   dichiarato su stderr), in aggiunta all'uscita 1 sui critici — il
   "`--fail-under`-equivalente" già in uso nel monitor citazioni. Lo
-  sfruttano le unit `deploy/seo-rrf-audit.service` + `.timer`
+  sfruttano le unit `deploy/mars-audit.service` + `.timer`
   (settimanale il mercoledì, stesso hardening delle altre unit,
   `--history` su `/var/lib/seorrf/audit.jsonl`, referto HTML
   persistito, giudizio LLM opzionale via `citations.env`): il
   fallimento del servizio è la notifica di regressione, e la unit
-  modello `deploy/seo-rrf-notify@.service` la trasforma in webhook
+  modello `deploy/mars-notify@.service` la trasforma in webhook
   attivo (ntfy/Slack/Teams) agganciabile con `OnFailure=` anche al
   monitoraggio citazioni.
 - **Chrome di sistema multipiattaforma** (v1.43.1): `CHROME_PATHS`
@@ -346,7 +358,7 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza MIT dichiarata nel modulo.
 
-## Interfaccia grafica locale — `seo_rrf_gui.py` v2.20.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.21.0 + `gui/`
 
 - **Risultati separati per tipologia MARS** (v2.19.0): la sezione
   unica "Risultati dell'audit e referto" è diventata cinque
@@ -486,7 +498,7 @@ sono nel [README.md](README.md).
   la **registrazione completa** (azienda e telefono, completabili
   dal profilo in qualsiasi momento) — vincolo applicato lato server
   (403), non solo nella UI. Utenti e sessioni su SQLite locale
-  (`seo_rrf_gui.db`, escluso dal repo), password PBKDF2-SHA256 con
+  (`mars_gui.db`, escluso dal repo), password PBKDF2-SHA256 con
   salt per utente, cookie di sessione HttpOnly SameSite=Strict con
   scadenza a 7 giorni.
 
@@ -558,11 +570,11 @@ sono nel [README.md](README.md).
   (script v1.2.1) adotta la palette del brand, il font Titillium Web
   e la firma "Lympha Technologies S.r.l." nel footer.
 - **Esecuzione come servizio**: unit systemd
-  `deploy/seo-rrf-gui.service` con utente dinamico senza privilegi,
+  `deploy/mars-gui.service` con utente dinamico senza privilegi,
   filesystem in sola lettura e riavvio automatico, per le
   installazioni presso i clienti.
 
-## Monitoraggio citazioni IA — `seo_rrf_citations.py` v1.1.0
+## Monitoraggio citazioni IA — `mars_citations.py` v1.2.0
 
 - Interroga assistenti IA con ricerca web sulle query target del sito
   (da file o riusate dal referto JSON dell'audit con `--from-audit`) e
@@ -581,7 +593,7 @@ sono nel [README.md](README.md).
   Dalla GUI v2.9.0 lo storico è consultabile anche nell'interfaccia
   (grafico per provider e tabella).
 - **Esecuzione periodica**: unit systemd `deploy/
-  seo-rrf-citations.service` + `.timer` (settimanale, hardening,
+  mars-citations.service` + `.timer` (settimanale, hardening,
   chiavi in `/etc/seorrf/citations.env`).
 - Testato senza chiamate reali: server API finti locali per entrambi i
   provider (8 test dedicati).
@@ -630,7 +642,7 @@ sono nel [README.md](README.md).
   mappatura heading→paragrafi in ordine di documento, deduplica
   `/`↔`/index.html`, query auto-generate degeneri, propagazione di
   `--rrf-k` ai renderer (dettaglio in
-  [seo_rrf_audit.md](seo_rrf_audit.md)).
+  [mars_audit.md](mars_audit.md)).
 
 ## File di servizio e documentazione
 
@@ -643,7 +655,7 @@ sono nel [README.md](README.md).
   vendorizzati Bootstrap Italia e asset brand inclusi nel
   versionamento perché necessari all'esecuzione offline).
 - [README.md](README.md) con diagrammi dell'infrastruttura (pipeline
-  CLI e architettura GUI), [seo_rrf_audit.md](seo_rrf_audit.md) (nota
+  CLI e architettura GUI), [mars_audit.md](mars_audit.md) (nota
   tecnica di consegna con changelog),
   [audit_miaweb_rrf.html](audit_miaweb_rrf.html) (esempio di referto
   di consulenza per www.miaweb.art, curato a mano a partire dai dati
@@ -711,7 +723,7 @@ analisi del 2026-08-03).
 - I profili di citabilità per assistente IA sono euristiche
   dichiarate (i pesi non derivano da comportamento documentato dai
   vendor): utili come confronto relativo, non come previsione di
-  citazione — quella la misura `seo_rrf_citations.py`.
+  citazione — quella la misura `mars_citations.py`.
 - Il giudizio LLM è **attivo di default** (modalità `auto`): con la
   chiave nell'ambiente ogni audit fa una richiesta API con costi a
   carico della chiave; il verdetto è il parere di un modello su un

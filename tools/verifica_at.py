@@ -26,7 +26,7 @@ CHROME_PATHS = {
 }
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import seo_rrf_gui as gui  # noqa: E402
+import mars_gui as gui  # noqa: E402
 
 PAGES = {
     "/": ("<!DOCTYPE html><html lang=\"it\"><head>"

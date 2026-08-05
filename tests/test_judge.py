@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 VERDETTI_JSON = json.dumps([
     {"id": 1, "score": 82, "reason": "Risposta diretta e completa"},

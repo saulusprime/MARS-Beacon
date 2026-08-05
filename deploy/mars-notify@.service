@@ -1,7 +1,7 @@
-# Notifica di fallimento per le unit seo-rrf-*: si aggancia con
-# OnFailure=seo-rrf-notify@%n.service (gia' predisposto, commentato,
-# in seo-rrf-audit.service e utilizzabile allo stesso modo in
-# seo-rrf-citations.service) e invia un POST al webhook configurato.
+# Notifica di fallimento per le unit mars-*: si aggancia con
+# OnFailure=mars-notify@%n.service (gia' predisposto, commentato,
+# in mars-audit.service e utilizzabile allo stesso modo in
+# mars-citations.service) e invia un POST al webhook configurato.
 #
 # Prerequisiti:
 #   - curl installato
@@ -14,11 +14,11 @@
 #     application/json' -d '{"text":"..."}' ${NOTIFY_URL}
 #
 # Installazione:
-#   sudo cp deploy/seo-rrf-notify@.service /etc/systemd/system/
+#   sudo cp deploy/mars-notify@.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   (si attiva da sola al fallimento delle unit agganciate)
 #
-# Prova manuale:  sudo systemctl start seo-rrf-notify@test.service
+# Prova manuale:  sudo systemctl start mars-notify@test.service
 
 [Unit]
 Description=Notifica fallimento di %i

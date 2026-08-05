@@ -3,7 +3,7 @@
 
 import json
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 
 def _payload(scores, findings):

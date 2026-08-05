@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Test unitari delle funzioni di base (token, n-grammi, URL, RAM)."""
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 
 def test_tokenize_rimuove_stopword_e_minuscolizza():

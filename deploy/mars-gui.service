@@ -4,9 +4,9 @@
 #   1. Copia il progetto in /opt/seorrf (script, gui/, requirements.txt)
 #   2. python3 -m venv /opt/seorrf/venv
 #      /opt/seorrf/venv/bin/pip install -r /opt/seorrf/requirements.txt
-#   3. sudo cp deploy/seo-rrf-gui.service /etc/systemd/system/
+#   3. sudo cp deploy/mars-gui.service /etc/systemd/system/
 #   4. sudo systemctl daemon-reload
-#      sudo systemctl enable --now seo-rrf-gui
+#      sudo systemctl enable --now mars-gui
 #
 # L'interfaccia resta raggiungibile solo dalla macchina stessa su
 # http://127.0.0.1:8765/ — non esporre su reti non fidate senza un
@@ -21,7 +21,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/seorrf
-ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/seo_rrf_gui.py \
+ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/mars_gui.py \
     --host 127.0.0.1 --port 8765 --no-browser
 Restart=on-failure
 RestartSec=5

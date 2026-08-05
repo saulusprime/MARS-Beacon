@@ -1,4 +1,4 @@
-# seo_rrf_audit.py — nota tecnica
+# mars_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
 di un sito. Consegnato in chat il 2026-08-03. Versione 1.38.0, ~6420
@@ -120,7 +120,7 @@ solo gli utenti autenticati avviano il check, con limite di **un
 check all'ora per utente** (un annullamento non consuma lo slot); il
 download dei referti richiede la **registrazione completa** (azienda
 e telefono nel profilo, completabili anche dopo). Utenti e sessioni
-su SQLite locale (`seo_rrf_gui.db`, nel `.gitignore`), password con
+su SQLite locale (`mars_gui.db`, nel `.gitignore`), password con
 PBKDF2-SHA256 e salt per utente, sessioni con cookie HttpOnly
 SameSite=Strict. Nuovi endpoint: `/api/register`, `/api/login`,
 `/api/logout`, `/api/me`, `/api/profile`; `/api/audit`, `/api/status`
@@ -647,9 +647,9 @@ pip install requests beautifulsoup4 lxml
 # opzionale, per il recupero vettoriale reale:
 pip install sentence-transformers numpy
 
-python3 seo_rrf_audit.py https://esempio.it --format html --output report.html
-python3 seo_rrf_audit.py https://esempio.it --max-pages 40 --queries query.txt
-python3 seo_rrf_audit.py https://esempio.it --embeddings paraphrase-multilingual-MiniLM-L12-v2
+python3 mars_audit.py https://esempio.it --format html --output report.html
+python3 mars_audit.py https://esempio.it --max-pages 40 --queries query.txt
+python3 mars_audit.py https://esempio.it --embeddings paraphrase-multilingual-MiniLM-L12-v2
 ```
 
 Opzioni: `--max-pages` (default 25), `--queries FILE` (una per riga; se omesso

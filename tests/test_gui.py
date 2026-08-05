@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""API del server della GUI (seo_rrf_gui.py): auth, limiti, referti."""
+"""API del server della GUI (mars_gui.py): auth, limiti, referti."""
 
 import json
 import threading
@@ -10,7 +10,7 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-import seo_rrf_gui as gui
+import mars_gui as gui
 
 
 @pytest.fixture(scope="module")
@@ -72,8 +72,8 @@ def _attendi_stato(base, cookie, attesi, timeout=120):
 
 
 def sra_version():
-    import seo_rrf_audit
-    return seo_rrf_audit.__version__
+    import mars_audit
+    return mars_audit.__version__
 
 
 # ---------------- statici e ambiente ----------------
@@ -93,7 +93,7 @@ def test_statici_con_csp_e_traversal_negato(gui_base):
         assert "Content-Security-Policy" in headers
         assert headers.get("X-Content-Type-Options") == "nosniff"
 
-    status, _, _ = _api(gui_base, "/../seo_rrf_audit.py")
+    status, _, _ = _api(gui_base, "/../mars_audit.py")
     assert status == 404
 
 

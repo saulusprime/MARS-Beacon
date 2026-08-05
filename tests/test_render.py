@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 RENDERED_HTML = """<!DOCTYPE html>
 <html lang="it"><head><title>Drenaggio SPA - guida</title></head>
@@ -121,7 +121,7 @@ def test_cli_render_e_scelte():
 
 
 def test_gui_valida_render():
-    import seo_rrf_gui as gui
+    import mars_gui as gui
     config, err = gui.validate_config(
         {"url": "x.it", "render": "auto"})
     assert err == "" and config["render"] == "auto"

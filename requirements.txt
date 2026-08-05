@@ -1,4 +1,4 @@
-# Dipendenze di esecuzione di seo_rrf_audit.py e seo_rrf_gui.py.
+# Dipendenze di esecuzione di mars_audit.py e mars_gui.py.
 requests>=2.28
 beautifulsoup4>=4.11
 lxml>=4.9
@@ -6,7 +6,7 @@ lxml>=4.9
 # Facoltative, per il recupero vettoriale con embedding reali:
 #   pip install sentence-transformers numpy
 
-# Facoltativa, per il monitoraggio citazioni IA (seo_rrf_citations.py)
+# Facoltativa, per il monitoraggio citazioni IA (mars_citations.py)
 # e per il giudizio LLM sulla citabilita' (attivo di default in
 # modalita' "auto" quando ANTHROPIC_API_KEY e' presente):
 #   pip install anthropic

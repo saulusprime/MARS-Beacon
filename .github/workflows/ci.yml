@@ -23,7 +23,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
       - name: Lint
-        run: flake8 seo_rrf_audit.py seo_rrf_gui.py seo_rrf_citations.py tests/
+        run: flake8 mars_audit.py mars_gui.py mars_citations.py tests/
       - name: Test
         run: pytest -q
 
@@ -44,7 +44,7 @@ jobs:
           pip install -r requirements.txt
       - name: Avvio della GUI in background
         run: |
-          python seo_rrf_gui.py --no-browser --port 8765 &
+          python mars_gui.py --no-browser --port 8765 &
           for i in $(seq 1 30); do
             curl -sf http://127.0.0.1:8765/api/env > /dev/null && break
             sleep 1

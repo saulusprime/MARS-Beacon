@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Robustezza del crawling: redirect, soft-404, non-HTML, sitemap .gz."""
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 
 def _fetcher(**kw):

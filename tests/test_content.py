@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Estrazione dei contenuti: parsing, chunking, deduplica, query."""
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 
 def _page_with_blocks(blocks):

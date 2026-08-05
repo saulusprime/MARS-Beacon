@@ -1,6 +1,6 @@
 # Accessibilità della GUI — verifica automatica e manuale
 
-Obiettivo: WCAG 2.2 AA per l'interfaccia di `seo_rrf_gui.py`.
+Obiettivo: WCAG 2.2 AA per l'interfaccia di `mars_gui.py`.
 La verifica ha due gambe: l'audit **automatico** (Pa11y in CI, su
 pagine reali servite dalla GUI) e la verifica **manuale con screen
 reader**, che gli strumenti automatici non possono sostituire
@@ -23,7 +23,7 @@ Esecuzione locale:
 
 ```bash
 # 1. avvia la GUI (usa un DB pulito: l'email di prova non deve esistere)
-python3 seo_rrf_gui.py --no-browser --port 8765
+python3 mars_gui.py --no-browser --port 8765
 
 # 2. in un altro terminale
 PA11Y_CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \

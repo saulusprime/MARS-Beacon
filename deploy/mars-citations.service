@@ -1,8 +1,8 @@
 # Esecuzione singola del monitoraggio citazioni IA.
-# Attivata periodicamente da seo-rrf-citations.timer.
+# Attivata periodicamente da mars-citations.timer.
 #
 # Prerequisiti sulla macchina:
-#   - /opt/seorrf con il progetto e venv (vedi seo-rrf-gui.service)
+#   - /opt/seorrf con il progetto e venv (vedi mars-gui.service)
 #   - /opt/seorrf/venv/bin/pip install anthropic
 #   - /etc/seorrf/citations.env con le chiavi API, ad esempio:
 #       ANTHROPIC_API_KEY=sk-ant-...
@@ -20,15 +20,15 @@ Description=Lympha Technologies - monitoraggio citazioni IA
 Documentation=file:///opt/seorrf/README.md
 After=network-online.target
 Wants=network-online.target
-# Notifica attiva sulle regressioni: vedi seo-rrf-notify@.service
-#OnFailure=seo-rrf-notify@%n.service
+# Notifica attiva sulle regressioni: vedi mars-notify@.service
+#OnFailure=mars-notify@%n.service
 
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/seorrf
 EnvironmentFile=/etc/seorrf/citations.env
 StateDirectory=seorrf
-ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/seo_rrf_citations.py \
+ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/mars_citations.py \
     https://SITO-DEL-CLIENTE.it \
     --queries /etc/seorrf/query.txt \
     --provider anthropic \

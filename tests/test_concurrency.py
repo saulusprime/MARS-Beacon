@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 HTML = (b"<html><head><title>Pagina</title></head>"
         b"<body><h1>Titolo</h1><p>" + b"contenuto utile " * 20 +

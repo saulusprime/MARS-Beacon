@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """i18n completa dei rilievi: catalogo EN, resolver, renderer."""
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 
 class _Zero(dict):

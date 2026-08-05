@@ -1,4 +1,4 @@
-/* Logica della GUI di seo_rrf_audit.py.
+/* Logica della GUI di mars_audit.py.
    Vanilla JS, nessuna dipendenza oltre al bundle Bootstrap Italia.
    Tutto il contenuto dinamico è inserito con textContent: i dati
    provengono dal sito auditato e non vanno mai interpretati come HTML. */
@@ -54,7 +54,7 @@
     RESULT_SECTIONS.forEach((id) => { el(id).hidden = hidden; });
   }
 
-  const PRESETS_KEY = "seo_rrf_presets";
+  const PRESETS_KEY = "seo_rrf_presets";  /* chiave storica: conserva i preset salvati prima del rename */
   const PRESET_FIELDS = [
     "f-url", "f-max-pages", "f-delay", "f-max-body", "f-retries",
     "f-workers", "f-render", "f-market", "f-judge",
@@ -1001,7 +1001,7 @@
             "per forzare il proxy char-TFIDF.";
         }
         el("footer-info").textContent +=
-          " — seo_rrf_audit.py " + env.tool_version +
+          " — mars_audit.py " + env.tool_version +
           " · interfaccia " + env.gui_version;
       })
       .catch(() => { /* la GUI resta usabile senza /api/env */ });
@@ -1145,7 +1145,7 @@
       })
       .catch(() => showFormError(
         "Impossibile contattare il server locale: verifica che " +
-        "seo_rrf_gui.py sia in esecuzione."));
+        "mars_gui.py sia in esecuzione."));
   }
 
   function showFormError(message) {

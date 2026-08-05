@@ -1,8 +1,8 @@
 # Esecuzione singola dell'audit MARS periodico con storico.
-# Attivata periodicamente da seo-rrf-audit.timer.
+# Attivata periodicamente da mars-audit.timer.
 #
 # Prerequisiti sulla macchina:
-#   - /opt/seorrf con il progetto e venv (vedi seo-rrf-gui.service)
+#   - /opt/seorrf con il progetto e venv (vedi mars-gui.service)
 #   - facoltativo /etc/seorrf/citations.env con ANTHROPIC_API_KEY:
 #     se presente, il giudizio LLM (--judge auto) parte da solo;
 #     senza chiave l'audit resta interamente offline
@@ -16,21 +16,21 @@
 # systemctl e nei sistemi di monitoraggio) quando l'audit rileva
 # criticita' oppure il punteggio complessivo scende sotto la soglia
 # --fail-under. Per una notifica attiva (webhook ntfy/Slack/Teams)
-# decommenta OnFailure e installa seo-rrf-notify@.service.
+# decommenta OnFailure e installa mars-notify@.service.
 
 [Unit]
 Description=Lympha Technologies - audit MARS periodico
 Documentation=file:///opt/seorrf/README.md
 After=network-online.target
 Wants=network-online.target
-#OnFailure=seo-rrf-notify@%n.service
+#OnFailure=mars-notify@%n.service
 
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/seorrf
 EnvironmentFile=-/etc/seorrf/citations.env
 StateDirectory=seorrf
-ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/seo_rrf_audit.py \
+ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/mars_audit.py \
     https://SITO-DEL-CLIENTE.it \
     --own-site \
     --history /var/lib/seorrf/audit.jsonl \

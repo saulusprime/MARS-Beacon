@@ -5,7 +5,7 @@ import datetime
 
 import requests
 
-import seo_rrf_audit as sra
+import mars_audit as sra
 
 
 def _fetcher():

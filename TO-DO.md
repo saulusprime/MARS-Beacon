@@ -62,7 +62,7 @@ si smistano nelle quattro fisarmoniche pilastro esistenti
       e riuso della logica di scoperta Chrome/Chromium già scritta per
       il rendering Playwright; esito esposto in `/api/env`.
 
-### Core CLI (seo_rrf_audit.py)
+### Core CLI (mars_audit.py)
 
 - [ ] Flag `--lighthouse off|auto|always` (default `off`, coerente con
       `--render`; `auto` parte solo se Node+Chrome trovati, altrimenti
@@ -98,7 +98,7 @@ si smistano nelle quattro fisarmoniche pilastro esistenti
       interattiva nel referto statico (eventuale treemap solo in GUI);
       metriche e score con testo + simbolo, mai solo colore.
 
-### GUI (seo_rrf_gui.py + gui/)
+### GUI (mars_gui.py + gui/)
 
 - [ ] Form: gruppo di opzioni Lighthouse (attivazione, device,
       pagine) con avviso se Node/Chrome mancano (da `/api/env`),
@@ -144,7 +144,7 @@ si smistano nelle quattro fisarmoniche pilastro esistenti
       ranking reale; complementare all'import GSC già realizzato
       (`--queries-gsc`, v1.32.0).
 
-## P2 — Interfaccia grafica (seo_rrf_gui.py)
+## P2 — Interfaccia grafica (mars_gui.py)
 
 - [ ] Incorporare il logo nel referto HTML autonomo (oggi la firma è
       testuale per contenere il peso del file) e valutare i font
@@ -155,7 +155,7 @@ si smistano nelle quattro fisarmoniche pilastro esistenti
 
 ## P3 — Distribuzione ed ecosistema
 
-- [ ] Packaging: `pyproject.toml`, entry point `seo-rrf-audit`, pubblicazione
+- [ ] Packaging: `pyproject.toml`, entry point `mars-audit`, pubblicazione
       su PyPI; valutare la scomposizione del file singolo in moduli
       (`crawler`, `indexes`, `audits`, `render`) mantenendo l'installazione
       monocomando.

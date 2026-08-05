@@ -26,16 +26,16 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 
 | File | Descrizione |
 |---|---|
-| [seo_rrf_audit.py](seo_rrf_audit.py) | Lo strumento: CLI autonoma, PEP8, `flake8` pulito |
-| [seo_rrf_gui.py](seo_rrf_gui.py) | Interfaccia web locale: server stdlib che pilota lo script ed espone i referti |
-| [seo_rrf_citations.py](seo_rrf_citations.py) | Monitoraggio periodico delle citazioni IA effettive (Claude, Perplexity) con storico e soglie |
+| [mars_audit.py](mars_audit.py) | Lo strumento: CLI autonoma, PEP8, `flake8` pulito |
+| [mars_gui.py](mars_gui.py) | Interfaccia web locale: server stdlib che pilota lo script ed espone i referti |
+| [mars_citations.py](mars_citations.py) | Monitoraggio periodico delle citazioni IA effettive (Claude, Perplexity) con storico e soglie |
 | [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies |
 | [deploy/](deploy/) | Unit systemd per l'esecuzione come servizio automatico sulle macchine dei clienti |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI GitHub Actions: flake8 + pytest multi-Python + audit accessibilità Pa11y |
 | [tests/](tests/) | Suite pytest: unit test del nucleo numerico, fixture site locale, end-to-end CLI e GUI |
 | [AS-IS.md](AS-IS.md) | Stato di fatto: tutto ciò che è già realizzato e verificato |
 | [TO-DO.md](TO-DO.md) | Ciò che resta da fare: bug noti, sviluppi e idee di miglioramento |
-| [seo_rrf_audit.md](seo_rrf_audit.md) | Nota tecnica di consegna: uso, verifiche eseguite, difetti corretti, fonti |
+| [mars_audit.md](mars_audit.md) | Nota tecnica di consegna: uso, verifiche eseguite, difetti corretti, fonti |
 | [audit_miaweb_rrf.html](audit_miaweb_rrf.html) | Esempio di referto di consulenza (www.miaweb.art, 2026-08-03), redatto a partire dai dati del tool con verdetto sintetico e piano d'azione per priorità |
 
 ## Installazione
@@ -73,10 +73,10 @@ formati di referto.
 ## Uso
 
 ```bash
-python3 seo_rrf_audit.py https://esempio.it
-python3 seo_rrf_audit.py https://esempio.it --format html --output report.html
-python3 seo_rrf_audit.py https://esempio.it --max-pages 40 --queries query.txt
-python3 seo_rrf_audit.py https://esempio.it \
+python3 mars_audit.py https://esempio.it
+python3 mars_audit.py https://esempio.it --format html --output report.html
+python3 mars_audit.py https://esempio.it --max-pages 40 --queries query.txt
+python3 mars_audit.py https://esempio.it \
     --embeddings paraphrase-multilingual-MiniLM-L12-v2
 ```
 
@@ -119,8 +119,8 @@ Adatto all'uso in CI come gate di qualità.
 ## Interfaccia grafica locale
 
 ```bash
-python3 seo_rrf_gui.py            # apre http://127.0.0.1:8765/
-python3 seo_rrf_gui.py --port 9000 --no-browser
+python3 mars_gui.py            # apre http://127.0.0.1:8765/
+python3 mars_gui.py --port 9000 --no-browser
 ```
 
 Interfaccia web in **Bootstrap Italia** (vanilla JavaScript, nessun
@@ -244,18 +244,18 @@ re-brand basta ridefinire i token in `lympha-brand.css` e sostituire
 logo e favicon.
 
 **Esecuzione come servizio.** Per le installazioni presso i clienti è
-inclusa la unit systemd [deploy/seo-rrf-gui.service](deploy/seo-rrf-gui.service)
+inclusa la unit systemd [deploy/mars-gui.service](deploy/mars-gui.service)
 (utente dinamico senza privilegi, filesystem in sola lettura, riavvio
 automatico): istruzioni di installazione nei commenti della unit.
 Per l'**audit periodico senza GUI** ci sono
-[deploy/seo-rrf-audit.service](deploy/seo-rrf-audit.service) +
-[.timer](deploy/seo-rrf-audit.timer) (settimanale, stesso hardening):
+[deploy/mars-audit.service](deploy/mars-audit.service) +
+[.timer](deploy/mars-audit.timer) (settimanale, stesso hardening):
 l'audit gira con `--history` — ogni referto riporta il delta rispetto
 all'esecuzione precedente — e con `--fail-under`, così il servizio
 fallisce sulle regressioni (criticità o punteggio sotto soglia); il
 fallimento è visibile in `systemctl` e può attivare una **notifica
 webhook** (ntfy/Slack/Teams) tramite la unit modello
-[deploy/seo-rrf-notify@.service](deploy/seo-rrf-notify@.service),
+[deploy/mars-notify@.service](deploy/mars-notify@.service),
 agganciabile via `OnFailure=` anche al monitoraggio citazioni.
 
 ## Monitoraggio delle citazioni IA effettive
@@ -263,13 +263,13 @@ agganciabile via `OnFailure=` anche al monitoraggio citazioni.
 ```bash
 pip install anthropic                          # SDK ufficiale (una tantum)
 export ANTHROPIC_API_KEY=sk-ant-...            # chiavi SOLO via ambiente
-python3 seo_rrf_citations.py https://miosito.it --queries query.txt
-python3 seo_rrf_citations.py https://miosito.it \
+python3 mars_citations.py https://miosito.it --queries query.txt
+python3 mars_citations.py https://miosito.it \
     --from-audit referto.json --competitor concorrente.it \
     --history storico.jsonl --fail-under 20
 ```
 
-[seo_rrf_citations.py](seo_rrf_citations.py) chiude il cerchio
+[mars_citations.py](mars_citations.py) chiude il cerchio
 dell'audit: dopo aver ottimizzato il sito, misura se gli assistenti IA
 **lo citano davvero**. Interroga i provider con ricerca web sulle
 query target (da file, o riusate dal referto JSON dell'audit con
@@ -292,8 +292,8 @@ citati i concorrenti (`--competitor`, max 3).
   precedente; `--fail-under PCT` fa uscire con codice `1` sotto
   soglia, così cron/systemd segnalano la regressione.
 - **Servizio periodico**: unit pronte in
-  [deploy/seo-rrf-citations.service](deploy/seo-rrf-citations.service)
-  + [.timer](deploy/seo-rrf-citations.timer) (settimanale, hardening
+  [deploy/mars-citations.service](deploy/mars-citations.service)
+  + [.timer](deploy/mars-citations.timer) (settimanale, hardening
   come la GUI, chiavi in `/etc/seorrf/citations.env`).
 - **Costi e cortesia**: massimo 15 query per esecuzione
   (`--max-queries`), massimo 5 ricerche web per risposta, pausa
@@ -337,7 +337,7 @@ da ciascun intervento (variazione esatta del punteggio d'area proiettata
 sui pesi del profilo). Sono **stime euristiche dichiarate** (le
 preferenze dei vendor non sono documentate): servono a confrontare i
 punti di forza del sito rispetto ai diversi assistenti, non a predire
-citazioni; per la misura reale c'è `seo_rrf_citations.py`.
+citazioni; per la misura reale c'è `mars_citations.py`.
 
 A tarare le stime ci pensa, dalla v1.18.0, il **giudizio LLM**
 (`--judge`, attivo di default in modalità `auto`): un modello valuta un
@@ -475,8 +475,8 @@ lo script ed esegue `run_audit()` in un thread, catturandone il log.
 ```mermaid
 flowchart LR
     B["Browser<br/>gui/index.html · app.js<br/>Bootstrap Italia vendorizzato"]
-    S["seo_rrf_gui.py<br/>ThreadingHTTPServer · solo stdlib<br/>127.0.0.1:8765 · CSP · un audit alla volta"]
-    A["seo_rrf_audit.py<br/>run_audit() in un thread<br/>referti html + json + text"]
+    S["mars_gui.py<br/>ThreadingHTTPServer · solo stdlib<br/>127.0.0.1:8765 · CSP · un audit alla volta"]
+    A["mars_audit.py<br/>run_audit() in un thread<br/>referti html + json + text"]
     B -->|"POST /api/audit"| S
     B -->|"GET /api/status (polling 1s)"| S
     B -->|"GET /api/report/{html,json,text}"| S
@@ -554,7 +554,7 @@ accessibilità Pa11y.
 Difetti trovati e corretti in quella fase: mappatura heading→paragrafi in
 ordine di documento (non aritmetica), deduplica `/` vs `/index.html`, query
 auto-generate degeneri, propagazione di `--rrf-k` a tutti i renderer.
-Dettaglio completo in [seo_rrf_audit.md](seo_rrf_audit.md).
+Dettaglio completo in [mars_audit.md](mars_audit.md).
 
 ## Fonti
 
