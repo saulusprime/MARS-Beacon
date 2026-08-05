@@ -35,7 +35,6 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | [AS-IS.md](AS-IS.md) | Stato di fatto: tutto ciò che è già realizzato e verificato |
 | [TO-DO.md](TO-DO.md) | Ciò che resta da fare: bug noti, sviluppi e idee di miglioramento |
 | [mars_audit.md](mars_audit.md) | Nota tecnica di consegna: uso, verifiche eseguite, difetti corretti, fonti |
-| [audit_miaweb_rrf.html](audit_miaweb_rrf.html) | Esempio di referto di consulenza (www.miaweb.art, 2026-08-03), redatto a partire dai dati del tool con verdetto sintetico e piano d'azione per priorità |
 
 ## Installazione
 

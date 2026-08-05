@@ -664,10 +664,10 @@ sono nel [README.md](README.md).
   versionamento perché necessari all'esecuzione offline).
 - [README.md](README.md) con diagrammi dell'infrastruttura (pipeline
   CLI e architettura GUI), [mars_audit.md](mars_audit.md) (nota
-  tecnica di consegna con changelog),
-  [audit_miaweb_rrf.html](audit_miaweb_rrf.html) (esempio di referto
-  di consulenza per www.miaweb.art, curato a mano a partire dai dati
-  dello strumento).
+  tecnica di consegna con changelog). L'esempio di referto di
+  consulenza `audit_miaweb_rrf.html` (miaweb.art, 2026-08-03) e il
+  concept `Features2.md` sono stati rimossi il 2026-08-05 a piano
+  recepito (l'integrazione Lighthouse è tracciata nel TO-DO).
 
 ## Convenzioni grafiche adottate (widget GUI e referto HTML)
 

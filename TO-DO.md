@@ -7,7 +7,7 @@ consapevolmente, per non rivalutarlo — è documentato in
 spuntate qui. Le voci marcate **[bug/rischio]** sono comportamenti
 osservati nel codice; il resto sono proposte.
 
-## P1 — Integrazione Lighthouse (da Features2.md)
+## P1 — Integrazione Lighthouse
 
 Obiettivo: integrare il fork di Google Lighthouse
 (<https://github.com/saulusprime/lighthouse.git>) per aggiungere gli
