@@ -1,8 +1,8 @@
 # mars_audit.py — nota tecnica
 
 Script Python 3 (PEP8, `flake8` pulito) per audit SEO + Reciprocal Rank Fusion
-di un sito. Consegnato in chat il 2026-08-03. Versione 1.38.0, ~6420
-righe (~6430), licenza Apache 2.0 (MIT fino al 2026-08-05, cambiata
+di un sito. Consegnato in chat il 2026-08-03. Versione 1.45.0, ~8.280
+righe, licenza Apache 2.0 (MIT fino al 2026-08-05, cambiata
 in vista dell'integrazione del fork di Lighthouse e dell'uso B2B
 enterprise). Dal 2026-08-05 il prodotto si chiama
 **MARS Beacon** (Meta-fusion, Accessibility, Ranking & Security
@@ -641,6 +641,40 @@ passaggio o al focus da tastiera (i nodi sono focusabili, con
 `aria-label` completa) e dettagli nella regione di stato
 `role="status"` — niente informazione solo-hover. Layout iniziale
 sempre dal core (deterministico); Pa11y 3/3.
+
+Novità 1.40.0 (2026-08-04): gate di regressione `--fail-under PUNTI`
+(uscita 1 anche col punteggio complessivo sotto soglia, motivo su
+stderr) e audit periodico come servizio: unit
+`deploy/mars-audit.service` + `.timer` settimanale con `--history`,
+più la unit modello `deploy/mars-notify@.service` che trasforma il
+fallimento in webhook (ntfy/Slack/Teams) via `OnFailure=`.
+
+Novità 1.41.0 (2026-08-04): referto HTML con CSS di stampa (PDF
+pulito dal browser), ancore stabili per rilievo (`#r-…` dalla chiave
+storica) con permalink, link dai Top rilievi e dal piano di
+remediation.
+
+Novità 1.42.0 (2026-08-04): tipologie MARS — campo `pillar`
+(meta-fusion/accessibility/ranking/security) su ogni rilievo, campo
+additivo allo schema JSON; la GUI 2.19.0 lo usa per le sezioni
+risultati separate.
+
+Novità 1.43.0 (2026-08-04): i18n dei referti con `--lang it|en`
+(catalogo `_FINDINGS_EN`, ~120 voci chiave+parametri, fallback campo
+per campo sull'italiano); il JSON resta canonico in italiano con
+`key`/`params` per rilievo. La 1.43.1 aggiunge `CHROME_PATHS`
+multipiattaforma per il rendering col Chrome di sistema.
+
+Novità 1.44.0 (2026-08-05): il prodotto diventa **MARS Beacon** in
+vista dell'integrazione del fork di Lighthouse; repository GitHub
+rinominato `MARS-Beacon`. Il token robots.txt resta `SeoRrfAudit`.
+
+Novità 1.45.0 (2026-08-05): file rinominati `mars_*` (questo script
+è ora `mars_audit.py`; GUI 2.21.0, citations 1.2.0, unit deploy
+`mars-*`); cookie di sessione `mars_session`, database GUI
+`mars_gui.db`, chiave localStorage dei preset invariata. Licenza del
+progetto da MIT ad **Apache License 2.0** con file `NOTICE`
+(allineamento al fork Lighthouse e uso B2B enterprise).
 
 ## Uso
 

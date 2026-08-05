@@ -620,7 +620,7 @@ sono nel [README.md](README.md).
   ultimo esito 27/27 il 2026-08-05 — dichiaratamente non
   sostitutiva della sessione umana.
 
-- **Suite pytest: 258 test in ~16 secondi** (`tests/`), senza rete
+- **Suite pytest: 277 test in ~2 minuti** (`tests/`), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
   k=60, rango da 1), chunking, deduplica, `norm_url`, query

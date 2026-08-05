@@ -3,7 +3,7 @@
 **MARS Beacon** (*Meta-fusion, Accessibility, Ranking & Security
 Audit*)
 
-Strumento (Python 3, file singolo, ~2.000 righe, licenza Apache 2.0)
+Strumento (Python 3, file singolo, ~8.300 righe, licenza Apache 2.0)
 che misura quanto un sito è **recuperabile e citabile dai motori di
 ricerca ibridi e dagli assistenti IA** (ChatGPT, Claude, Perplexity, Google AI
 Overviews). Oltre ai controlli SEO classici, riproduce localmente la pipeline
@@ -510,7 +510,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 258 test, ~16 secondi, nessun accesso alla rete esterna
+pytest            # 277 test, ~2 minuti, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
