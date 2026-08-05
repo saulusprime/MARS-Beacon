@@ -69,7 +69,7 @@ from typing import Dict, List, Optional, Tuple
 
 import mars_audit as sra
 
-__version__ = "2.29.0"
+__version__ = "2.30.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 

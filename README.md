@@ -202,15 +202,20 @@ Cosa offre:
 - **Grafo dell'architettura dei link** (pattern Screaming Frog):
   layout force-directed **deterministico calcolato in Python**, home
   al centro, ampiezza dei nodi = link in ingresso, ambra per le
-  pagine oltre 3 click o senza percorso. Nella GUI è **interattivo**:
-  zoom, pan, trascinamento dei nodi per districare, evidenziazione
-  del vicinato al passaggio o al focus da tastiera con i dettagli in
-  una regione di stato; dalla v1.53.0 lo è **anche nel referto
-  HTML** (JavaScript inline autonomo, nessuna origine esterna:
-  senza JavaScript resta il disegno statico stampabile), insieme
-  alla **treemap interattiva della superficie contenutistica**
-  (pagine × parole indicizzabili, colore dalla gravità dei
-  rilievi, con tabella dei dati di fallback).
+  pagine oltre 3 click o senza percorso. Dalla v1.59.0 il motore
+  interattivo — **vanilla JavaScript, identico in GUI e nel referto
+  HTML** — offre: **simulazione a forze viva** che si sveglia al
+  trascinamento (il disegno iniziale resta quello deterministico,
+  stampabile), **vista ad anelli di profondità** commutabile (un
+  anello per click dalla home, soglia dei 3 click marcata),
+  **frecce direzionali** sugli archi, **evidenziazione bloccabile
+  col clic** (Esc la libera) con dettagli — link in ingresso e in
+  uscita — nella regione di stato, zoom, pan, legenda testuale e,
+  in GUI, la **ricerca per percorso**; `prefers-reduced-motion`
+  spegne ogni animazione. Nel referto convive con la **treemap
+  interattiva della superficie contenutistica** (pagine × parole
+  indicizzabili, colore dalla gravità dei rilievi, tabella dei
+  dati di fallback); senza JavaScript resta la resa statica.
 - **Risultati separati per tipologia MARS**: una sezione di
   **sintesi** (verdetto, punteggi per area, top rilievi, confronto
   con l'esecuzione precedente, piano di remediation e scarico dei

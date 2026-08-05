@@ -580,12 +580,22 @@ _HTML_I18N: Dict[str, Dict[str, str]] = {
         "sc.absent": "assente dai primi %d",
         "sc.error": "errore: %s",
         "sc.skipped": "Non eseguita: %s",
-        "lg.hint": "Con JavaScript attivo: trascina i nodi per "
-                   "districare, rotella o pulsanti per lo zoom, "
-                   "trascina lo sfondo per spostarti.",
+        "lg.hint": "Con JavaScript attivo: trascina i nodi (la "
+                   "fisica segue), clic su un nodo per bloccare "
+                   "l'evidenziazione (Esc per liberarla), rotella "
+                   "o pulsanti per lo zoom, trascina lo sfondo "
+                   "per spostarti.",
         "lg.zin": "Ingrandisci",
         "lg.zout": "Riduci",
         "lg.reset": "Vista iniziale",
+        "lg.vforza": "Vista a forza",
+        "lg.vanelli": "Anelli di profondità",
+        "lg.legend": "Legenda: ● home · ● entro 3 click · "
+                     "● oltre 3 click o senza percorso; ampiezza "
+                     "= link in ingresso; le frecce seguono la "
+                     "direzione del link; negli anelli il cerchio "
+                     "marcato è la soglia dei 3 click.",
+        "lg.outgoing": "%d in uscita",
         "depth.h": "Profondita' di crawl",
         "depth.meta": "Quanti click servono dalla home per "
                       "raggiungere ogni pagina lungo i link "
@@ -761,12 +771,21 @@ _HTML_I18N: Dict[str, Dict[str, str]] = {
         "sc.absent": "absent from the top %d",
         "sc.error": "error: %s",
         "sc.skipped": "Not run: %s",
-        "lg.hint": "With JavaScript enabled: drag nodes to "
-                   "untangle, mouse wheel or buttons to zoom, "
-                   "drag the background to pan.",
+        "lg.hint": "With JavaScript enabled: drag nodes (the "
+                   "physics follows), click a node to pin the "
+                   "highlight (Esc releases it), mouse wheel or "
+                   "buttons to zoom, drag the background to pan.",
         "lg.zin": "Zoom in",
         "lg.zout": "Zoom out",
         "lg.reset": "Initial view",
+        "lg.vforza": "Force view",
+        "lg.vanelli": "Depth rings",
+        "lg.legend": "Legend: ● home · ● within 3 clicks · "
+                     "● beyond 3 clicks or unreachable; size = "
+                     "incoming links; arrows follow the link "
+                     "direction; in the rings view the marked "
+                     "circle is the 3-click threshold.",
+        "lg.outgoing": "%d outgoing",
         "depth.h": "Crawl depth",
         "depth.meta": "How many clicks from the home page it takes "
                       "to reach each page along internal links: "
@@ -2453,16 +2472,43 @@ def render_html(base: str, pages: List[Page],
                lab["lg.hint"],
                graph["width"], graph["height"],
                lab["graph.aria"]))
+        # Frecce di direzione: marker normale ed evidenziato.
+        parts.append(
+            "<defs>"
+            "<marker id=\"lg-arr\" viewBox=\"0 0 8 8\" refX=\"7\" "
+            "refY=\"4\" markerWidth=\"5.5\" markerHeight=\"5.5\" "
+            "orient=\"auto-start-reverse\">"
+            "<path d=\"M0 0L8 4L0 8z\" "
+            "style=\"fill:var(--line)\"/></marker>"
+            "<marker id=\"lg-arr-hi\" viewBox=\"0 0 8 8\" "
+            "refX=\"7\" refY=\"4\" markerWidth=\"5.5\" "
+            "markerHeight=\"5.5\" orient=\"auto-start-reverse\">"
+            "<path d=\"M0 0L8 4L0 8z\" "
+            "style=\"fill:var(--accent)\"/></marker>"
+            "</defs>")
         nodes = graph["nodes"]
+        radii = [min(15.0, 5.0 + 1.8 * n["incoming"] ** 0.5)
+                 for n in nodes]
+        outgoing = [0] * len(nodes)
+        for link in graph["links"]:
+            outgoing[link["source"]] += 1
         for link in graph["links"]:
             a = nodes[link["source"]]
             b = nodes[link["target"]]
+            # L'arco si ferma al bordo del nodo di destinazione,
+            # cosi' la freccia resta visibile.
+            dx = b["x"] - a["x"]
+            dy = b["y"] - a["y"]
+            lung = (dx * dx + dy * dy) ** 0.5 or 1.0
+            acc = (radii[link["target"]] + 3.0) / lung
             parts.append(
                 "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" "
                 "y2=\"%.1f\" stroke=\"var(--line)\" "
-                "stroke-width=\"0.8\" data-s=\"%d\" "
+                "stroke-width=\"0.8\" "
+                "marker-end=\"url(#lg-arr)\" data-s=\"%d\" "
                 "data-t=\"%d\"/>"
-                % (a["x"], a["y"], b["x"], b["y"],
+                % (a["x"], a["y"], b["x"] - dx * acc,
+                   b["y"] - dy * acc,
                    link["source"], link["target"]))
         if len(nodes) <= GRAPH_LABEL_ALL:
             labelled = {n["url"] for n in nodes}
@@ -2476,19 +2522,23 @@ def render_html(base: str, pages: List[Page],
             hue = ("var(--accent)" if node["home"] else
                    "var(--warn)" if problematico else
                    "var(--good)")
-            r = min(15.0, 5.0 + 1.8 * node["incoming"] ** 0.5)
+            r = radii[i]
             profondita = (lab["graph.clicks"] % node["depth"]
                           if node["depth"] is not None
                           else lab["graph.sitemap_only"])
             parts.append(
                 "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" "
                 "fill=\"%s\" fill-opacity=\"0.75\" stroke=\"%s\" "
-                "class=\"lg-node\" data-i=\"%d\" tabindex=\"0\">"
-                "<title>%s</title></circle>"
-                % (node["x"], node["y"], r, hue, hue, i,
+                "class=\"lg-node\" data-i=\"%d\" data-r=\"%.1f\" "
+                "data-depth=\"%s\" tabindex=\"0\">"
+                "<title>%s, %s</title></circle>"
+                % (node["x"], node["y"], r, hue, hue, i, r,
+                   "x" if node["depth"] is None
+                   else node["depth"],
                    lab["graph.node_title"]
                    % (esc(str(node["label"])), node["incoming"],
-                      profondita)))
+                      profondita),
+                   lab["lg.outgoing"] % outgoing[i]))
             if node["url"] in labelled:
                 # Alone chiaro sotto il testo: leggibile anche
                 # quando l'etichetta attraversa un arco.
@@ -2503,13 +2553,20 @@ def render_html(base: str, pages: List[Page],
         parts.append(
             "</svg>"
             "<p class=\"lg-controls\">"
+            "<button type=\"button\" id=\"lg-vforza\" "
+            "aria-pressed=\"true\">%s</button> "
+            "<button type=\"button\" id=\"lg-vanelli\" "
+            "aria-pressed=\"false\">%s</button> · "
             "<button type=\"button\" id=\"lg-zin\">%s</button> "
             "<button type=\"button\" id=\"lg-zout\">%s</button> "
             "<button type=\"button\" id=\"lg-reset\">%s</button>"
             "</p>"
+            "<p class=\"meta\">%s</p>"
             "<p id=\"lg-info\" class=\"meta\" role=\"status\"></p>"
             "</section>"
-            % (lab["lg.zin"], lab["lg.zout"], lab["lg.reset"]))
+            % (lab["lg.vforza"], lab["lg.vanelli"],
+               lab["lg.zin"], lab["lg.zout"], lab["lg.reset"],
+               lab["lg.legend"]))
 
     math = surface_math(pages)
     if math:
@@ -2725,12 +2782,17 @@ _REPORT_JS = """
         r.addEventListener("blur", pulisci);
       });
   }
-  /* Grafo dei link: zoom (rotella o pulsanti), pan (trascina lo
-     sfondo), trascinamento dei nodi, vicinato evidenziato al
-     passaggio o al focus con dettagli nella regione di stato. */
+  /* Grafo dei link, motore evoluto: simulazione a forze viva
+     (semina dal layout deterministico del core, si sveglia al
+     trascinamento), vista alternativa ad anelli di profondita',
+     frecce direzionali, evidenziazione bloccabile col clic (Esc
+     libera). prefers-reduced-motion spegne ogni animazione: il
+     disegno resta quello statico, pienamente fruibile. */
   var svg = document.getElementById("lg-svg");
   if (!svg) { return; }
   var info = document.getElementById("lg-info");
+  var ridotto = window.matchMedia && window.matchMedia(
+    "(prefers-reduced-motion: reduce)").matches;
   var base = svg.getAttribute("viewBox").split(" ").map(Number);
   var vb = base.slice();
   var nodi = Array.prototype.slice.call(
@@ -2742,14 +2804,233 @@ _REPORT_JS = """
     svg.querySelectorAll("text[data-i]"), function (t) {
       etichette[t.getAttribute("data-i")] = t;
     });
-  var vicini = nodi.map(function () { return []; });
-  archi.forEach(function (l) {
-    var s = +l.getAttribute("data-s");
-    var t = +l.getAttribute("data-t");
-    if (vicini[s]) { vicini[s].push(t); }
-    if (vicini[t]) { vicini[t].push(s); }
+  var N = nodi.length;
+  var pos = [];
+  var vel = [];
+  var raggi = [];
+  var prof = [];
+  nodi.forEach(function (c) {
+    pos.push([+c.getAttribute("cx"), +c.getAttribute("cy")]);
+    vel.push([0, 0]);
+    raggi.push(+c.getAttribute("data-r") || 6);
+    var d = c.getAttribute("data-depth");
+    prof.push(d === "x" ? null : +d);
   });
-  function applica() { svg.setAttribute("viewBox", vb.join(" ")); }
+  var lati = archi.map(function (l) {
+    return [+l.getAttribute("data-s"),
+      +l.getAttribute("data-t")];
+  });
+  var vicini = nodi.map(function () { return []; });
+  lati.forEach(function (st) {
+    vicini[st[0]].push(st[1]);
+    vicini[st[1]].push(st[0]);
+  });
+
+  function ridisegna() {
+    var i, k;
+    for (i = 0; i < N; i += 1) {
+      nodi[i].setAttribute("cx", pos[i][0]);
+      nodi[i].setAttribute("cy", pos[i][1]);
+      var e = etichette[String(i)];
+      if (e) {
+        e.setAttribute("x", pos[i][0] + raggi[i] + 3);
+        e.setAttribute("y", pos[i][1] + 4);
+      }
+    }
+    for (k = 0; k < archi.length; k += 1) {
+      var s = lati[k][0];
+      var t = lati[k][1];
+      var dx = pos[t][0] - pos[s][0];
+      var dy = pos[t][1] - pos[s][1];
+      var lun = Math.sqrt(dx * dx + dy * dy) || 1;
+      var acc = (raggi[t] + 3) / lun;
+      archi[k].setAttribute("x1", pos[s][0]);
+      archi[k].setAttribute("y1", pos[s][1]);
+      archi[k].setAttribute("x2", pos[t][0] - dx * acc);
+      archi[k].setAttribute("y2", pos[t][1] - dy * acc);
+    }
+  }
+
+  var vista = "forza";
+  var blocco = null;
+  var caldo = 0;
+  var anim = null;
+  function passo() {
+    var i, j, k;
+    for (i = 0; i < N; i += 1) {
+      for (j = i + 1; j < N; j += 1) {
+        var dx = pos[j][0] - pos[i][0];
+        var dy = pos[j][1] - pos[i][1];
+        var d2 = dx * dx + dy * dy + 0.01;
+        var d = Math.sqrt(d2);
+        var f = 900 / d2;
+        vel[i][0] -= f * dx / d;
+        vel[i][1] -= f * dy / d;
+        vel[j][0] += f * dx / d;
+        vel[j][1] += f * dy / d;
+      }
+    }
+    for (k = 0; k < lati.length; k += 1) {
+      var s = lati[k][0];
+      var t = lati[k][1];
+      var ex = pos[t][0] - pos[s][0];
+      var ey = pos[t][1] - pos[s][1];
+      var lun = Math.sqrt(ex * ex + ey * ey) || 1;
+      var tira = (lun - 70) * 0.02;
+      vel[s][0] += tira * ex / lun;
+      vel[s][1] += tira * ey / lun;
+      vel[t][0] -= tira * ex / lun;
+      vel[t][1] -= tira * ey / lun;
+    }
+    var energia = 0;
+    for (i = 0; i < N; i += 1) {
+      if (i === blocco) {
+        vel[i][0] = 0;
+        vel[i][1] = 0;
+        continue;
+      }
+      vel[i][0] += (base[2] / 2 - pos[i][0]) * 0.002;
+      vel[i][1] += (base[3] / 2 - pos[i][1]) * 0.002;
+      vel[i][0] *= 0.82;
+      vel[i][1] *= 0.82;
+      pos[i][0] += vel[i][0];
+      pos[i][1] += vel[i][1];
+      energia += vel[i][0] * vel[i][0] +
+        vel[i][1] * vel[i][1];
+    }
+    ridisegna();
+    caldo -= 1;
+    if (vista === "forza" && !ridotto &&
+        (energia > 0.4 || caldo > 0)) {
+      anim = requestAnimationFrame(passo);
+    } else {
+      anim = null;
+    }
+  }
+  function scalda(giri) {
+    caldo = Math.max(caldo, giri || 30);
+    if (vista !== "forza" || ridotto) { return; }
+    if (anim === null) {
+      anim = requestAnimationFrame(passo);
+    }
+  }
+
+  var guide = [];
+  function togliGuide() {
+    guide.forEach(function (g) {
+      if (g.parentNode) { g.parentNode.removeChild(g); }
+    });
+    guide = [];
+  }
+  function transizione(dest) {
+    if (ridotto) {
+      pos = dest;
+      ridisegna();
+      return;
+    }
+    var da = pos.map(function (p) { return p.slice(); });
+    var t0 = null;
+    function quadro(ts) {
+      if (t0 === null) { t0 = ts; }
+      var q = Math.min(1, (ts - t0) / 350);
+      var morbo = q * (2 - q);
+      for (var i = 0; i < N; i += 1) {
+        pos[i][0] = da[i][0] +
+          (dest[i][0] - da[i][0]) * morbo;
+        pos[i][1] = da[i][1] +
+          (dest[i][1] - da[i][1]) * morbo;
+      }
+      ridisegna();
+      if (q < 1) { requestAnimationFrame(quadro); }
+    }
+    requestAnimationFrame(quadro);
+  }
+  function versoAnelli() {
+    var maxD = 0;
+    prof.forEach(function (d) {
+      if (d !== null && d > maxD) { maxD = d; }
+    });
+    var esterno = maxD + 1;
+    var cx = base[2] / 2;
+    var cy = base[3] / 2;
+    var rmax = Math.min(base[2], base[3]) / 2 - 24;
+    function raggio(d) {
+      return d / (esterno + 0.5) * rmax;
+    }
+    var perAnello = {};
+    var i;
+    for (i = 0; i < N; i += 1) {
+      var d = prof[i] === null ? esterno : prof[i];
+      (perAnello[d] = perAnello[d] || []).push(i);
+    }
+    var dest = new Array(N);
+    Object.keys(perAnello).forEach(function (chiave) {
+      var anello = +chiave;
+      var gruppo = perAnello[chiave];
+      gruppo.sort(function (a, b) {
+        return Math.atan2(pos[a][1] - cy, pos[a][0] - cx) -
+          Math.atan2(pos[b][1] - cy, pos[b][0] - cx);
+      });
+      gruppo.forEach(function (n, idx) {
+        if (anello === 0) {
+          dest[n] = [cx, cy];
+          return;
+        }
+        var ang = -Math.PI / 2 +
+          idx * 2 * Math.PI / gruppo.length;
+        dest[n] = [cx + raggio(anello) * Math.cos(ang),
+          cy + raggio(anello) * Math.sin(ang)];
+      });
+    });
+    togliGuide();
+    var primo = svg.querySelector("line");
+    for (i = 1; i <= esterno; i += 1) {
+      var cerchio = document.createElementNS(
+        "http://www.w3.org/2000/svg", "circle");
+      cerchio.setAttribute("cx", cx);
+      cerchio.setAttribute("cy", cy);
+      cerchio.setAttribute("r", raggio(i));
+      cerchio.setAttribute("fill", "none");
+      cerchio.setAttribute("stroke",
+        i === 3 ? "var(--warn)" : "var(--line)");
+      cerchio.setAttribute("stroke-width",
+        i === 3 ? "1.4" : "0.7");
+      cerchio.setAttribute("stroke-dasharray", "4 5");
+      cerchio.setAttribute("pointer-events", "none");
+      svg.insertBefore(cerchio, primo);
+      guide.push(cerchio);
+    }
+    transizione(dest);
+  }
+  function bottoneVista(id, nome) {
+    var b = document.getElementById(id);
+    if (!b) { return; }
+    b.addEventListener("click", function () {
+      if (vista === nome) { return; }
+      vista = nome;
+      document.getElementById("lg-vforza").setAttribute(
+        "aria-pressed", nome === "forza" ? "true" : "false");
+      document.getElementById("lg-vanelli").setAttribute(
+        "aria-pressed", nome === "anelli" ? "true" : "false");
+      if (nome === "anelli") {
+        if (anim !== null) {
+          cancelAnimationFrame(anim);
+          anim = null;
+        }
+        versoAnelli();
+      } else {
+        togliGuide();
+        scalda(80);
+        if (ridotto) { ridisegna(); }
+      }
+    });
+  }
+  bottoneVista("lg-vforza", "forza");
+  bottoneVista("lg-vanelli", "anelli");
+
+  function applica() {
+    svg.setAttribute("viewBox", vb.join(" "));
+  }
   function zoom(f, cx, cy) {
     var nw = Math.max(60, Math.min(base[2] * 3, vb[2] * f));
     var nh = nw * base[3] / base[2];
@@ -2764,43 +3045,74 @@ _REPORT_JS = """
     return [vb[0] + (ev.clientX - r.left) / r.width * vb[2],
       vb[1] + (ev.clientY - r.top) / r.height * vb[3]];
   }
+
+  var fisso = null;
   function evidenzia(i) {
     nodi.forEach(function (c, j) {
       c.setAttribute("fill-opacity",
-        j === i || vicini[i].indexOf(j) !== -1 ? "0.95" : "0.25");
+        j === i || vicini[i].indexOf(j) !== -1
+          ? "0.95" : "0.25");
     });
-    archi.forEach(function (l) {
-      var suo = +l.getAttribute("data-s") === i ||
-        +l.getAttribute("data-t") === i;
+    archi.forEach(function (l, k) {
+      var suo = lati[k][0] === i || lati[k][1] === i;
       l.setAttribute("stroke",
         suo ? "var(--accent)" : "var(--line)");
       l.setAttribute("stroke-width", suo ? "1.6" : "0.8");
+      l.setAttribute("marker-end",
+        suo ? "url(#lg-arr-hi)" : "url(#lg-arr)");
     });
     if (info) { info.textContent = titolo(nodi[i]); }
   }
   function spegni() {
+    if (fisso !== null) {
+      evidenzia(fisso);
+      return;
+    }
     nodi.forEach(function (c) {
       c.setAttribute("fill-opacity", "0.75");
     });
     archi.forEach(function (l) {
       l.setAttribute("stroke", "var(--line)");
       l.setAttribute("stroke-width", "0.8");
+      l.setAttribute("marker-end", "url(#lg-arr)");
     });
     if (info) { info.textContent = ""; }
   }
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape" && fisso !== null) {
+      fisso = null;
+      spegni();
+    }
+  });
+
   var drag = null;
   var pan = null;
+  var mosso = false;
   nodi.forEach(function (c, i) {
     c.addEventListener("pointerenter", function () {
-      if (drag === null) { evidenzia(i); }
+      if (drag === null && fisso === null) { evidenzia(i); }
     });
-    c.addEventListener("focus", function () { evidenzia(i); });
+    c.addEventListener("focus", function () {
+      if (fisso === null) { evidenzia(i); }
+    });
     c.addEventListener("pointerleave", function () {
       if (drag === null) { spegni(); }
     });
-    c.addEventListener("blur", spegni);
+    c.addEventListener("blur", function () { spegni(); });
+    c.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      if (mosso) {
+        mosso = false;
+        return;
+      }
+      fisso = fisso === i ? null : i;
+      if (fisso === null) { spegni(); }
+      else { evidenzia(i); }
+    });
     c.addEventListener("pointerdown", function (ev) {
       drag = i;
+      blocco = i;
+      mosso = false;
       c.setPointerCapture(ev.pointerId);
       ev.preventDefault();
       ev.stopPropagation();
@@ -2808,25 +3120,23 @@ _REPORT_JS = """
     c.addEventListener("pointermove", function (ev) {
       if (drag !== i) { return; }
       var p = punto(ev);
-      c.setAttribute("cx", p[0]);
-      c.setAttribute("cy", p[1]);
-      var e = etichette[String(i)];
-      if (e) {
-        e.setAttribute("x", p[0] + 8);
-        e.setAttribute("y", p[1] + 4);
-      }
-      archi.forEach(function (l) {
-        if (+l.getAttribute("data-s") === i) {
-          l.setAttribute("x1", p[0]);
-          l.setAttribute("y1", p[1]);
-        }
-        if (+l.getAttribute("data-t") === i) {
-          l.setAttribute("x2", p[0]);
-          l.setAttribute("y2", p[1]);
-        }
-      });
+      pos[i][0] = p[0];
+      pos[i][1] = p[1];
+      mosso = true;
+      if (vista === "forza") { scalda(20); }
+      ridisegna();
     });
-    c.addEventListener("pointerup", function () { drag = null; });
+    c.addEventListener("pointerup", function () {
+      drag = null;
+      blocco = null;
+      if (vista === "forza" && mosso) { scalda(50); }
+    });
+  });
+  svg.addEventListener("click", function (ev) {
+    if (ev.target === svg && fisso !== null) {
+      fisso = null;
+      spegni();
+    }
   });
   svg.addEventListener("pointerdown", function (ev) {
     if (ev.target === svg) {
@@ -2989,6 +3299,8 @@ outline-offset:1px}
 border:1px solid var(--line);border-radius:6px;
 background:var(--card);color:var(--ink);cursor:pointer}
 .lg-controls button:hover{border-color:var(--accent)}
+.lg-controls button[aria-pressed="true"]{
+border-color:var(--accent);color:var(--accent);font-weight:700}
 @media print{.lg-controls{display:none}}
 @media print{
 :root{--bg:#fff;--card:#fff;--ink:#000;--muted:#444;--line:#bbb;

@@ -2187,6 +2187,11 @@
   }
 
   function renderLinkGraph(graph) {
+    /* Motore evoluto (v2.30.0): simulazione a forze viva che si
+       sveglia al trascinamento, vista ad anelli di profondita',
+       frecce direzionali, evidenziazione bloccabile col clic
+       (Esc libera), ricerca per percorso. prefers-reduced-motion
+       spegne ogni animazione. */
     const block = el("graph-block");
     const box = el("graph-svg");
     box.textContent = "";
@@ -2195,12 +2200,11 @@
       return;
     }
     el("graph-intro").textContent =
-      "Ogni cerchio è una pagina (ampiezza = link in ingresso); " +
-      "in ambra le pagine oltre 3 click o senza percorso di " +
-      "link. Mostrate " + graph.nodes.length + " pagine su " +
-      graph.total + ". Trascina i nodi per districare, rotella " +
-      "o pulsanti per lo zoom, trascina lo sfondo per spostarti.";
+      "Ogni cerchio è una pagina; mostrate " +
+      graph.nodes.length + " pagine su " + graph.total + ".";
 
+    const ridotto = window.matchMedia && window.matchMedia(
+      "(prefers-reduced-motion: reduce)").matches;
     graphView.base = [0, 0, graph.width, graph.height];
     graphView.vb = graphView.base.slice();
     const svg = svgNode("svg", {
@@ -2211,14 +2215,38 @@
         "orfane e profondità sono nei rilievi dell'area tecnica",
     });
 
-    const pos = graph.nodes.map((n) => ({ x: n.x, y: n.y }));
+    const defs = document.createElementNS(
+      "http://www.w3.org/2000/svg", "defs");
+    defs.innerHTML =
+      '<marker id="g-arr" viewBox="0 0 8 8" refX="7" refY="4"' +
+      ' markerWidth="5.5" markerHeight="5.5"' +
+      ' orient="auto-start-reverse">' +
+      '<path d="M0 0L8 4L0 8z" fill="#d8d8d2"/></marker>' +
+      '<marker id="g-arr-hi" viewBox="0 0 8 8" refX="7"' +
+      ' refY="4" markerWidth="5.5" markerHeight="5.5"' +
+      ' orient="auto-start-reverse">' +
+      '<path d="M0 0L8 4L0 8z" fill="#186078"/></marker>';
+    svg.appendChild(defs);
+
+    const N = graph.nodes.length;
+    const pos = graph.nodes.map((n) => [n.x, n.y]);
+    const vel = graph.nodes.map(() => [0, 0]);
+    const raggi = graph.nodes.map((n) =>
+      Math.min(15, 5 + 1.8 * Math.sqrt(n.incoming)));
+    const lati = graph.links.map((l) => [l.source, l.target]);
     const vicini = graph.nodes.map(() => []);
-    const edgeEls = graph.links.map((link) => {
+    const uscita = graph.nodes.map(() => 0);
+    lati.forEach((st) => {
+      vicini[st[0]].push(st[1]);
+      vicini[st[1]].push(st[0]);
+      uscita[st[0]] += 1;
+    });
+
+    const edgeEls = lati.map(() => {
       const line = svgNode("line", {
         stroke: "#d8d8d2", "stroke-width": 1,
+        "marker-end": "url(#g-arr)",
       });
-      vicini[link.source].push(link.target);
-      vicini[link.target].push(link.source);
       svg.appendChild(line);
       return line;
     });
@@ -2234,12 +2262,12 @@
       const problematico = node.depth === null || node.depth > 3;
       const hue = node.home ? "#186078"
         : problematico ? "#9a6a00" : "#1c6b45";
-      const r = Math.min(15, 5 + 1.8 * Math.sqrt(node.incoming));
       const circle = svgNode("circle", {
-        r: r, fill: hue, "fill-opacity": "0.8", stroke: hue,
-        tabindex: "0", role: "img",
+        r: raggi[i], fill: hue, "fill-opacity": "0.8",
+        stroke: hue, tabindex: "0", role: "img",
         "aria-label": node.label + ": " + node.incoming +
-          " link in ingresso, " + (node.depth === null
+          " link in ingresso, " + uscita[i] + " in uscita, " +
+          (node.depth === null
             ? "solo da sitemap" : node.depth + " click"),
         class: "graph-node",
       });
@@ -2258,52 +2286,241 @@
       labelEls.push(text);
     });
 
-    function place(i) {
-      nodeEls[i].setAttribute("cx", pos[i].x);
-      nodeEls[i].setAttribute("cy", pos[i].y);
-      labelEls[i].setAttribute("x", pos[i].x + 8);
-      labelEls[i].setAttribute("y", pos[i].y + 4);
-    }
-    function placeEdges() {
-      graph.links.forEach((link, k) => {
-        edgeEls[k].setAttribute("x1", pos[link.source].x);
-        edgeEls[k].setAttribute("y1", pos[link.source].y);
-        edgeEls[k].setAttribute("x2", pos[link.target].x);
-        edgeEls[k].setAttribute("y2", pos[link.target].y);
+    function ridisegna() {
+      for (let i = 0; i < N; i += 1) {
+        nodeEls[i].setAttribute("cx", pos[i][0]);
+        nodeEls[i].setAttribute("cy", pos[i][1]);
+        labelEls[i].setAttribute("x", pos[i][0] + raggi[i] + 3);
+        labelEls[i].setAttribute("y", pos[i][1] + 4);
+      }
+      lati.forEach((st, k) => {
+        const dx = pos[st[1]][0] - pos[st[0]][0];
+        const dy = pos[st[1]][1] - pos[st[0]][1];
+        const lun = Math.sqrt(dx * dx + dy * dy) || 1;
+        const acc = (raggi[st[1]] + 3) / lun;
+        edgeEls[k].setAttribute("x1", pos[st[0]][0]);
+        edgeEls[k].setAttribute("y1", pos[st[0]][1]);
+        edgeEls[k].setAttribute("x2", pos[st[1]][0] - dx * acc);
+        edgeEls[k].setAttribute("y2", pos[st[1]][1] - dy * acc);
       });
     }
-    graph.nodes.forEach((_n, i) => place(i));
-    placeEdges();
+    ridisegna();
 
+    let vista = "forza";
+    let blocco = null;
+    let caldo = 0;
+    let anim = null;
+    function passo() {
+      let energia = 0;
+      for (let i = 0; i < N; i += 1) {
+        for (let j = i + 1; j < N; j += 1) {
+          const dx = pos[j][0] - pos[i][0];
+          const dy = pos[j][1] - pos[i][1];
+          const d2 = dx * dx + dy * dy + 0.01;
+          const d = Math.sqrt(d2);
+          const f = 900 / d2;
+          vel[i][0] -= f * dx / d;
+          vel[i][1] -= f * dy / d;
+          vel[j][0] += f * dx / d;
+          vel[j][1] += f * dy / d;
+        }
+      }
+      lati.forEach((st) => {
+        const ex = pos[st[1]][0] - pos[st[0]][0];
+        const ey = pos[st[1]][1] - pos[st[0]][1];
+        const lun = Math.sqrt(ex * ex + ey * ey) || 1;
+        const tira = (lun - 70) * 0.02;
+        vel[st[0]][0] += tira * ex / lun;
+        vel[st[0]][1] += tira * ey / lun;
+        vel[st[1]][0] -= tira * ex / lun;
+        vel[st[1]][1] -= tira * ey / lun;
+      });
+      for (let i = 0; i < N; i += 1) {
+        if (i === blocco) { vel[i] = [0, 0]; continue; }
+        vel[i][0] += (graph.width / 2 - pos[i][0]) * 0.002;
+        vel[i][1] += (graph.height / 2 - pos[i][1]) * 0.002;
+        vel[i][0] *= 0.82;
+        vel[i][1] *= 0.82;
+        pos[i][0] += vel[i][0];
+        pos[i][1] += vel[i][1];
+        energia += vel[i][0] * vel[i][0] +
+          vel[i][1] * vel[i][1];
+      }
+      ridisegna();
+      caldo -= 1;
+      if (vista === "forza" && !ridotto &&
+          (energia > 0.4 || caldo > 0)) {
+        anim = requestAnimationFrame(passo);
+      } else {
+        anim = null;
+      }
+    }
+    function scalda(giri) {
+      caldo = Math.max(caldo, giri || 30);
+      if (vista !== "forza" || ridotto) { return; }
+      if (anim === null) { anim = requestAnimationFrame(passo); }
+    }
+
+    let guide = [];
+    function togliGuide() {
+      guide.forEach((g) => g.remove());
+      guide = [];
+    }
+    function transizione(dest) {
+      if (ridotto) {
+        dest.forEach((p, i) => { pos[i] = p; });
+        ridisegna();
+        return;
+      }
+      const da = pos.map((p) => p.slice());
+      let t0 = null;
+      const quadro = (ts) => {
+        if (t0 === null) { t0 = ts; }
+        const q = Math.min(1, (ts - t0) / 350);
+        const morbo = q * (2 - q);
+        for (let i = 0; i < N; i += 1) {
+          pos[i][0] = da[i][0] + (dest[i][0] - da[i][0]) * morbo;
+          pos[i][1] = da[i][1] + (dest[i][1] - da[i][1]) * morbo;
+        }
+        ridisegna();
+        if (q < 1) { requestAnimationFrame(quadro); }
+      };
+      requestAnimationFrame(quadro);
+    }
+    function versoAnelli() {
+      let maxD = 0;
+      graph.nodes.forEach((n) => {
+        if (n.depth !== null && n.depth > maxD) {
+          maxD = n.depth;
+        }
+      });
+      const esterno = maxD + 1;
+      const cx = graph.width / 2;
+      const cy = graph.height / 2;
+      const rmax = Math.min(graph.width, graph.height) / 2 - 24;
+      const raggio = (d) => d / (esterno + 0.5) * rmax;
+      const perAnello = {};
+      graph.nodes.forEach((n, i) => {
+        const d = n.depth === null ? esterno : n.depth;
+        (perAnello[d] = perAnello[d] || []).push(i);
+      });
+      const dest = new Array(N);
+      Object.keys(perAnello).forEach((chiave) => {
+        const anello = +chiave;
+        const gruppo = perAnello[chiave];
+        gruppo.sort((a, b) =>
+          Math.atan2(pos[a][1] - cy, pos[a][0] - cx) -
+          Math.atan2(pos[b][1] - cy, pos[b][0] - cx));
+        gruppo.forEach((n, idx) => {
+          if (anello === 0) { dest[n] = [cx, cy]; return; }
+          const ang = -Math.PI / 2 +
+            idx * 2 * Math.PI / gruppo.length;
+          dest[n] = [cx + raggio(anello) * Math.cos(ang),
+            cy + raggio(anello) * Math.sin(ang)];
+        });
+      });
+      togliGuide();
+      const primo = svg.querySelector("line");
+      for (let g = 1; g <= esterno; g += 1) {
+        const cerchio = svgNode("circle", {
+          cx: cx, cy: cy, r: raggio(g), fill: "none",
+          stroke: g === 3 ? "#9a6a00" : "#d8d8d2",
+          "stroke-width": g === 3 ? 1.4 : 0.7,
+          "stroke-dasharray": "4 5",
+          "pointer-events": "none",
+        });
+        svg.insertBefore(cerchio, primo);
+        guide.push(cerchio);
+      }
+      transizione(dest);
+    }
+    function impostaVista(nome) {
+      if (vista === nome) { return; }
+      vista = nome;
+      el("graph-vforza").setAttribute("aria-pressed",
+        nome === "forza" ? "true" : "false");
+      el("graph-vanelli").setAttribute("aria-pressed",
+        nome === "anelli" ? "true" : "false");
+      if (nome === "anelli") {
+        if (anim !== null) {
+          cancelAnimationFrame(anim);
+          anim = null;
+        }
+        versoAnelli();
+      } else {
+        togliGuide();
+        scalda(80);
+        if (ridotto) { ridisegna(); }
+      }
+    }
+    el("graph-vforza").onclick = () => impostaVista("forza");
+    el("graph-vanelli").onclick = () => impostaVista("anelli");
+
+    let fisso = null;
     function evidenzia(i) {
       nodeEls.forEach((c, j) => c.setAttribute("fill-opacity",
-        j === i || vicini[i].indexOf(j) !== -1 ? "0.95" : "0.25"));
-      graph.links.forEach((link, k) => {
-        const suo = link.source === i || link.target === i;
+        j === i || vicini[i].indexOf(j) !== -1
+          ? "0.95" : "0.25"));
+      lati.forEach((st, k) => {
+        const suo = st[0] === i || st[1] === i;
         edgeEls[k].setAttribute("stroke",
           suo ? "#186078" : "#e8e8e4");
         edgeEls[k].setAttribute("stroke-width", suo ? 2 : 1);
+        edgeEls[k].setAttribute("marker-end",
+          suo ? "url(#g-arr-hi)" : "url(#g-arr)");
       });
       labelEls[i].setAttribute("visibility", "visible");
       const node = graph.nodes[i];
       el("graph-info").textContent = node.label + " — " +
-        node.incoming + " link in ingresso, " +
+        node.incoming + " link in ingresso, " + uscita[i] +
+        " in uscita, " +
         (node.depth === null ? "raggiungibile solo da sitemap"
-          : node.depth + " click dalla home") + ", " +
-        vicini[i].length + " collegamenti mostrati.";
+          : node.depth + " click dalla home") + "." +
+        (fisso === i
+          ? " Evidenziazione bloccata: Esc per liberarla." : "");
     }
     function spegni() {
-      nodeEls.forEach((c) => c.setAttribute("fill-opacity", "0.8"));
-      graph.links.forEach((_l, k) => {
+      if (fisso !== null) { evidenzia(fisso); return; }
+      nodeEls.forEach((c) =>
+        c.setAttribute("fill-opacity", "0.8"));
+      lati.forEach((_st, k) => {
         edgeEls[k].setAttribute("stroke", "#d8d8d2");
         edgeEls[k].setAttribute("stroke-width", 1);
+        edgeEls[k].setAttribute("marker-end", "url(#g-arr)");
       });
       labelEls.forEach((t, j) => {
-        if (!mostraTutte && top.indexOf(graph.nodes[j].url) === -1) {
+        if (!mostraTutte &&
+            top.indexOf(graph.nodes[j].url) === -1) {
           t.setAttribute("visibility", "hidden");
         }
       });
+      el("graph-info").textContent =
+        "Seleziona un nodo (mouse o Tab) per i dettagli.";
     }
+    box.onkeydown = (event) => {
+      if (event.key === "Escape" && fisso !== null) {
+        fisso = null;
+        spegni();
+      }
+    };
+    const ricerca = el("graph-search");
+    ricerca.value = "";
+    ricerca.oninput = () => {
+      const testo = ricerca.value.trim().toLowerCase();
+      if (!testo) { spegni(); return; }
+      let trovate = 0;
+      nodeEls.forEach((c, i) => {
+        const bene = graph.nodes[i].label
+          .toLowerCase().indexOf(testo) !== -1;
+        if (bene) { trovate += 1; }
+        c.setAttribute("fill-opacity", bene ? "0.95" : "0.15");
+        labelEls[i].setAttribute("visibility",
+          bene ? "visible" : "hidden");
+      });
+      el("graph-info").textContent = trovate +
+        " pagina/e corrispondono a «" +
+        ricerca.value.trim() + "».";
+    };
 
     function svgPoint(event) {
       const rect = svg.getBoundingClientRect();
@@ -2314,13 +2531,30 @@
 
     let dragNode = null;
     let panFrom = null;
+    let mosso = false;
     nodeEls.forEach((circle, i) => {
-      circle.addEventListener("pointerenter", () => evidenzia(i));
-      circle.addEventListener("focus", () => evidenzia(i));
-      circle.addEventListener("pointerleave", spegni);
-      circle.addEventListener("blur", spegni);
+      circle.addEventListener("pointerenter", () => {
+        if (dragNode === null && fisso === null) {
+          evidenzia(i);
+        }
+      });
+      circle.addEventListener("focus", () => {
+        if (fisso === null) { evidenzia(i); }
+      });
+      circle.addEventListener("pointerleave", () => {
+        if (dragNode === null) { spegni(); }
+      });
+      circle.addEventListener("blur", () => spegni());
+      circle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (mosso) { mosso = false; return; }
+        fisso = fisso === i ? null : i;
+        if (fisso === null) { spegni(); } else { evidenzia(i); }
+      });
       circle.addEventListener("pointerdown", (event) => {
         dragNode = i;
+        blocco = i;
+        mosso = false;
         circle.setPointerCapture(event.pointerId);
         event.preventDefault();
         event.stopPropagation();
@@ -2328,14 +2562,23 @@
       circle.addEventListener("pointermove", (event) => {
         if (dragNode !== i) { return; }
         const [px, py] = svgPoint(event);
-        pos[i].x = px;
-        pos[i].y = py;
-        place(i);
-        placeEdges();
+        pos[i][0] = px;
+        pos[i][1] = py;
+        mosso = true;
+        if (vista === "forza") { scalda(20); }
+        ridisegna();
       });
       circle.addEventListener("pointerup", () => {
         dragNode = null;
+        blocco = null;
+        if (vista === "forza" && mosso) { scalda(50); }
       });
+    });
+    svg.addEventListener("click", (event) => {
+      if (event.target === svg && fisso !== null) {
+        fisso = null;
+        spegni();
+      }
     });
     svg.addEventListener("pointerdown", (event) => {
       if (event.target === svg) {
@@ -2371,6 +2614,7 @@
     box.appendChild(svg);
     block.hidden = false;
   }
+
   function renderRemediation(plan) {
     const block = el("remediation-block");
     const list = el("remediation-list");

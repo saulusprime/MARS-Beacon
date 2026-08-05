@@ -151,15 +151,25 @@ NVDA — `↓` per scorrere, `H` per i titoli, `B` per i pulsanti,
 7. **Widget grafici** — anello, donut e trend hanno un
    `aria-label` con il dato completo ("Punteggio complessivo 66 su
    100: da migliorare"); i dettagli decorativi sono `aria-hidden`.
+   Il grafo dei link (motore evoluto, v2.30.0): i nodi annunciano
+   etichetta, link in ingresso/uscita e profondità; i bottoni
+   "Vista a forza"/"Anelli di profondità" annunciano lo stato
+   (`aria-pressed`); il clic su un nodo blocca l'evidenziazione e
+   la regione di stato lo dichiara ("Esc per liberarla"); la
+   ricerca annuncia quante pagine corrispondono; con
+   `prefers-reduced-motion` nessuna animazione.
 8. **Referto HTML interattivo** (aperto in una nuova scheda) — la
    treemap della superficie contenutistica ha rettangoli
    raggiungibili con Tab che annunciano pagina, parole, chunk e
    gravità; i dettagli compaiono anche in una regione
    `role="status"` e la **tabella di fallback** (in un `<details>`)
    contiene tutti i dati; il grafo dei link ha nodi focusabili con
-   `<title>` parlante, pulsanti di zoom etichettati e dettagli in
-   regione di stato; senza JavaScript e in stampa resta la resa
-   statica completa.
+   `<title>` parlante (link in ingresso e in uscita compresi),
+   pulsanti etichettati per zoom e cambio vista (forza/anelli, con
+   `aria-pressed`), evidenziazione bloccabile col clic (Esc la
+   libera) e dettagli in regione di stato; senza JavaScript, in
+   stampa o con `prefers-reduced-motion` resta la resa statica
+   completa.
 
 ### Registro degli esiti
 

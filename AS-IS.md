@@ -16,7 +16,30 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-05.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `mars_audit.py` v1.58.0 (+ package `marsbeacon/`)
+## Strumento CLI — `mars_audit.py` v1.59.0 (+ package `marsbeacon/`)
+
+- **Grafo dei link, motore evoluto** (v1.59.0, GUI v2.30.0,
+  2026-08-05) — in vanilla JavaScript su entrambe le superfici
+  (GUI e referto HTML): **simulazione a forze viva** (repulsione,
+  molle sugli archi, richiamo al centro, smorzamento) seminata dal
+  layout deterministico del core — il disegno iniziale resta
+  identico e stampabile, la fisica **si sveglia al trascinamento**
+  e si spegne da sola quando l'energia si esaurisce; **vista ad
+  anelli di profondità** commutabile (un anello per click dalla
+  home, soglia dei 3 click marcata, senza-percorso sull'anello
+  esterno; transizione animata che preserva gli angoli);
+  **frecce direzionali** sugli archi (marker SVG, archi accorciati
+  al bordo del nodo, evidenziate col vicinato); **evidenziazione
+  bloccabile col clic** (Esc o clic sullo sfondo la libera, stato
+  annunciato nella regione di stato); dettagli con **link in
+  ingresso e in uscita** (conteggio nel `<title>` lato server, già
+  localizzato); in GUI anche la **ricerca per percorso** (le
+  pagine corrispondenti restano evidenziate, esito annunciato);
+  legenda testuale (mai solo colore) e bottoni-vista con
+  `aria-pressed`. **`prefers-reduced-motion` spegne ogni
+  animazione**: resta la resa statica, pienamente fruibile.
+  Suite verde, AT 31/31, JS validato con `node --check` su
+  entrambe le superfici.
 
 - **Scomposizione in moduli** (v1.58.0, 2026-08-05, dal P3): le
   10.050 righe del file singolo vivono ora nel package
@@ -589,7 +612,11 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza dichiarata nel modulo.
 
-## Interfaccia grafica locale — `mars_gui.py` v2.29.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.30.0 + `gui/`
+
+- **Grafo dei link, motore evoluto** (v2.30.0, 2026-08-05): vedi
+  la voce v1.59.0 dello strumento CLI — fisica viva, anelli di
+  profondità, frecce, pin col clic, ricerca per percorso.
 
 - **Ancora di realtà nella GUI** (v2.29.0, 2026-08-05): select nel
   form (Auto / Obbligatoria / Spenta, quarta colonna della riga

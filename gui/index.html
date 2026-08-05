@@ -964,6 +964,15 @@
              aria-label="Controlli del grafo">
           <button type="button"
                   class="btn btn-outline-secondary btn-sm me-2"
+                  id="graph-vforza"
+                  aria-pressed="true">Vista a forza</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-3"
+                  id="graph-vanelli"
+                  aria-pressed="false">Anelli di
+            profondità</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-2"
                   id="graph-zoom-in">Ingrandisci</button>
           <button type="button"
                   class="btn btn-outline-secondary btn-sm me-2"
@@ -972,6 +981,24 @@
                   class="btn btn-outline-secondary btn-sm"
                   id="graph-reset">Reimposta vista</button>
         </div>
+        <div class="form-group mb-2" style="max-width: 22rem">
+          <label for="graph-search" class="active">Cerca una
+            pagina nel grafo</label>
+          <input type="search" class="form-control form-control-sm"
+                 id="graph-search" autocomplete="off"
+                 aria-describedby="h-graph-search">
+          <small id="h-graph-search" class="form-text">
+            Le pagine il cui percorso contiene il testo restano
+            evidenziate; vuoto per azzerare.
+          </small>
+        </div>
+        <p class="small text-muted mb-2" id="graph-legend">
+          Legenda: ● home · ● entro 3 click · ● oltre 3 click o
+          senza percorso; ampiezza = link in ingresso; le frecce
+          seguono la direzione del link; negli anelli il cerchio
+          marcato è la soglia dei 3 click. Clic su un nodo blocca
+          l'evidenziazione, Esc la libera.
+        </p>
         <p class="small mb-2" id="graph-info" role="status">
           Seleziona un nodo (mouse o Tab) per i dettagli.
         </p>

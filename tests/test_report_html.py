@@ -158,6 +158,13 @@ def test_referto_con_treemap_grafo_e_script():
     assert "lg-svg" in out and "data-s=" in out
     assert "class=\"lg-node\"" in out and "data-i=" in out
     assert "id=\"lg-zin\"" in out
+    # motore evoluto (v1.59.0): frecce, profondita' nei dati,
+    # viste commutabili e legenda
+    assert "marker-end=\"url(#lg-arr)\"" in out
+    assert "data-depth=" in out and "data-r=" in out
+    assert "id=\"lg-vanelli\"" in out
+    assert "aria-pressed=\"true\"" in out
+    assert "Legenda:" in out
     # script inline autonomo in coda, prima di </body>
     assert "<script>" in out and "querySelectorAll" in out
     assert out.rstrip().endswith("</html>")
