@@ -29,3 +29,8 @@ seo_rrf_gui.db
 # Sorgente originale del logo MARS (1,7 MB): nel repo va solo la
 # versione ottimizzata gui/brand/mars-logo.png
 1785858215.png
+
+# Fork Lighthouse installato a setup-time da
+# tools/update-lighthouse.sh (tag in tools/lighthouse-patches/PIN):
+# mai nel repo, si ricostruisce da zero a ogni esecuzione
+lighthouse/

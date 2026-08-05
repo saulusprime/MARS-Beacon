@@ -1,0 +1,61 @@
+From 424096a8bfbaafba056253a930ecb068d2625a98 Mon Sep 17 00:00:00 2001
+From: Paolo <lymphalab@outlook.it>
+Date: Wed, 5 Aug 2026 09:59:09 +0200
+Subject: [PATCH] mars: disable Sentry error reporting entirely
+
+No interactive prompt, no cached consent (Configstore), no telemetry
+network traffic, for every entry point (CLI and Node API). This is the
+only patch the MARS Beacon fork carries on top of upstream v13.4.1.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+---
+ cli/bin.js         | 10 +++-------
+ core/lib/sentry.js |  4 ++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/cli/bin.js b/cli/bin.js
+index a7b7d90e..ee843185 100644
+--- a/cli/bin.js
++++ b/cli/bin.js
+@@ -27,7 +27,6 @@ import * as commands from './commands/commands.js';
+ import * as Printer from './printer.js';
+ import {getFlags} from './cli-flags.js';
+ import {runLighthouse} from './run.js';
+-import {askPermission} from './sentry-prompt.js';
+ import {LH_ROOT} from '../shared/root.js';
+ import {Sentry} from '../core/lib/sentry.js';
+ 
+@@ -112,12 +111,9 @@ async function begin() {
+   }
+   cliFlags.chromeFlags.push('--enable-features=DevToolsWebMCPSupport');
+ 
+-  // By default, cliFlags.enableErrorReporting is undefined so the user is
+-  // prompted. This can be overridden with an explicit flag or by the cached
+-  // answer returned by askPermission().
+-  if (typeof cliFlags.enableErrorReporting === 'undefined') {
+-    cliFlags.enableErrorReporting = await askPermission();
+-  }
++  // MARS Beacon fork: error reporting (Sentry) is permanently disabled —
++  // no prompt, no cached consent, no telemetry network traffic.
++  cliFlags.enableErrorReporting = false;
+   if (cliFlags.enableErrorReporting) {
+     await Sentry.init({
+       url: urlUnderTest,
+diff --git a/core/lib/sentry.js b/core/lib/sentry.js
+index 915c2155..5f33c375 100644
+--- a/core/lib/sentry.js
++++ b/core/lib/sentry.js
+@@ -44,6 +44,10 @@ const sentryDelegate = {
+  * @param {{url: string, flags: LH.CliFlags, config?: LH.Config, environmentData: NodeOptions}} opts
+  */
+ async function init(opts) {
++  // MARS Beacon fork: telemetry is disabled for every entry point, not just
++  // the CLI — Sentry stays a noop regardless of flags.
++  return; // eslint-disable-line no-unreachable
++
+   // If error reporting is disabled, leave the functions as a noop
+   if (!opts.flags.enableErrorReporting) {
+     return;
+-- 
+2.53.0
+

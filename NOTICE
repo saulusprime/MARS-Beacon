@@ -5,7 +5,12 @@ Questo prodotto include componenti di terze parti:
 
 - Bootstrap Italia (gui/vendor/), distribuito con la propria licenza
   BSD-3-Clause; i file vendorizzati conservano le rispettive note.
-- Il progetto prevede l'integrazione di un fork di Google Lighthouse
-  (https://github.com/GoogleChrome/lighthouse), Copyright Google LLC,
-  licenza Apache License 2.0: alla vendorizzazione del fork questo
-  file NOTICE ne riporterà l'attribuzione completa.
+- Google Lighthouse (https://github.com/GoogleChrome/lighthouse),
+  Copyright Google LLC, licenza Apache License 2.0. MARS Beacon ne
+  usa un fork (https://github.com/saulusprime/lighthouse) con
+  modifiche dichiarate rispetto all'upstream: telemetria Sentry
+  disattivata (patch in tools/lighthouse-patches/). Il fork non è
+  incluso in questo repository: viene installato nella directory
+  lighthouse/ da tools/update-lighthouse.sh, al tag dichiarato in
+  tools/lighthouse-patches/PIN; il checkout installato conserva la
+  propria LICENSE.
