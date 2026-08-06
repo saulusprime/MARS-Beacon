@@ -315,7 +315,7 @@ fallimento è visibile in `systemctl` e può attivare una **notifica
 webhook** (ntfy/Slack/Teams) tramite la unit modello
 [deploy/mars-notify@.service](deploy/mars-notify@.service),
 agganciabile via `OnFailure=` anche al monitoraggio citazioni.
-Per il **server solo-API** (branch `devapi`) c'è
+Per il **server solo-API** c'è
 [deploy/mars-api.service](deploy/mars-api.service) — stesso
 hardening, database condivisibile con la GUI, convivenza su
 8765/8766 — e l'esempio nginx
@@ -372,9 +372,9 @@ protezione dal path traversal ed esegue un audit alla volta.
 
 API esposte (usate dal frontend, utilizzabili anche da script):
 `GET /api/env` (versioni, RAM disponibile, valori suggeriti),
-`POST /api/audit` (avvio; `409` se un audit è già in corso; dal
-branch `devapi` anche `lang`, `soglie`, `queries_gsc` e
-`fail_under` per la parità con la CLI),
+`POST /api/audit` (avvio; `409` se un audit è già in corso;
+anche `lang`, `soglie`, `queries_gsc` e `fail_under` per la
+parità con la CLI),
 `GET /api/status` (stato, log, sintesi, rilievi, esiti RRF),
 `GET /api/report/{html,json,text,md,csv}` (referti, `?download=1`
 per lo scarico) — queste cinque rotte del ciclo audit sono

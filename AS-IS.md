@@ -691,12 +691,12 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza dichiarata nel modulo.
 
-## API — contratto e registro (programma P1 API-first, branch `devapi`)
+## API — contratto e registro (programma P1 API-first)
 
 **Stato: programma CONCLUSO il 2026-08-06, inclusa la voce
 condizionale** (migrazione GUI alle rotte v1 e deprecazione degli
-alias — bullet in testa); il branch `devapi` NON è ancora fuso in
-`main`. In sintesi: contratto OpenAPI 3.1 **auto-generato** dal
+alias), **e fuso in `main`** lo stesso giorno (merge `dee7d92` —
+bullet in testa): le release ripartono da `main`. In sintesi: contratto OpenAPI 3.1 **auto-generato** dal
 registro dichiarativo delle rotte (`marsbeacon/api.py`, 26 rotte,
 `API_CONTRACT_VERSION` **1.4.0**, golden `docs/openapi.json`,
 spec servita da `GET /api/v1/openapi.json`, documentazione Scalar
@@ -709,9 +709,17 @@ ogni formato e lingua on-demand; **token Bearer** e CORS
 esplicito; **frontend statico separato** (`MARS_API_BASE` in
 config.js, accesso token cross-origin); e2e a origini separate,
 job CI "Contratto API", `docs/API.md`, `deploy/mars-api.service`
-e `deploy/nginx-mars.conf.example`. Nel TO-DO resta solo la
-decisione di merge. Dettaglio nei bullet che seguono, dal più
-recente.
+e `deploy/nginx-mars.conf.example`. Il TO-DO non ha più voci P1.
+Dettaglio nei bullet che seguono, dal più recente.
+
+- **Merge di `devapi` in `main`** (2026-08-06, merge `dee7d92` —
+  chiude anche l'ultima voce P1 del TO-DO, la decisione del
+  titolare). I nove commit del programma sono stati fusi con
+  `--no-ff` per lasciare l'evento leggibile nella storia; verde
+  riverificato alla fusione (405 test, flake8 pulito; AT
+  strumentale 31/31 dalla chiusura della voce condizionale). Da
+  qui le release ripartono da `main`; `devapi` resta come branch
+  storico, cancellabile a discrezione del titolare.
 
 - **GUI migrata alle rotte v1 e alias legacy DEPRECATI:
   contratto 1.4.0** (GUI v2.36.0, 2026-08-06 — chiusa la voce
