@@ -151,7 +151,9 @@ main fieldset legend.h5 {
   color: var(--lt-teal-900);
 }
 
-/* -------------------------------- Footer ------------------------------- */
+/* -------------------------------- Footer -------------------------------
+   Replica del footer di lymphatech.it: regole portate da
+   webroot/css/lympha.css del sito, sugli stessi token --lt-*. */
 
 .lt-footer {
   background: var(--lt-teal-900);
@@ -159,9 +161,17 @@ main fieldset legend.h5 {
   border-top: 0;
 }
 
+.lt-footer__main {
+  padding-block: 3.5rem;
+}
+
 .lt-footer .lt-name {
   color: #fff;
   font-weight: 700;
+}
+
+.lt-footer__brand .lt-name {
+  font-size: 1.25rem;
 }
 
 .lt-footer .lt-name span {
@@ -170,12 +180,102 @@ main fieldset legend.h5 {
 
 .lt-footer a {
   color: #fff;
+  text-decoration: none;
+}
+
+.lt-footer a:hover {
+  text-decoration: underline;
 }
 
 .lt-footer a:focus-visible,
 .lt-header a:focus-visible {
   outline: 2px solid var(--lt-orange) !important;
   outline-offset: 2px;
+}
+
+.lt-footer h2 {
+  color: #fff;
+  font-size: 1.05rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.lt-footer__address {
+  font-style: normal;
+  color: #cdd8e4;
+  font-size: .86rem;
+  line-height: 1.6;
+}
+
+.lt-footer__address strong {
+  color: #fff;
+}
+
+.lt-rating-badge {
+  height: 1.1em;
+  width: auto;
+  vertical-align: -.2em;
+  margin-left: .4rem;
+}
+
+.lt-footer__tagline {
+  color: #aebfd0;
+  font-size: .92rem;
+}
+
+/* Placca bianca per i loghi di certificazione (leggibili sul
+   footer scuro) */
+.lt-cert-plate {
+  display: inline-block;
+  background: #fff;
+  padding: .45rem .65rem;
+  border-radius: .5rem;
+}
+
+.lt-cert-plate img {
+  display: block;
+  width: 150px;
+  max-width: 100%;
+  height: auto;
+}
+
+.lt-footer .lt-cert-cap {
+  font-size: .76rem;
+  color: #aebfd0;
+  line-height: 1.45;
+}
+
+.lt-green-plate {
+  display: inline-block;
+}
+
+.lt-green-plate img {
+  display: block;
+  width: 171px;
+  max-width: 100%;
+  height: auto;
+}
+
+.lt-footer__bar {
+  background: var(--lt-teal-700);
+  font-size: .85rem;
+  color: #aebfd0;
+}
+
+.lt-footer__linkedin {
+  display: inline-flex;
+  padding: .25rem;
+}
+
+.lt-footer__linkedin svg {
+  width: 24px;
+  height: 24px;
+}
+
+.lt-footer__wcag {
+  height: 34px;
+  width: auto;
+  display: block;
 }
 
 /* Logo MARS Beacon a destra nell'header (decorativo: il nome e'

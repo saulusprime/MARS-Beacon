@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="171" height="60" viewBox="0 0 171 60" role="img" xml:lang="en">
+<title>ESG SME Rating BBB — issued by Ecomate S.R.L.</title>
+<desc>Riproduzione statica del badge HTML fornito da Ecomate (The
+Open-ESG Rating Agency): fascia verde superiore con EU-VAT e data,
+corpo con dicitura ESG SME Rating e giudizio BBB su campo ambra,
+fascia verde inferiore con l'emittente. Vedi ORIGINI.txt.</desc>
+<defs>
+<clipPath id="arrotonda"><rect width="171" height="60" rx="6"/></clipPath>
+</defs>
+<g clip-path="url(#arrotonda)" font-family="Arial, sans-serif">
+<rect width="171" height="60" fill="#f8f9fa"/>
+<rect width="171" height="12" fill="#28a745"/>
+<rect y="48" width="171" height="12" fill="#28a745"/>
+<rect x="85.5" y="12" width="85.5" height="36" fill="#ffc107" fill-opacity=".5"/>
+<text x="85.5" y="8" fill="#fff" font-size="5" text-anchor="middle">EU-VAT: EU-03099141206 | June 2026</text>
+<text x="7" y="27" fill="#212529" font-size="10" font-weight="bold">ESG</text>
+<text x="7" y="38" fill="#212529" font-size="8" font-weight="bold">SME Rating</text>
+<text x="128.25" y="35" fill="#212529" font-size="14" font-weight="bold" text-anchor="middle">BBB</text>
+<text x="85.5" y="56" fill="#fff" font-size="5" text-anchor="middle">Issued by Ecomate S.R.L. - The Open-ESG Rating Agency</text>
+</g>
+</svg>

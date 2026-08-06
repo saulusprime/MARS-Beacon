@@ -34,6 +34,12 @@
     return fetch(apiUrl(path), opts);
   }
 
+  /* Anno corrente nella barra del footer (stesso comportamento
+     del sito istituzionale, che aggiorna [data-year] via JS). */
+  document.querySelectorAll("[data-year]").forEach(function (n) {
+    n.textContent = String(new Date().getFullYear());
+  });
+
   /* Il ciclo audit usa il modello a risorse (/api/v1/audits, job
      con id): l'id dell'ultimo job vive in localStorage cosi' il
      ricaricamento della pagina ripristina i risultati. Gli alias

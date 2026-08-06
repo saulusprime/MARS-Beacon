@@ -1046,7 +1046,31 @@ Dettaglio nei bullet che seguono, dal più recente.
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.36.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.37.0 + `gui/`
+
+- **Footer istituzionale identico a lymphatech.it** (v2.37.0,
+  2026-08-06, in vista della pubblicazione dell'app sul dominio
+  lymphatech.it): stessa struttura, voci e link del footer del
+  sito — quattro colonne (brand e anagrafica societaria completa,
+  Servizi, Azienda, Documenti e policy con targhe ISO 9001, ESG e
+  Green Cloud) più la barra con copyright (anno via `[data-year]`
+  aggiornato da app.js come sul sito), LinkedIn e badge WCAG — su
+  **index.html e tos.html**. Il markup NON è copiato dal sito (il
+  page-builder vi produce `<body>` annidati e `<style>` duplicati,
+  HTML invalido): è rifatto pulito con la griglia Bootstrap
+  Italia, i link portati ad URL assoluti e le regole `.lt-footer`
+  del CSS del sito portate in theme.css sugli stessi token
+  `--lt-*` già condivisi. GUI offline per costruzione (e CSP
+  `img-src 'self'`): i badge sono **vendorizzati in `gui/brand/`**
+  con provenienza in `ORIGINI.txt` — stella del rating di
+  legalità, targa Accredia/Kiwa, badge WCAG (copie identiche),
+  istantanea del badge Green Cloud (il link punta comunque al
+  certificato live) e **badge ESG Ecomate ridisegnato come SVG
+  immagine**: il markup del provider ha testo bianco 5px su verde
+  (contrasto 3.3:1) che come testo reale fallirebbe il criterio
+  WCAG 1.4.3 in Pa11y, come immagine-logo con alt descrittivo no.
+  Verificato: 405 test, **Pa11y 3/3 pagine 0 errori** e **AT
+  strumentale 31/31** in Chrome reale col footer nuovo.
 
 - **Ciclo audit sulle rotte v1** (v2.36.0, 2026-08-06, branch
   `devapi`): job con id persistito, referti per job, alias legacy

@@ -1,0 +1,41 @@
+Origine degli asset di brand e delle attestazioni nel footer
+=============================================================
+
+Il footer della GUI replica quello di https://lymphatech.it
+(stessa struttura, voci e link). La GUI e' offline per
+costruzione: i badge sono vendorizzati qui, non caricati da
+remoto. Scaricati il 2026-08-06.
+
+badge-stella-due-plus-oro.svg
+  https://lymphatech.it/lympha_tech/img/lympha/badge_stella_due_plus_oro.svg
+  Rating di legalita' RT18284 (copia identica; l'SVG dichiara nel
+  desc di non essere un simbolo ufficiale AGCOM).
+
+accredia-kiwa.png
+  https://lymphatech.it/lympha_tech/img/lympha/accredia_kiwa.png
+  Targa Accredia/Kiwa della certificazione ISO 9001:2015
+  Reg. Num. 19349-A (copia identica).
+
+wcag21-aa.png
+  https://lymphatech.it/lympha_tech/img/lympha/wcag2.1AA-v.png
+  Badge di conformita' WCAG 2.1 AA (copia identica).
+
+green-cloud-badge.png
+  https://www.green-cloud.it/api/green-certificates/v1/badgesUuid/f0bfb489-140f-4940-a1e2-a6c24012fe79/fdf102fd-eca1-4b4c-bcba-30632e4b4404/Company_H_CO/sm/0
+  Istantanea del badge servito dall'API Green Cloud; il link nel
+  footer punta comunque al certificato live sul dominio
+  dell'emittente, che resta la fonte di verita'.
+
+esg-ecomate.svg
+  Riproduzione statica (stessi testi, colori e proporzioni) del
+  badge HTML fornito da Ecomate S.R.L. e incorporato nel footer
+  di lymphatech.it. Trasformato in immagine perche' il markup
+  originale usa testo bianco 5px su verde (#28a745, contrasto
+  3.3:1): come testo reale farebbe fallire il criterio WCAG
+  1.4.3 verificato da Pa11y in CI, mentre come immagine-logo
+  rientra nell'esenzione dei logotipi e porta un alt descrittivo.
+
+I badge attestano certificazioni della societa' Lympha
+Technologies S.r.l. e appartengono ai rispettivi emittenti
+(AGCOM/rating di legalita', Accredia/Kiwa, W3C-WAI, Green Cloud,
+Ecomate): non sono coperti dalla licenza Apache 2.0 del progetto.

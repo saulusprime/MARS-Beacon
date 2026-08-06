@@ -1,0 +1,15 @@
+<svg viewBox="80 72 442 166" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Badge rating: una stella e due segni più dorati con bordo oro scuro</title>
+<desc>Stella dorata con bordo oro scuro affiancata da due segni più dorati più piccoli, anch'essi con bordo oro scuro. Non è un simbolo ufficiale AGCOM.</desc>
+
+<g transform="translate(170,160)">
+<polygon points="0,-78 22,-24 80,-24 33,12 51,68 0,33 -51,68 -33,12 -80,-24 -22,-24"
+fill="#E8B23A" stroke="#B8841A" stroke-width="3" stroke-linejoin="round"/>
+</g>
+
+<polygon points="340,118 360,118 360,150 392,150 392,170 360,170 360,202 340,202 340,170 308,170 308,150 340,150"
+fill="#E8B23A" stroke="#B8841A" stroke-width="3" stroke-linejoin="round"/>
+
+<polygon points="460,118 480,118 480,150 512,150 512,170 480,170 480,202 460,202 460,170 428,170 428,150 460,150"
+fill="#E8B23A" stroke="#B8841A" stroke-width="3" stroke-linejoin="round"/>
+</svg>
