@@ -693,25 +693,56 @@ sono nel [README.md](README.md).
 
 ## API — contratto e registro (programma P1 API-first, branch `devapi`)
 
-**Stato: programma CONCLUSO il 2026-08-06** (otto commit su
-`devapi`, da fc29029 a 51d9580; il branch NON è ancora fuso in
-`main`). In sintesi: contratto OpenAPI 3.1 **auto-generato** dal
+**Stato: programma CONCLUSO il 2026-08-06, inclusa la voce
+condizionale** (migrazione GUI alle rotte v1 e deprecazione degli
+alias — bullet in testa); il branch `devapi` NON è ancora fuso in
+`main`. In sintesi: contratto OpenAPI 3.1 **auto-generato** dal
 registro dichiarativo delle rotte (`marsbeacon/api.py`, 26 rotte,
-`API_CONTRACT_VERSION` **1.3.0**, golden `docs/openapi.json`,
+`API_CONTRACT_VERSION` **1.4.0**, golden `docs/openapi.json`,
 spec servita da `GET /api/v1/openapi.json`, documentazione Scalar
 su `GET /api/docs`); **parità CLI↔API** (lang, soglie,
 queries_gsc, fail_under); **backend puro** (motore in
-`marsbeacon/api.py`, combinato `mars_gui.py` v2.35.0 come
+`marsbeacon/api.py`, combinato `mars_gui.py` v2.36.0 come
 facciata, entry solo-API `mars_api.py` v0.2.0 su porta 8766 con
 `--cors` e `--max-audit`); **job con id** e referti per job in
 ogni formato e lingua on-demand; **token Bearer** e CORS
 esplicito; **frontend statico separato** (`MARS_API_BASE` in
 config.js, accesso token cross-origin); e2e a origini separate,
 job CI "Contratto API", `docs/API.md`, `deploy/mars-api.service`
-e `deploy/nginx-mars.conf.example`. Resta nel TO-DO la sola voce
-condizionale (migrazione GUI alle rotte v1 + deprecazione alias
-legacy) e la decisione di merge. Dettaglio nei bullet che
-seguono, dal più recente.
+e `deploy/nginx-mars.conf.example`. Nel TO-DO resta solo la
+decisione di merge. Dettaglio nei bullet che seguono, dal più
+recente.
+
+- **GUI migrata alle rotte v1 e alias legacy DEPRECATI:
+  contratto 1.4.0** (GUI v2.36.0, 2026-08-06 — chiusa la voce
+  condizionale del programma). Il **ciclo audit della GUI usa il
+  modello a risorse**: avvio su `POST /api/v1/audits` con **id del
+  job persistito** in localStorage (`mars_job_id`: il
+  ricaricamento della pagina ripristina i risultati dal job, e un
+  job sparito o di un altro utente azzera l'id), polling e SSE
+  per-job, annullamento con `DELETE`, **link dei referti legati al
+  job** (`setReportLinks` su `.../report?format=…`; gli href
+  statici in index.html sono diventati dinamici, `bindApiLink`
+  reso idempotente per i rebind a ogni audit) e adattatore
+  `messaggioErrore` per l'oggetto d'errore uniforme v1. Sistemata
+  en passant una lacuna della guardia download (non copriva
+  dl-md/dl-csv; ora copre anche l'assenza di job). Nel registro il
+  modello `Route` ha il campo **`deprecated`** ({since,
+  replacement}) e le **cinque rotte legacy del ciclo audit**
+  (`POST /api/audit`, `GET /api/status`, `POST /api/cancel`,
+  `GET /api/events`, `GET /api/report/{formato}`) sono dichiarate
+  **DEPRECATE dal 2026-08-06** nella spec — `deprecated: true` +
+  data e sostituto nella description, "mai rimozione silenziosa":
+  **gli alias restano attivi** e i contract test continuano a
+  esercitarli; le altre rotte legacy (env, me, account, history,
+  citations) non hanno sostituto v1 e restano il contratto
+  corrente. `API_CONTRACT_VERSION` 1.4.0, golden rigenerato.
+  2 test in più (le cinque deprecazioni dichiarate con data e
+  sostituto, nessuna rotta v1 deprecata; app.js senza riferimenti
+  alle rotte legacy del ciclo audit, con job id persistito e
+  referti per job); **verifica AT strumentale 31/31 con la GUI
+  migrata in Chrome reale** (i flussi ora esercitano davvero le
+  rotte v1). Suite 405 test, flake8 pulito.
 
 - **Qualità, deploy e documentazione — FASE 4 CONCLUSA: il
   programma P1 API-first è COMPLETO** (2026-08-06; resta solo la
@@ -1006,7 +1037,12 @@ seguono, dal più recente.
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.35.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.36.0 + `gui/`
+
+- **Ciclo audit sulle rotte v1** (v2.36.0, 2026-08-06, branch
+  `devapi`): job con id persistito, referti per job, alias legacy
+  deprecati — dettaglio nella sezione "API — contratto e
+  registro" più sopra.
 
 - **Bundle statico separato** (v2.35.0, 2026-08-06, branch
   `devapi`): base API configurabile, accesso con token API
@@ -1554,7 +1590,7 @@ seguono, dal più recente.
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 403 test in ~30 secondi** (inclusa
+- **Suite pytest: 405 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

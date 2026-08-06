@@ -71,7 +71,7 @@ from marsbeacon.api import (  # noqa: F401
     read_citations_history,
     validate_config)
 
-__version__ = "2.35.0"
+__version__ = "2.36.0"
 
 # Nome storico del cookie di sessione: la costante canonica e' nel
 # contratto (marsbeacon.api.SESSION_COOKIE_NAME).

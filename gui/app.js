@@ -34,6 +34,38 @@
     return fetch(apiUrl(path), opts);
   }
 
+  /* Il ciclo audit usa il modello a risorse (/api/v1/audits, job
+     con id): l'id dell'ultimo job vive in localStorage cosi' il
+     ricaricamento della pagina ripristina i risultati. Gli alias
+     legacy /api/audit-status-cancel-events-report restano attivi
+     sul server ma la GUI non li usa piu' (deprecazione dichiarata
+     nella spec). */
+  let jobId = "";
+  try {
+    jobId = window.localStorage.getItem("mars_job_id") || "";
+  } catch (err) { /* niente persistenza */ }
+
+  function setJobId(nuovo) {
+    jobId = nuovo || "";
+    try {
+      if (jobId) {
+        window.localStorage.setItem("mars_job_id", jobId);
+      } else {
+        window.localStorage.removeItem("mars_job_id");
+      }
+    } catch (err) { /* ignora */ }
+  }
+
+  /* Le rotte /api/v1 usano l'oggetto d'errore uniforme
+     {code, key, message, params}; le legacy la stringa. */
+  function messaggioErrore(data, fallback) {
+    if (data && data.error) {
+      if (typeof data.error === "string") { return data.error; }
+      if (data.error.message) { return data.error.message; }
+    }
+    return fallback;
+  }
+
   /* Nome di download suggerito per i link API (nell'assetto
      remoto il server non puo' imporlo: il blob e' anonimo). */
   function apiFileName(path) {
@@ -53,8 +85,12 @@
      negli href). */
   function bindApiLink(link, path) {
     link.href = apiUrl(path);
+    if (link._marsClick) {
+      link.removeEventListener("click", link._marsClick);
+      link._marsClick = null;
+    }
     if (!apiToken) { return; }
-    link.addEventListener("click", (ev) => {
+    const gestore = (ev) => {
       if (link.classList.contains("disabled")) { return; }
       ev.preventDefault();
       apiFetch(path)
@@ -75,7 +111,9 @@
             () => URL.revokeObjectURL(url), 60000);
         })
         .catch(() => {});
-    });
+    };
+    link._marsClick = gestore;
+    link.addEventListener("click", gestore);
   }
 
   function adaptStaticApiLinks() {
@@ -221,9 +259,10 @@
   el("register-form").addEventListener("submit", onRegister);
   el("profile-form").addEventListener("submit", onProfile);
   el("logout-btn").addEventListener("click", onLogout);
-  ["dl-html", "dl-json", "dl-text", "open-report"].forEach((id) => {
+  ["dl-html", "dl-json", "dl-text", "dl-md", "dl-csv",
+   "open-report"].forEach((id) => {
     el(id).addEventListener("click", (event) => {
-      if (!me || !me.profile_complete) {
+      if (!jobId || !me || !me.profile_complete) {
         event.preventDefault();
       }
     });
@@ -1067,7 +1106,8 @@
     btn.disabled = true;
     btn.textContent = "Annullamento…";
     el("announcer").textContent = "Annullamento richiesto…";
-    apiFetch("api/cancel", { method: "POST" }).catch(() => {
+    apiFetch("api/v1/audits/" + jobId,
+             { method: "DELETE" }).catch(() => {
       btn.disabled = false;
       btn.textContent = "Annulla audit";
     });
@@ -1083,7 +1123,10 @@
   /* Se un audit e' gia' concluso (es. pagina ricaricata), i
      risultati vengono ripristinati senza rilanciare nulla. */
   function restoreResults() {
-    apiFetch("api/status")
+    if (!jobId) {
+      return;
+    }
+    apiFetch("api/v1/audits/" + jobId)
       .then((r) => r.json())
       .then((snap) => {
         if (!running && snap.state === "done" &&
@@ -1093,6 +1136,8 @@
           el("progress-section").hidden = false;
           setOpen("sec-config", false);
           showResults(snap);
+        } else if (!snap.state) {
+          setJobId("");  // job sparito o di un altro utente
         }
       })
       .catch(() => { /* nessun audit precedente */ });
@@ -1263,7 +1308,7 @@
   /* ---------------- ciclo dell'audit ---------------- */
 
   function startAudit(config) {
-    apiFetch("api/audit", {
+    apiFetch("api/v1/audits", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(config),
@@ -1271,9 +1316,11 @@
       .then((r) => r.json().then((data) => ({ status: r.status, data })))
       .then(({ status, data }) => {
         if (status !== 202) {
-          showFormError(data.error || "Avvio non riuscito.");
+          showFormError(messaggioErrore(
+            data, "Avvio non riuscito."));
           return;
         }
+        setJobId(data.id);
         running = true;
         lastPhase = "";
         setSubmitState(true);
@@ -1329,7 +1376,8 @@
          header sugli EventSource): si va di polling, il ripiego
          gia' previsto dal protocollo. */
       try {
-        events = new EventSource(apiUrl("api/events"));
+        events = new EventSource(
+          apiUrl("api/v1/audits/" + jobId + "/events"));
         events.onmessage = (msg) => {
           handleSnapshot(JSON.parse(msg.data));
         };
@@ -1348,7 +1396,8 @@
   function handleSnapshot(snap) {
     if (!snap.state) {
       stopEvents();
-      fail(snap.error || "Sessione scaduta: accedi di nuovo.");
+      fail(messaggioErrore(
+        snap, "Sessione scaduta: accedi di nuovo."));
       return;
     }
     renderLog(snap.log || []);
@@ -1365,7 +1414,7 @@
   }
 
   function poll() {
-    apiFetch("api/status")
+    apiFetch("api/v1/audits/" + jobId)
       .then((r) => r.json())
       .then((snap) => {
         handleSnapshot(snap);
@@ -1433,7 +1482,23 @@
     el("results-toggle").focus();
   }
 
+  const REPORT_LINKS = {
+    "dl-html": ["html", true], "dl-json": ["json", true],
+    "dl-text": ["text", true], "dl-md": ["md", true],
+    "dl-csv": ["csv", true], "open-report": ["html", false],
+  };
+
+  function setReportLinks() {
+    Object.keys(REPORT_LINKS).forEach((id) => {
+      const fmt = REPORT_LINKS[id][0];
+      const scarica = REPORT_LINKS[id][1];
+      bindApiLink(el(id), "api/v1/audits/" + jobId +
+        "/report?format=" + fmt + (scarica ? "&download=1" : ""));
+    });
+  }
+
   function showResults(snap) {
+    setReportLinks();
     renderMeta(snap.summary);
     renderHero(snap.summary);
     renderDelta((snap.summary || {}).delta);

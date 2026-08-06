@@ -377,8 +377,10 @@ branch `devapi` anche `lang`, `soglie`, `queries_gsc` e
 `fail_under` per la parità con la CLI),
 `GET /api/status` (stato, log, sintesi, rilievi, esiti RRF),
 `GET /api/report/{html,json,text,md,csv}` (referti, `?download=1`
-per lo scarico). Dal branch `devapi` c'è anche il **modello a
-risorse**: `POST /api/v1/audits` crea un job con id da seguire su
+per lo scarico) — queste cinque rotte del ciclo audit sono
+**deprecate dichiaratamente** dal 2026-08-06 (restano attive; data
+e sostituto nella spec) in favore del **modello a risorse**:
+`POST /api/v1/audits` crea un job con id da seguire su
 `GET /api/v1/audits/{id}` (o via SSE per-job), annullare con
 `DELETE` e da cui scaricare i referti **in ogni formato e lingua**
 (`.../report?format=…&lang=…`, resi on-demand dalla stessa
@@ -614,7 +616,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 403 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 405 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "MARS Beacon API",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Contratto dell'API locale di MARS Beacon, generato dal registro dichiarativo delle rotte (marsbeacon/api.py): spec e codice non possono divergere per costruzione. Gli errori sono {\"error\": messaggio in italiano} (piu' \"code\" macchina dove indicato). Un audit alla volta; slot orario per utente; download dei referti riservato alla registrazione completa.",
     "license": {
       "name": "Apache 2.0",
@@ -253,7 +253,8 @@
         "tags": [
           "audit"
         ],
-        "description": "Annullamento cooperativo: interrompe richieste e attese alla prima occasione utile, senza risultati parziali; non consuma lo slot orario.",
+        "deprecated": true,
+        "description": "Annullamento cooperativo: interrompe richieste e attese alla prima occasione utile, senza risultati parziali; non consuma lo slot orario.\n\nDEPRECATA dal 2026-08-06: usare DELETE /api/v1/audits/{id}. L'alias resta attivo e funzionante (mai rimozione silenziosa).",
         "security": [
           {
             "cookieSession": []
@@ -945,7 +946,8 @@
         "tags": [
           "audit"
         ],
-        "description": "Un audit alla volta (409 se occupato) e uno slot orario per utente (429 con retry_in_s). L'avanzamento arriva da GET /api/status o dall'SSE di GET /api/events; i referti dei cinque formati da GET /api/report/{formato}. I campi numerici accettano anche stringhe numeriche; i campi omessi usano i default indicati.",
+        "deprecated": true,
+        "description": "Un audit alla volta (409 se occupato) e uno slot orario per utente (429 con retry_in_s). L'avanzamento arriva da GET /api/status o dall'SSE di GET /api/events; i referti dei cinque formati da GET /api/report/{formato}. I campi numerici accettano anche stringhe numeriche; i campi omessi usano i default indicati.\n\nDEPRECATA dal 2026-08-06: usare POST /api/v1/audits. L'alias resta attivo e funzionante (mai rimozione silenziosa).",
         "security": [
           {
             "cookieSession": []
@@ -1306,7 +1308,8 @@
         "tags": [
           "audit"
         ],
-        "description": "Snapshot del job: stato, log completo e — a fine audit — sintesi, rilievi, piano di remediation, esiti RRF e confronto competitivo. Il polling e' il ripiego dichiarato dell'SSE di GET /api/events.",
+        "deprecated": true,
+        "description": "Snapshot del job: stato, log completo e — a fine audit — sintesi, rilievi, piano di remediation, esiti RRF e confronto competitivo. Il polling e' il ripiego dichiarato dell'SSE di GET /api/events.\n\nDEPRECATA dal 2026-08-06: usare GET /api/v1/audits/{id}. L'alias resta attivo e funzionante (mai rimozione silenziosa).",
         "security": [
           {
             "cookieSession": []
@@ -1425,7 +1428,8 @@
         "tags": [
           "audit"
         ],
-        "description": "Invia lo snapshot di GET /api/status a ogni variazione (payload JSON nel campo data) e chiude il flusso allo stato terminale; il client ripiega sul polling se il flusso non e' disponibile.",
+        "deprecated": true,
+        "description": "Invia lo snapshot di GET /api/status a ogni variazione (payload JSON nel campo data) e chiude il flusso allo stato terminale; il client ripiega sul polling se il flusso non e' disponibile.\n\nDEPRECATA dal 2026-08-06: usare GET /api/v1/audits/{id}/events. L'alias resta attivo e funzionante (mai rimozione silenziosa).",
         "security": [
           {
             "cookieSession": []
@@ -1474,7 +1478,8 @@
         "tags": [
           "audit"
         ],
-        "description": "Una sola scansione produce tutti i formati. Riservato alla registrazione completa (azienda e telefono nel profilo). L'HTML e' servito con la CSP dedicata del referto (script inline autonomo, nessuna origine esterna).",
+        "deprecated": true,
+        "description": "Una sola scansione produce tutti i formati. Riservato alla registrazione completa (azienda e telefono nel profilo). L'HTML e' servito con la CSP dedicata del referto (script inline autonomo, nessuna origine esterna).\n\nDEPRECATA dal 2026-08-06: usare GET /api/v1/audits/{id}/report?format=.... L'alias resta attivo e funzionante (mai rimozione silenziosa).",
         "security": [
           {
             "cookieSession": []

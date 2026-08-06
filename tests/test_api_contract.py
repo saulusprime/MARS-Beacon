@@ -806,3 +806,30 @@ def _api_delete(base_url, path, cookie=""):
                     dict(resp.headers))
     except urllib.error.HTTPError as exc:
         return exc.code, json.loads(exc.read()), dict(exc.headers)
+
+
+def test_alias_legacy_deprecati_dichiarati():
+    """Le cinque rotte legacy del ciclo audit sono deprecate nella
+    spec con data e sostituto; gli alias restano attivi (i test
+    sopra continuano a esercitarli) e le rotte v1 non sono mai
+    deprecate."""
+    spec = api.openapi_spec()
+    deprecate = {}
+    for percorso, operazioni in spec["paths"].items():
+        for metodo, operazione in operazioni.items():
+            if operazione.get("deprecated"):
+                deprecate[(metodo.upper(), percorso)] = \
+                    operazione.get("description", "")
+    assert set(deprecate) == {
+        ("POST", "/api/audit"), ("GET", "/api/status"),
+        ("POST", "/api/cancel"), ("GET", "/api/events"),
+        ("GET", "/api/report/{formato}")}
+    for chiave, descrizione in deprecate.items():
+        assert "DEPRECATA dal 2026-08-06" in descrizione, chiave
+        assert "/api/v1/audits" in descrizione, chiave
+        assert "mai rimozione silenziosa" in descrizione, chiave
+    # nessuna rotta v1 e' deprecata
+    for percorso, operazioni in spec["paths"].items():
+        if percorso.startswith("/api/v1/"):
+            for operazione in operazioni.values():
+                assert not operazione.get("deprecated"), percorso

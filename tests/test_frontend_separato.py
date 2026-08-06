@@ -42,9 +42,9 @@ def test_app_js_passa_sempre_dal_wrapper():
     assert 'apiFetch("api/' in app
     # l'unica fetch nuda e' dentro il wrapper, su apiUrl
     assert app.count("fetch(apiUrl(") == 1
-    # SSE: base configurabile e guardia sul token (gli EventSource
-    # non portano header: con token si va di polling)
-    assert 'new EventSource(apiUrl("api/events"))' in app
+    # SSE: base configurabile, per-job, e guardia sul token (gli
+    # EventSource non portano header: con token si va di polling)
+    assert 'apiUrl("api/v1/audits/" + jobId + "/events")' in app
     assert "window.EventSource && !apiToken" in app
     # download: link legati al wrapper (blob nell'assetto remoto)
     assert "bindApiLink(" in app
@@ -84,3 +84,20 @@ def test_esempio_nginx_documenta_i_due_scenari():
     assert "white-label" in testo.lower()
     # SSE dietro proxy: buffering spento
     assert "proxy_buffering off" in testo
+
+
+def test_gui_migrata_alle_rotte_v1():
+    """Il ciclo audit della GUI usa il modello a risorse: nessun
+    riferimento alle cinque rotte legacy deprecate."""
+    app = _leggi("app.js")
+    for legacy in ('"api/audit"', '"api/status"', '"api/cancel"',
+                   'api/events"', "api/report/"):
+        assert legacy not in app, legacy
+    assert 'apiFetch("api/v1/audits"' in app       # avvio
+    assert '"api/v1/audits/" + jobId' in app       # polling/cancel
+    assert "mars_job_id" in app                    # id persistito
+    assert "setReportLinks" in app                 # referti per job
+    assert "messaggioErrore" in app                # errori v1
+    # i link statici dei referti sono dinamici (legati al job)
+    indice = _leggi("index.html")
+    assert "api/report/" not in indice

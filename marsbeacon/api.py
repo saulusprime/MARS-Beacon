@@ -68,8 +68,11 @@ from marsbeacon.i18n import HTML_LANGS
 # queries_gsc, fail_under); la 1.2.0 GET /api/docs (documentazione
 # Scalar); la 1.3.0 il modello a risorse della Fase 2 — job con id
 # (/api/v1/audits), token Bearer (/api/v1/tokens), storico
-# paginato, snapshot con id, errori uniformi sulle rotte v1.
-API_CONTRACT_VERSION = "1.3.0"
+# paginato, snapshot con id, errori uniformi sulle rotte v1; la
+# 1.4.0 dichiara DEPRECATE le cinque rotte legacy del ciclo audit
+# (audit/status/cancel/events/report), sostituite dalle /api/v1 —
+# gli alias restano attivi, mai rimozione silenziosa.
+API_CONTRACT_VERSION = "1.4.0"
 
 
 # Nome del cookie di sessione: fa parte del contratto (schema di
@@ -203,6 +206,11 @@ class Route:
     request_schema: Optional[Dict[str, object]] = None
     responses: Dict[int, Dict[str, object]] = field(
         default_factory=dict)
+    # Deprecazione dichiarata (mai rimozione silenziosa):
+    # {"since": data ISO, "replacement": rotta sostitutiva}.
+    # L'alias resta attivo; la spec espone deprecated: true e il
+    # sostituto nella description.
+    deprecated: Optional[Dict[str, str]] = None
 
 
 def _err(description: str) -> Dict[str, object]:
@@ -535,6 +543,8 @@ ROUTES: Tuple[Route, ...] = (
     ),
     Route(
         "POST", "/api/cancel",
+        deprecated={"since": "2026-08-06",
+                    "replacement": "DELETE /api/v1/audits/{id}"},
         summary="Annulla l'audit in corso",
         description="Annullamento cooperativo: interrompe "
                     "richieste e attese alla prima occasione "
@@ -718,6 +728,8 @@ ROUTES: Tuple[Route, ...] = (
     ),
     Route(
         "POST", "/api/audit",
+        deprecated={"since": "2026-08-06",
+                    "replacement": "POST /api/v1/audits"},
         summary="Avvia un audit",
         description="Un audit alla volta (409 se occupato) e uno "
                     "slot orario per utente (429 con retry_in_s). "
@@ -751,6 +763,8 @@ ROUTES: Tuple[Route, ...] = (
     ),
     Route(
         "GET", "/api/status",
+        deprecated={"since": "2026-08-06",
+                    "replacement": "GET /api/v1/audits/{id}"},
         summary="Stato e sintesi dell'audit",
         description="Snapshot del job: stato, log completo e — a "
                     "fine audit — sintesi, rilievi, piano di "
@@ -767,6 +781,8 @@ ROUTES: Tuple[Route, ...] = (
     ),
     Route(
         "GET", "/api/events",
+        deprecated={"since": "2026-08-06",
+                    "replacement": "GET /api/v1/audits/{id}/events"},
         summary="Avanzamento push (Server-Sent Events)",
         description="Invia lo snapshot di GET /api/status a ogni "
                     "variazione (payload JSON nel campo data) e "
@@ -785,6 +801,9 @@ ROUTES: Tuple[Route, ...] = (
     ),
     Route(
         "GET", "/api/report/{formato}",
+        deprecated={"since": "2026-08-06",
+                    "replacement": "GET /api/v1/audits/{id}"
+                                   "/report?format=..."},
         summary="Referto dell'ultimo audit concluso",
         description="Una sola scansione produce tutti i formati. "
                     "Riservato alla registrazione completa "
@@ -1330,8 +1349,18 @@ def openapi_spec() -> Dict[str, object]:
             "summary": route.summary,
             "tags": list(route.tags),
         }
-        if route.description:
-            operazione["description"] = route.description
+        descrizione = route.description
+        if route.deprecated:
+            operazione["deprecated"] = True
+            descrizione = (descrizione + "\n\n" if descrizione
+                           else "")
+            descrizione += (
+                "DEPRECATA dal %s: usare %s. L'alias resta "
+                "attivo e funzionante (mai rimozione silenziosa)."
+                % (route.deprecated["since"],
+                   route.deprecated["replacement"]))
+        if descrizione:
+            operazione["description"] = descrizione
         if route.auth == AUTH_SESSION:
             operazione["security"] = [{"cookieSession": []},
                                       {"bearerAuth": []}]
