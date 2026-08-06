@@ -34,7 +34,7 @@ from typing import List, Optional
 
 from marsbeacon import api as mars_api
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
 class Handler(mars_api.ApiHandler):
@@ -77,6 +77,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                              "dichiarate nessun header CORS; "
                              "cross-origin ci si autentica col "
                              "token Bearer, mai col cookie")
+    parser.add_argument("--frame-ancestors", metavar="ORIGINE",
+                        action="append", default=[],
+                        help="origine autorizzata a incorniciare "
+                             "in un iframe le risposte del server "
+                             "(modalita' embed del frontend "
+                             "separato), ripetibile. Senza origini "
+                             "la CSP resta frame-ancestors 'self'")
     parser.add_argument("--max-audit", type=int, default=1,
                         metavar="N",
                         help="audit in parallelo ammessi (default "
@@ -92,6 +99,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
     mars_api.CITATIONS_HISTORY = Path(args.citations_history)
     mars_api.CORS_ORIGINS = tuple(args.cors)
+    mars_api.FRAME_ANCESTORS = tuple(args.frame_ancestors)
     mars_api.AUDIT_CONCURRENCY = args.max_audit
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)

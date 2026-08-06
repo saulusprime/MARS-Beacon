@@ -71,7 +71,7 @@ from marsbeacon.api import (  # noqa: F401
     read_citations_history,
     validate_config)
 
-__version__ = "2.39.0"
+__version__ = "2.40.0"
 
 # Nome storico del cookie di sessione: la costante canonica e' nel
 # contratto (marsbeacon.api.SESSION_COOKIE_NAME).
@@ -122,11 +122,20 @@ def main(argv: Optional[List[str]] = None) -> int:
                              "(default %s; nel deploy systemd "
                              "tipicamente /var/lib/seorrf/"
                              "citazioni.jsonl)" % CITATIONS_HISTORY)
+    parser.add_argument("--frame-ancestors", metavar="ORIGINE",
+                        action="append", default=[],
+                        help="origine autorizzata a incorniciare "
+                             "la GUI in un iframe (es. "
+                             "https://lymphatech.it), ripetibile "
+                             "— modalita' embed con ?embed=1. "
+                             "Senza origini dichiarate la CSP "
+                             "resta frame-ancestors 'self'")
     parser.add_argument("--version", action="version",
                         version="%(prog)s " + __version__)
     args = parser.parse_args(argv)
 
     mars_api.CITATIONS_HISTORY = Path(args.citations_history)
+    mars_api.FRAME_ANCESTORS = tuple(args.frame_ancestors)
 
     if not GUI_DIR.is_dir():
         print("Cartella 'gui/' non trovata accanto allo script.",

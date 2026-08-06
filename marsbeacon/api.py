@@ -1533,6 +1533,22 @@ CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; "
 # le pagine della GUI restano sotto la CSP stretta.
 REPORT_CSP = CSP + "; script-src 'unsafe-inline'"
 
+# Origini autorizzate a incorniciare la GUI in un iframe
+# (modalita' embed, P2). Vuota = solo 'self', il default storico:
+# la sicurezza di chi non embedda non cambia. Impostata da
+# --frame-ancestors di mars_gui.py / mars_api.py.
+FRAME_ANCESTORS: Tuple[str, ...] = ()
+
+
+def csp_corrente(referto: bool = False) -> str:
+    """CSP effettiva: frame-ancestors con le origini embed."""
+    base = REPORT_CSP if referto else CSP
+    if FRAME_ANCESTORS:
+        base = base.replace(
+            "frame-ancestors 'self'",
+            "frame-ancestors 'self' " + " ".join(FRAME_ANCESTORS))
+    return base
+
 
 class LineBuffer:
     """File-like che accumula righe complete in una lista condivisa."""
@@ -2470,7 +2486,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", csp or CSP)
+        self.send_header("Content-Security-Policy",
+                         csp or csp_corrente())
         self.send_header("Cache-Control", "no-store")
         origin = self.headers.get("Origin", "")
         if origin and origin in CORS_ORIGINS:
@@ -2574,7 +2591,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Accel-Buffering", "no")
-        self.send_header("Content-Security-Policy", CSP)
+        self.send_header("Content-Security-Policy", csp_corrente())
         self.end_headers()
 
         last_sent = None
@@ -2791,7 +2808,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 download = "%s.%s" % (nome, ext[fmt])
             self._send(200, report.encode("utf-8"), ctypes[fmt],
                        download=download,
-                       csp=REPORT_CSP if fmt == "html" else "")
+                       csp=csp_corrente(referto=True)
+                       if fmt == "html" else "")
         elif path.startswith("/api/v1/audits/"):
             self._get_v1_audit(path)
         elif path == "/api/v1/tokens":
@@ -2973,7 +2991,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             download = "%s.%s" % (nome, ext[fmt])
         self._send(200, report.encode("utf-8"),
                    REPORT_CTYPES[fmt], download=download,
-                   csp=REPORT_CSP if fmt == "html" else "")
+                   csp=csp_corrente(referto=True)
+                   if fmt == "html" else "")
 
     def _delete_v1_audit(self, path: str) -> None:
         resto = path[len("/api/v1/audits/"):]

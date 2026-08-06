@@ -86,6 +86,21 @@ def test_esempio_nginx_documenta_i_due_scenari():
     assert "proxy_buffering off" in testo
 
 
+def test_modalita_embed():
+    """Embed (P2): attivazione runtime e regole CSS presenti."""
+    app = _leggi("app.js")
+    assert "mars-embed" in app
+    assert "window.MARS_EMBED" in app
+    assert "embed=1" in app
+    config = _leggi("config.js")
+    assert "window.MARS_EMBED = false" in config
+    tema = _leggi("theme.css")
+    assert "body.mars-embed .lt-header" in tema
+    assert "body.mars-embed .lt-footer" in tema
+    # ancore senza header sticky da compensare
+    assert "--lt-header-h: 0px" in tema
+
+
 def test_gui_migrata_alle_rotte_v1():
     """Il ciclo audit della GUI usa il modello a risorse: nessun
     riferimento alle cinque rotte legacy deprecate."""

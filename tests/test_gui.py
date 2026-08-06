@@ -97,6 +97,21 @@ def sra_version():
 
 # ---------------- statici e ambiente ----------------
 
+def test_frame_ancestors_configurabile(gui_base):
+    """Embed (P2): la CSP resta 'self' di default; con origini
+    dichiarate frame-ancestors le elenca (letta a ogni risposta)."""
+    _status, _body, headers = _api(gui_base, "/")
+    assert ("frame-ancestors 'self';"
+            in headers["Content-Security-Policy"])
+    engine.FRAME_ANCESTORS = ("https://ospite.esempio.it",)
+    try:
+        _status, _body, headers = _api(gui_base, "/")
+        assert ("frame-ancestors 'self' https://ospite.esempio.it"
+                in headers["Content-Security-Policy"])
+    finally:
+        engine.FRAME_ANCESTORS = ()
+
+
 def test_statici_con_csp_e_traversal_negato(gui_base):
     for path, atteso in (("/", b"MARS Beacon"),
                          ("/", b"Lympha"),

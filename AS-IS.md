@@ -1046,7 +1046,33 @@ Dettaglio nei bullet che seguono, dal più recente.
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.39.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.40.0 + `gui/`
+
+- **Modalità embed** (GUI v2.40.0 + mars_api v0.3.0, 2026-08-06 —
+  chiude la strada A dell'analisi; la strada B, widget nativo, è
+  in "Scartato consapevolmente"): la sola applicazione, senza
+  header e footer, dentro l'iframe di una pagina già brandizzata.
+  **Attivazione runtime** con `?embed=1` (o `MARS_EMBED = true`
+  in config.js per un bundle dedicato): app.js mette
+  `body.mars-embed`, il CSS spegne `.lt-header`/`.lt-footer`,
+  azzera `--lt-header-h` (le ancore non compensano più l'header
+  sticky) e riduce i margini del `main` (con `!important`, per
+  vincere sull'utility `my-4`). **`frame-ancestors`
+  configurabile**: il motore espone `FRAME_ANCESTORS` e
+  `csp_corrente()`, letta a ogni risposta (pagine, SSE e referto
+  HTML, che estende la CSP base); il default resta `'self'` —
+  chi non embedda non cambia nulla — e l'opzione
+  `--frame-ancestors` (ripetibile, speculare a `--cors`) esiste
+  su entrambi gli entry. I tre assetti di autenticazione sono
+  documentati nel README (stesso sito: cookie; reverse proxy:
+  nessuna opzione; dominio terzo: token). Altezza dell'iframe
+  fissa con scroll interno (l'auto-altezza postMessage resta
+  un'estensione possibile). Verifica su tre livelli: test
+  strutturale del bundle, test di contratto della CSP sul server
+  vivo (default e con origine dichiarata), URL `?embed=1` in
+  Pa11y (**4/4 pagine, 0 errori**) e flusso **F8 dell'AT
+  strumentale (34/34)**: header e footer spenti, skip-link
+  ancora primo con Tab, applicazione visibile. Suite a **414**.
 
 - **Nota "strumento locale" rimossa dal footer; footer-info e
   data-year facoltativi** (v2.39.0, 2026-08-06, scelta del
@@ -1792,7 +1818,15 @@ analisi del 2026-08-03).
   in parte coperto dal giudizio LLM (v1.18.0).
 - I **Core Web Vitals**: territorio di Lighthouse.
 - **Business model, pricing e KPI**: materiale commerciale, non di
-  sviluppo (il white-label resta in TO-DO).
+  sviluppo (il white-label è fatto — v2.38.0).
+- Il **widget nativo di embed** (strada B dell'analisi del
+  2026-08-06): montare l'applicazione direttamente nel DOM della
+  pagina ospite. I reset globali di Bootstrap Italia collidono col
+  CSS ospite in entrambe le direzioni (servirebbe Shadow DOM o la
+  prefissazione di tutti i selettori), app.js usa decine di id
+  globali e assume il documento intero, e la doppia manutenzione
+  sarebbe permanente — a fronte dello stesso risultato visivo
+  dell'iframe con `?embed=1` (v2.40.0), che isola gratis.
 - Le **associazioni modello→backend** di Features.md (Claude→Brave,
   Kimi→Baidu, …): speculative e non verificate — i profili di
   citabilità sono presentati come euristiche dichiarate, mai come

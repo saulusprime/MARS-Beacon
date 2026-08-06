@@ -384,6 +384,30 @@ def main():
         check(7, "grafo dei link con aria-label",
               "rilievi" in grafo_label, grafo_label[:60])
 
+        # ---- Flusso 8: modalita' embed (?embed=1) ----
+        pagina_embed = browser.new_page(
+            viewport={"width": 1280, "height": 900})
+        pagina_embed.goto(base + "/?embed=1")
+        spenti = pagina_embed.evaluate(
+            "['.lt-header', '.lt-footer'].map(s => {"
+            "  const n = document.querySelector(s);"
+            "  return n ? getComputedStyle(n).display : 'assente';"
+            "})")
+        check(8, "embed: header e footer spenti",
+              spenti == ["none", "none"], "display=%s" % spenti)
+        pagina_embed.keyboard.press("Tab")
+        primo_embed = pagina_embed.evaluate(
+            "document.activeElement.textContent.trim()")
+        check(8, "embed: skip link ancora primo con Tab",
+              "contenuto principale" in primo_embed.lower(),
+              primo_embed)
+        principale = pagina_embed.evaluate(
+            "(() => { const m = document.getElementById('main');"
+            "return m && m.offsetParent !== null; })()")
+        check(8, "embed: applicazione visibile",
+              bool(principale), "main visibile=%s" % principale)
+        pagina_embed.close()
+
         browser.close()
 
     ok = sum(1 for _f, _n, esito, _d in ESITI if esito)

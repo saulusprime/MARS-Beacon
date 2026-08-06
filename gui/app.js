@@ -40,6 +40,17 @@
     n.textContent = String(new Date().getFullYear());
   });
 
+  /* ------- modalita' embed (P2) -------
+     La sola applicazione dentro l'iframe di una pagina gia'
+     brandizzata: header e footer spenti via CSS (theme.css,
+     body.mars-embed). Si attiva con ?embed=1 in query oppure
+     con MARS_EMBED in config.js (bundle dedicato all'embed).
+     Il framing da un'altra origine richiede il server avviato
+     con --frame-ancestors su quell'origine. */
+  const EMBED = window.MARS_EMBED === true ||
+    /(?:^|[?&])embed=1(?:&|$)/.test(window.location.search);
+  if (EMBED) { document.body.classList.add("mars-embed"); }
+
   /* Il ciclo audit usa il modello a risorse (/api/v1/audits, job
      con id): l'id dell'ultimo job vive in localStorage cosi' il
      ricaricamento della pagina ripristina i risultati. Gli alias

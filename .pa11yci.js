@@ -23,6 +23,7 @@ module.exports = {
   urls: [
     base + "/tos.html",
     base + "/",
+    base + "/?embed=1",
     {
       url: base + "/?vista=autenticata",
       actions: [

@@ -348,6 +348,37 @@ verifica). Il footer istituzionale completo vive nel TOML Lympha
 come frammento HTML; il brand generico MARS Beacon genera il
 footer minimo con ragione sociale e copyright.
 
+### Embed
+
+La **sola applicazione** — senza header e footer — dentro
+l'iframe di una pagina già brandizzata: si attiva con `?embed=1`
+nella query string, oppure con `MARS_EMBED = true` in config.js
+per un bundle dedicato all'embed. La CSP consente il framing solo
+alla stessa origine (`frame-ancestors 'self'`): per una pagina
+ospite su un'altra origine il server va avviato dichiarandola
+(opzione ripetibile, su `mars_gui.py` e `mars_api.py`):
+
+```bash
+python3 mars_gui.py --frame-ancestors https://lymphatech.it
+```
+
+```html
+<iframe src="https://app.lymphatech.it/?embed=1"
+        title="MARS Beacon — audit di citabilità"
+        style="width: 100%; height: 60rem; border: 0"></iframe>
+```
+
+L'autenticazione dipende dall'assetto: sullo **stesso sito**
+(app.lymphatech.it dentro lymphatech.it) i cookie viaggiano già;
+col **reverse proxy** sulla stessa origine (esempio in
+[deploy/nginx-mars.conf.example](deploy/nginx-mars.conf.example))
+non serve neppure `--frame-ancestors`; da un **dominio terzo** i
+cookie di terza parte sono bloccati dai browser e si usa
+l'accesso con token API. L'altezza dell'iframe è fissa, con
+scorrimento interno; il `title` dell'iframe è l'etichetta
+principale per le tecnologie assistive (in embed la pagina non ha
+h1 visibile).
+
 ## Monitoraggio delle citazioni IA effettive
 
 ```bash
@@ -641,7 +672,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 412 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 414 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

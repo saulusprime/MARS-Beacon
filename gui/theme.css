@@ -278,6 +278,27 @@ main fieldset legend.h5 {
   display: block;
 }
 
+/* -------------------------------- Embed --------------------------------
+   Modalita' embed (?embed=1 o MARS_EMBED in config.js): la sola
+   applicazione dentro l'iframe di una pagina gia' brandizzata —
+   header e footer li mette l'ospite. */
+
+body.mars-embed .lt-header,
+body.mars-embed .lt-footer {
+  display: none;
+}
+
+body.mars-embed {
+  /* senza header sticky le ancore non devono compensarlo */
+  --lt-header-h: 0px;
+}
+
+body.mars-embed #main {
+  /* deve vincere sull'utility my-4, che porta !important */
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
 /* Logo MARS Beacon a destra nell'header (decorativo: il nome e'
    gia' nell'h1). Sorgente ottimizzata in brand/mars-logo.png. */
 .lt-mars-logo {

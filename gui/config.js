@@ -11,3 +11,9 @@ window.__PUBLIC_PATH__ = "vendor/bootstrap-italia/fonts";
    SameSite=Strict non viaggia tra origini). */
 window.MARS_API_BASE = "";
 
+/* Modalita' embed: true = la sola applicazione, senza header e
+   footer, per un bundle dedicato all'iframe di una pagina gia'
+   brandizzata. In alternativa (bundle unico) si attiva a runtime
+   con ?embed=1 nella query string dell'iframe. */
+window.MARS_EMBED = false;
+
