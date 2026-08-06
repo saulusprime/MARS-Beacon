@@ -346,7 +346,7 @@ L'applicazione è deterministica e il repository *è* il brand
 Lympha applicato: riapplicarlo non cambia un byte (la suite lo
 verifica). Il footer istituzionale completo vive nel TOML Lympha
 come frammento HTML; il brand generico MARS Beacon genera il
-footer minimo con ragione sociale, nota di onestà e copyright.
+footer minimo con ragione sociale e copyright.
 
 ## Monitoraggio delle citazioni IA effettive
 
@@ -641,7 +641,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 411 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 412 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

@@ -1197,9 +1197,14 @@
             env.default_embeddings_model + ". Scrivi «none» " +
             "per forzare il proxy char-TFIDF.";
         }
-        el("footer-info").textContent +=
-          " — mars_audit.py " + env.tool_version +
-          " · interfaccia " + env.gui_version;
+        /* Le versioni compaiono solo se il brand prevede
+           l'elemento footer-info (facoltativo dalla v2.39.0). */
+        const info = el("footer-info");
+        if (info) {
+          info.textContent +=
+            " — mars_audit.py " + env.tool_version +
+            " · interfaccia " + env.gui_version;
+        }
       })
       .catch(() => { /* la GUI resta usabile senza /api/env */ });
   }

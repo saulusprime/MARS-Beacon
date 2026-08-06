@@ -143,10 +143,6 @@ frammento_html = '''
       <div class="container py-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div>
           <p class="mb-0">Copyright © 2011–<span data-year>2026</span> Lympha Technologies S.r.l.</p>
-          <p class="mb-0" id="footer-info">
-            Strumento locale: nessun dato lascia questa macchina, tranne le
-            richieste verso il sito auditato.
-          </p>
         </div>
         <div class="d-flex align-items-center gap-3">
           <a href="https://www.linkedin.com/company/lympha-technologies-s-r-l-/"

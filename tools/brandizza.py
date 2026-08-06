@@ -167,13 +167,22 @@ def carica_config(percorso: Path) -> dict:
             raise ErroreBrand("[footer] prevede la sola chiave "
                               "frammento_html.")
         frammento = footer["frammento_html"]
-        for atteso in ("<footer", "</footer>", 'id="footer-info"',
-                       "data-year"):
+        for atteso in ("<footer", "</footer>"):
             if atteso not in frammento:
                 raise ErroreBrand(
-                    "[footer] frammento_html senza %r: la GUI ne "
-                    "ha bisogno (app.js scrive in footer-info e "
-                    "aggiorna data-year)." % atteso)
+                    "[footer] frammento_html senza %r: deve "
+                    "essere l'elemento footer completo." % atteso)
+        # Elementi facoltativi: la GUI li usa se ci sono (app.js
+        # scrive le versioni in footer-info e aggiorna data-year),
+        # ma un brand puo' legittimamente farne a meno.
+        if 'id="footer-info"' not in frammento:
+            print("avviso: [footer] senza id=\"footer-info\" — le "
+                  "versioni non compariranno nel footer.",
+                  file=sys.stderr)
+        if "data-year" not in frammento:
+            print("avviso: [footer] senza data-year — l'anno del "
+                  "copyright non verra' aggiornato da app.js.",
+                  file=sys.stderr)
 
     verifica_contrasti(palette)
     return dati
@@ -295,10 +304,6 @@ def footer_html(config: dict) -> str:
     <div class="container small">
       <p class="mb-1">
         <span class="lt-name">%s</span>
-      </p>
-      <p class="mb-0" id="footer-info">
-        Strumento locale: nessun dato lascia questa macchina, tranne le
-        richieste verso il sito auditato.
       </p>
       <p class="mb-0">Copyright © %s %s</p>
     </div>

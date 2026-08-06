@@ -68,8 +68,9 @@ def test_brand_generico_senza_tracce_lympha(tmp_path):
         # regioni ancora marcate: il bundle resta ri-brandizzabile
         for regione in ("testa", "testata", "footer"):
             assert "<!-- brand:%s inizio -->" % regione in pagina
-        # contratto della GUI: app.js scrive qui
-        assert 'id="footer-info"' in pagina
+        # niente footer-info: il footer minimo non mostra le
+        # versioni (facoltativo dalla v2.39.0), l'anno resta
+        assert 'id="footer-info"' not in pagina
         assert "data-year" in pagina
         assert 'href="brand/mars-logo.png"' in pagina  # favicon
     css = _leggi(bundle, os.path.join("brand", "brand.css"))
@@ -114,15 +115,29 @@ def test_tabella_sconosciuta_respinta(tmp_path):
     assert "sconosciuta" in esito.stderr
 
 
-def test_frammento_footer_incompleto_respinto(tmp_path):
-    """Un footer senza footer-info romperebbe app.js: rifiutato."""
+def test_frammento_footer_senza_elementi_facoltativi(tmp_path):
+    """footer-info e data-year sono facoltativi (dalla v2.39.0):
+    il brand si applica, con avviso — app.js tollera l'assenza."""
     bundle = _bundle(tmp_path)
     with open(BRAND_LYMPHA, encoding="utf-8") as fh:
         testo = fh.read()
-    config = os.path.join(str(tmp_path), "senza-info.toml")
+    config = os.path.join(str(tmp_path), "senza-anno.toml")
     with open(config, "w", encoding="utf-8") as fh:
-        fh.write(testo.replace('id="footer-info"',
-                               'id="footer-altro"'))
+        fh.write(testo.replace("data-year", "data-anno"))
+    esito = _applica(config, bundle)
+    assert esito.returncode == 0, esito.stderr
+    assert "avviso" in esito.stderr
+    assert "data-year" in esito.stderr
+
+
+def test_frammento_footer_non_strutturale_respinto(tmp_path):
+    """Il frammento deve restare l'elemento footer completo."""
+    bundle = _bundle(tmp_path)
+    with open(BRAND_LYMPHA, encoding="utf-8") as fh:
+        testo = fh.read()
+    config = os.path.join(str(tmp_path), "monco.toml")
+    with open(config, "w", encoding="utf-8") as fh:
+        fh.write(testo.replace("</footer>", "</footre>"))
     esito = _applica(config, bundle)
     assert esito.returncode == 2
-    assert "footer-info" in esito.stderr
+    assert "footer completo" in esito.stderr

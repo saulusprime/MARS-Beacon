@@ -1046,7 +1046,22 @@ Dettaglio nei bullet che seguono, dal più recente.
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.38.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.39.0 + `gui/`
+
+- **Nota "strumento locale" rimossa dal footer; footer-info e
+  data-year facoltativi** (v2.39.0, 2026-08-06, scelta del
+  titolare in vista della pubblicazione web): la frase "nessun
+  dato lascia questa macchina" sarebbe falsa per l'app pubblicata
+  su lymphatech.it — via dal frammento Lympha e dal template del
+  footer minimo (con essa sparisce anche la riga delle versioni,
+  che app.js scriveva in footer-info). Il validatore del tool,
+  che alla v2.38.0 bocciava un frammento senza footer-info o
+  data-year, ora li tratta da **facoltativi con avviso** su
+  stderr (resta fatale un frammento che non sia l'elemento
+  footer completo); app.js tollera l'assenza dell'elemento con
+  una guardia esplicita. Suite a **412** (la bocciatura è
+  diventata due casi: tolleranza con avviso e struttura monca
+  respinta); Pa11y 3/3 con 0 errori e AT 31/31 riverificati.
 
 - **White-label da un unico file TOML** (v2.38.0, 2026-08-06,
   chiude la voce P2 del TO-DO): `tools/brandizza.py` applica un
