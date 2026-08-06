@@ -6,7 +6,7 @@ Audit*)
 [![CI](https://github.com/saulusprime/MARS-Beacon/actions/workflows/ci.yml/badge.svg)](https://github.com/saulusprime/MARS-Beacon/actions/workflows/ci.yml)
 [![Licenza: Apache 2.0](https://img.shields.io/badge/licenza-Apache_2.0-blue)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#installazione)
-[![Versione 1.61.0](https://img.shields.io/badge/versione-1.61.0-186078)](AS-IS.md)
+[![Versione 1.62.0](https://img.shields.io/badge/versione-1.62.0-186078)](AS-IS.md)
 [![Stato: attivo](https://img.shields.io/badge/stato-attivo-success)](AS-IS.md)
 [![Referti in 5 lingue](https://img.shields.io/badge/referti-it_%C2%B7_en_%C2%B7_fr_%C2%B7_de_%C2%B7_es-186078)](#opzioni)
 [![Accessibilità WCAG 2.2 AA](https://img.shields.io/badge/accessibilit%C3%A0-WCAG_2.2_AA-6f42c1)](docs/ACCESSIBILITA.md)
@@ -590,7 +590,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 381 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 385 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

@@ -701,6 +701,13 @@ personalizzazioni nel blocco JSON `thresholds`, esempio commentato
 in `docs/soglie.esempio.toml`. Parsing con `tomllib` (stdlib da
 Python 3.11; su 3.10 ripiego dichiarato sul pacchetto `tomli`).
 
+Novità 1.62.0 (2026-08-06, branch devapi): due helper estratti per
+la parità CLI↔API del programma API-first — `parse_gsc_queries`
+(l'export CSV Search Console come testo; `load_gsc_queries` legge
+il file e delega) e `check_thresholds` (la validazione delle soglie
+senza passare da un file TOML; `load_thresholds` la riusa).
+Comportamento della CLI invariato.
+
 ## Uso
 
 ```

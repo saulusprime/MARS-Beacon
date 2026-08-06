@@ -124,6 +124,7 @@ from marsbeacon.base import (  # noqa: F401
     CONFIG_THRESHOLDS,
     _CONFIG_MODULES,
     apply_thresholds,
+    check_thresholds,
     load_thresholds)
 from marsbeacon.base import (  # noqa: F401
     CONTACT_SLUGS,
@@ -423,6 +424,7 @@ from marsbeacon.audits import (  # noqa: F401
     merge_lighthouse_findings,
     node_version,
     overall_score,
+    parse_gsc_queries,
     read_history_last)
 from marsbeacon.audits import (  # noqa: F401
     run_judge,

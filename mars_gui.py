@@ -71,7 +71,7 @@ import mars_audit as sra
 
 from marsbeacon import api as mars_api
 
-__version__ = "2.31.0"
+__version__ = "2.32.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -438,29 +438,40 @@ class Job:
         cfg = self.config
         buf = LineBuffer(self.log, self.lock)
         judge_mode = str(cfg.get("judge", sra.DEFAULT_JUDGE))
+        soglie = dict(cfg.get("soglie") or {})
         try:
             with contextlib.redirect_stderr(buf):
-                (pages, findings, scores, results, mode,
-                 competitive) = sra.run_audit(
-                    base=str(cfg["url"]),
-                    max_pages=int(cfg["max_pages"]),
-                    queries=list(cfg["queries"]),
-                    model_name=str(cfg["embeddings"]),
-                    delay=float(cfg["delay"]),
-                    k=int(cfg["rrf_k"]),
-                    verbose=True,
-                    max_body_mb=float(cfg["max_body"]),
-                    robots_mode=str(cfg["robots"]),
-                    retries=int(cfg["retries"]),
-                    workers=int(cfg["workers"]),
-                    render=str(cfg["render"]),
-                    competitors=list(cfg["competitors"]),
-                    top_n=int(cfg.get("top_n",
-                                      sra.DEFAULT_TOP_N)),
-                    rrf_weights=cfg.get("rrf_weights"),
-                    chunk_words=int(cfg.get(
-                        "chunk_words", sra.DEFAULT_CHUNK_WORDS)),
-                    stop_event=self.stop_event)
+                # Soglie di prassi personalizzate (parita' con
+                # --config della CLI): attive solo durante
+                # l'audit, ripristino garantito dal finally.
+                precedenti = (sra.apply_thresholds(soglie)
+                              if soglie else {})
+                try:
+                    (pages, findings, scores, results, mode,
+                     competitive) = sra.run_audit(
+                        base=str(cfg["url"]),
+                        max_pages=int(cfg["max_pages"]),
+                        queries=list(cfg["queries"]),
+                        model_name=str(cfg["embeddings"]),
+                        delay=float(cfg["delay"]),
+                        k=int(cfg["rrf_k"]),
+                        verbose=True,
+                        max_body_mb=float(cfg["max_body"]),
+                        robots_mode=str(cfg["robots"]),
+                        retries=int(cfg["retries"]),
+                        workers=int(cfg["workers"]),
+                        render=str(cfg["render"]),
+                        competitors=list(cfg["competitors"]),
+                        top_n=int(cfg.get("top_n",
+                                          sra.DEFAULT_TOP_N)),
+                        rrf_weights=cfg.get("rrf_weights"),
+                        chunk_words=int(cfg.get(
+                            "chunk_words",
+                            sra.DEFAULT_CHUNK_WORDS)),
+                        stop_event=self.stop_event)
+                finally:
+                    if precedenti:
+                        sra.apply_thresholds(precedenti)
                 lighthouse = sra.run_lighthouse(
                     str(cfg["url"]), pages,
                     mode=str(cfg.get("lighthouse",
@@ -506,6 +517,7 @@ class Job:
         k = int(cfg["rrf_k"])
         base = str(cfg["url"])
         market = str(cfg.get("market", sra.DEFAULT_MARKET))
+        lang = str(cfg.get("lang", "it"))
         delta = None
         if self.user_id:
             previous = get_store().last_audit_report(
@@ -526,7 +538,8 @@ class Job:
                                     market=market, judge=judge,
                                     delta=delta,
                                     lighthouse=lighthouse_block,
-                                    search_check=search),
+                                    search_check=search,
+                                    lang=lang),
             "json": sra.render_json(base, pages, findings, scores,
                                     results, mode, k, competitive,
                                     market=market, judge=judge,
@@ -544,25 +557,29 @@ class Job:
                                             "chunk_words",
                                             sra.DEFAULT_CHUNK_WORDS,
                                         )),
-                                    }),
+                                    },
+                                    thresholds=soglie or None),
             "text": sra.render_text(base, pages, findings, scores,
                                     results, mode, k, competitive,
                                     market=market, judge=judge,
                                     delta=delta,
                                     lighthouse=lighthouse_block,
-                                    search_check=search),
+                                    search_check=search,
+                                    lang=lang),
             "md": sra.render_markdown(base, pages, findings,
                                       scores, results, mode, k,
                                       competitive, market=market,
                                       judge=judge, delta=delta,
                                       lighthouse=lighthouse_block,
-                                      search_check=search),
+                                      search_check=search,
+                                      lang=lang),
             "csv": sra.render_csv(base, pages, findings, scores,
                                   results, mode, k, competitive,
                                   market=market, judge=judge,
                                   delta=delta,
                                   lighthouse=lighthouse_block,
-                                  search_check=search),
+                                  search_check=search,
+                                  lang=lang),
         }
         severities = [f.severity for f in findings]
         clean, flagged, broken = sra.page_status_counts(pages,
@@ -594,6 +611,13 @@ class Job:
             "critical": severities.count(sra.SEV_CRITICAL),
             "warning": severities.count(sra.SEV_WARNING),
             "info": severities.count(sra.SEV_INFO),
+            "lang": lang,
+            "thresholds": soglie or None,
+            "fail_under": cfg.get("fail_under"),
+            "gate_passed": (
+                None if cfg.get("fail_under") is None
+                else bool(sra.overall_score(scores)
+                          >= float(str(cfg["fail_under"])))),
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
         if self.user_id:
@@ -793,8 +817,42 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
         if value is None:
             return None, "Valore non valido per '%s'." % name
 
+    lang = str(raw.get("lang", "it")).strip().lower()
+    if lang not in sra.HTML_LANGS:
+        return None, "Valore non valido per 'lang'."
+
+    fail_under = raw.get("fail_under")
+    if fail_under is not None:
+        try:
+            fail_under = float(fail_under)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None, "Valore non valido per 'fail_under'."
+        if not 0 <= fail_under <= 100:
+            return None, "Valore non valido per 'fail_under'."
+
+    soglie_raw = raw.get("soglie")
+    soglie: Dict[str, object] = {}
+    if soglie_raw is not None:
+        if not isinstance(soglie_raw, dict):
+            return None, "Il campo 'soglie' vuole un oggetto."
+        try:
+            soglie = sra.check_thresholds(soglie_raw)
+        except ValueError as exc:
+            return None, str(exc)
+
     queries = [q.strip() for q in str(raw.get("queries", "")).split("\n")
                if q.strip()]
+
+    queries_gsc = str(raw.get("queries_gsc", ""))
+    if queries_gsc.strip():
+        if queries:
+            return None, ("'queries' e 'queries_gsc' non sono "
+                          "combinabili: scegli una sola sorgente "
+                          "di query.")
+        queries = sra.parse_gsc_queries(queries_gsc)
+        if not queries:
+            return None, ("Nessuna query utilizzabile nell'export "
+                          "Search Console.")
 
     competitors = [c.strip() for c in
                    str(raw.get("competitors", "")).split("\n")
@@ -828,6 +886,9 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
         "queries": queries,
         "embeddings": str(raw.get("embeddings", "")).strip(),
         "competitors": competitors,
+        "lang": lang,
+        "soglie": soglie,
+        "fail_under": fail_under,
     }, ""
 
 

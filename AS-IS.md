@@ -693,6 +693,40 @@ sono nel [README.md](README.md).
 
 ## API — contratto e registro (programma P1, branch `devapi`)
 
+- **Parità CLI↔API su POST /api/audit: contratto 1.1.0** (core
+  v1.62.0, GUI v2.32.0, 2026-08-06 — chiude il "gap di parità"
+  della Fase 1). Quattro campi nuovi, validati in
+  `validate_config` con messaggi in italiano:
+  **`lang`** (it|en|fr|de|es: i quattro referti di prosa
+  scaricabili escono nella lingua scelta, il JSON resta canonico
+  in italiano — parità con `--lang`); **`soglie`** (oggetto
+  validato da **`check_thresholds`**, il cuore di
+  `load_thresholds` estratto in `base.py` proprio per questo:
+  stessa validazione del `--config` TOML senza passare da un
+  file; applicate con `apply_thresholds` **solo attorno a
+  `run_audit`** con ripristino garantito dal `finally`, echeggiate
+  nel blocco `thresholds` del referto JSON e nella sintesi);
+  **`queries_gsc`** (contenuto dell'export CSV Search Console
+  come testo: **`parse_gsc_queries`** estratta da
+  `load_gsc_queries` in `audits.py` — il file delega al parser di
+  testo, comportamento CLI invariato; non combinabile con
+  `queries`, stessa regola della CLI); **`fail_under`** (0-100:
+  la sintesi del job echeggia `fail_under` e **`gate_passed`** —
+  l'equivalente API del codice d'uscita 1 della CLI). La sintesi
+  porta anche `lang` e `thresholds`. Nel registro API lo schema
+  del blocco `soglie` è **derivato da `CONFIG_THRESHOLDS`**
+  (chiavi, tipi e intervalli non possono divergere dal registro
+  delle soglie), `lang` enum da `HTML_LANGS`;
+  `API_CONTRACT_VERSION` 1.1.0, golden rigenerato. 4 test in più
+  (validate_config coi messaggi, parse da testo con BOM,
+  **e2e reale sul sito fixture**: audit con lang=en + soglie
+  190-195 + fail_under=100 → sintesi echeggiata, referto text in
+  inglese con la soglia dichiarata "190-195 characters", JSON con
+  `thresholds`, gate_passed false, **default ripristinati a fine
+  job**); suite 385 test, flake8 pulito. Il frontend della GUI
+  non espone ancora i campi nuovi (come fu per Lighthouse in
+  v2.24.0: via API sono già utilizzabili).
+
 - **Le sei decisioni preliminari della P1 API-first**, ratificate
   il 2026-08-06, qui per memoria (pattern delle quattro decisioni
   P1 Lighthouse): *contratto* **auto-generato** da un registro
@@ -785,7 +819,12 @@ sono nel [README.md](README.md).
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.31.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.32.0 + `gui/`
+
+- **Parità CLI↔API nel POST /api/audit** (v2.32.0, 2026-08-06,
+  branch `devapi`): lang, soglie, queries_gsc e fail_under —
+  dettaglio nella sezione "API — contratto e registro" più sopra;
+  il form della GUI non li espone ancora.
 
 - **Contratto API dal registro delle rotte** (v2.31.0,
   2026-08-06, branch `devapi`): il server serve la spec generata
@@ -1313,7 +1352,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 381 test in ~30 secondi** (inclusa
+- **Suite pytest: 385 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

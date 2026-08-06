@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "MARS Beacon API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Contratto dell'API locale di MARS Beacon, generato dal registro dichiarativo delle rotte (marsbeacon/api.py): spec e codice non possono divergere per costruzione. Gli errori sono {\"error\": messaggio in italiano} (piu' \"code\" macchina dove indicato). Un audit alla volta; slot orario per utente; download dei referti riservato alla registrazione completa.",
     "license": {
       "name": "Apache 2.0",
@@ -1076,6 +1076,78 @@
                   "embeddings": {
                     "type": "string",
                     "description": "Modello sentence-transformers; vuoto = auto, 'none' = proxy."
+                  },
+                  "lang": {
+                    "type": "string",
+                    "enum": [
+                      "it",
+                      "en",
+                      "fr",
+                      "de",
+                      "es"
+                    ],
+                    "default": "it",
+                    "description": "Lingua dei referti scaricabili (html, text, md, csv); il JSON resta canonico in italiano."
+                  },
+                  "soglie": {
+                    "type": "object",
+                    "properties": {
+                      "description_max": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 600
+                      },
+                      "description_min": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 400
+                      },
+                      "estraibilita_minima": {
+                        "type": "number",
+                        "minimum": 0.01,
+                        "maximum": 1.0
+                      },
+                      "parole_obiettivo": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000
+                      },
+                      "parole_scarse": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000
+                      },
+                      "title_max": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 300
+                      },
+                      "title_min": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200
+                      },
+                      "varieta_anchor_minima": {
+                        "type": "number",
+                        "minimum": 0.01,
+                        "maximum": 1.0
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Soglie di prassi personalizzate (equivalente di --config della CLI): i rilievi dichiarano sempre la soglia usata e il referto JSON le echeggia nel blocco 'thresholds'. Coppie min/max validate sul valore efficace."
+                  },
+                  "queries_gsc": {
+                    "type": "string",
+                    "description": "Contenuto dell'export CSV \"Query\" di Google Search Console (rapporto Rendimento): prime 15 per clic e impressioni, deduplicate. Non combinabile con 'queries'."
+                  },
+                  "fail_under": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Gate di regressione: la sintesi del job echeggia soglia ed esito (fail_under, gate_passed)."
                   }
                 },
                 "required": [

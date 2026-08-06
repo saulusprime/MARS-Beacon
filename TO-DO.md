@@ -46,17 +46,12 @@ scelta — non rivalutare).
 
 ### Fase 1 — Il contratto (lo "swagger")
 
-Registro, generatore, spec servita, golden, validazione runtime e
-contract test sono **fatti** (censimento completo delle 17 rotte,
-`API_CONTRACT_VERSION` 1.0.0 — vedi AS-IS "API — contratto e
-registro"). Resta:
+Registro, generatore, spec servita, golden, validazione runtime,
+contract test e **parità CLI↔API** (lang, soglie, queries_gsc,
+fail_under nel POST /api/audit) sono **fatti** — censimento
+completo delle 17 rotte, `API_CONTRACT_VERSION` 1.1.0, vedi AS-IS
+"API — contratto e registro". Resta:
 
-- [ ] **Gap di parità CLI↔API da colmare e specificare**: lingua
-      del referto (`lang` sui download, oggi solo it), soglie di
-      prassi (blocco `soglie` nel POST, validato dal registro
-      `CONFIG_THRESHOLDS` — equivalente di `--config`), query
-      reali da Search Console (upload CSV), `fail_under`
-      echeggiato nell'esito del job.
 - [ ] **Scalar vendorizzato** (decisione di Fase 0): script
       `tools/update-scalar.sh` sul modello di update-vendor che
       scarica `@scalar/api-reference` (MIT) da npm, pota ai soli

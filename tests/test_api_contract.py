@@ -380,3 +380,126 @@ def test_contract_audit_ed_eventi(base):
     assert stato == 400
     assert "render" in corpo["error"]
     _conforme("POST", "/api/audit", 400, corpo)
+
+
+# ------------- parita' CLI-API (lang, soglie, GSC, gate) ----------
+
+def test_validate_config_parita_cli_api():
+    base_cfg = {"url": "esempio.test"}
+    cfg, err = gui.validate_config(dict(base_cfg))
+    assert err == "" and cfg["lang"] == "it"
+    assert cfg["soglie"] == {} and cfg["fail_under"] is None
+
+    cfg, err = gui.validate_config(
+        {**base_cfg, "lang": "fr", "fail_under": 70,
+         "soglie": {"title_min": 25}})
+    assert err == ""
+    assert cfg["lang"] == "fr"
+    assert cfg["fail_under"] == 70.0
+    assert cfg["soglie"] == {"title_min": 25}
+
+    _, err = gui.validate_config({**base_cfg, "lang": "xx"})
+    assert err == "Valore non valido per 'lang'."
+    _, err = gui.validate_config({**base_cfg, "fail_under": 101})
+    assert err == "Valore non valido per 'fail_under'."
+    _, err = gui.validate_config({**base_cfg, "soglie": [1]})
+    assert err == "Il campo 'soglie' vuole un oggetto."
+    _, err = gui.validate_config(
+        {**base_cfg, "soglie": {"inventata": 1}})
+    assert "Soglia sconosciuta" in err
+    _, err = gui.validate_config(
+        {**base_cfg, "soglie": {"title_min": 70}})
+    assert "deve restare minore" in err
+
+
+def test_validate_config_queries_gsc():
+    csv_gsc = ("Query piu' frequenti,Clic,Impressioni\n"
+               "drenaggio linfatico,120,1500\n"
+               "linfodrenaggio costi,80,900\n"
+               "drenaggio linfatico,10,50\n")
+    cfg, err = gui.validate_config(
+        {"url": "esempio.test", "queries_gsc": csv_gsc})
+    assert err == ""
+    assert cfg["queries"] == ["drenaggio linfatico",
+                              "linfodrenaggio costi"]
+
+    _, err = gui.validate_config(
+        {"url": "esempio.test", "queries": "una query",
+         "queries_gsc": csv_gsc})
+    assert "non sono combinabili" in err
+    _, err = gui.validate_config(
+        {"url": "esempio.test", "queries_gsc": "Query\n"})
+    assert "Nessuna query utilizzabile" in err
+
+
+def test_parse_gsc_queries_da_testo():
+    import mars_audit as sra
+    testo = ("﻿Query;Clic;Impressioni\n"
+             "seconda;5;100\nprima;50;10\n")
+    assert sra.parse_gsc_queries(testo) == ["prima", "seconda"]
+    assert sra.parse_gsc_queries("") == []
+
+
+def _attendi(base_url, cookie, attesi, timeout=120):
+    import time as _time
+    scadenza = _time.time() + timeout
+    snap = {}
+    while _time.time() < scadenza:
+        _, snap, _ = _api(base_url, "/api/status", cookie=cookie)
+        if snap.get("state") in attesi:
+            break
+        _time.sleep(0.3)
+    return snap
+
+
+def test_contract_audit_e2e_parita(base, site):
+    """Audit reale sul sito fixture con lingua, soglie e gate:
+    la sintesi echeggia tutto e i referti rispettano lingua e
+    soglie personalizzate."""
+    cookie = _registra(base, email="parita@esempio.it",
+                       completo=True)
+    stato, corpo, _ = _api(
+        base, "/api/audit",
+        {"url": site, "max_pages": 4, "delay": 0,
+         "lighthouse": "off", "lang": "en",
+         "soglie": {"title_min": 190, "title_max": 195},
+         "fail_under": 100},
+        cookie=cookie)
+    assert (stato, corpo) == (202, {"ok": True})
+    snap = _attendi(base, cookie, ("done", "error"))
+    assert snap["state"] == "done", snap.get("error")
+    _conforme("GET", "/api/status", 200, snap)
+
+    sintesi = snap["summary"]
+    assert sintesi["lang"] == "en"
+    assert sintesi["thresholds"] == {"title_min": 190,
+                                     "title_max": 195}
+    assert sintesi["fail_under"] == 100.0
+    assert sintesi["gate_passed"] is False
+
+    stato, testo, _ = _api_grezza(base, "/api/report/text",
+                                  cookie=cookie)
+    assert stato == 200
+    assert "Pages analysed" in testo
+    assert "190-195 characters" in testo
+    stato, referto_json, _ = _api_grezza(base, "/api/report/json",
+                                         cookie=cookie)
+    assert stato == 200
+    assert json.loads(referto_json)["thresholds"] == {
+        "title_min": 190, "title_max": 195}
+    # ripristino verificato: i default non sono rimasti alterati
+    import mars_audit as sra
+    assert sra.TITLE_MIN == 30 and sra.TITLE_MAX == 65
+
+
+def _api_grezza(base_url, path, cookie=""):
+    req = urllib.request.Request(base_url + path)
+    if cookie:
+        req.add_header("Cookie", cookie)
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return (resp.status, resp.read().decode("utf-8"),
+                    dict(resp.headers))
+    except urllib.error.HTTPError as exc:
+        return (exc.code, exc.read().decode("utf-8"),
+                dict(exc.headers))

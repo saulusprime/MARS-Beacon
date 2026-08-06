@@ -31,6 +31,7 @@ import re
 
 from marsbeacon.base import CHUNK_WORDS_MAX
 from marsbeacon.base import CHUNK_WORDS_MIN
+from marsbeacon.base import CONFIG_THRESHOLDS
 from marsbeacon.base import JUDGE_MODES
 from marsbeacon.base import LIGHTHOUSE_DEVICES
 from marsbeacon.base import LIGHTHOUSE_MODES
@@ -43,13 +44,16 @@ from marsbeacon.base import ROBOTS_MODES
 from marsbeacon.base import SEARCH_CHECK_MODES
 from marsbeacon.base import TOP_N_MAX
 from marsbeacon.base import TOP_N_MIN
+from marsbeacon.i18n import HTML_LANGS
 
 
 # Versione del contratto API, indipendente dalla versione dello
 # strumento: si muove solo quando cambia il contratto. La 1.0.0
-# segna il censimento completo della superficie attuale (17
-# rotte); e' il numero che compare in info.version della spec.
-API_CONTRACT_VERSION = "1.0.0"
+# ha segnato il censimento completo della superficie (17 rotte);
+# la 1.1.0 aggiunge la parita' CLI-API su POST /api/audit (lang,
+# soglie, queries_gsc, fail_under). E' il numero che compare in
+# info.version della spec.
+API_CONTRACT_VERSION = "1.1.0"
 
 
 # Nome del cookie di sessione: fa parte del contratto (schema di
@@ -144,6 +148,29 @@ class Route:
 
 def _err(description: str) -> Dict[str, object]:
     return {"description": description, "schema": ERROR_SCHEMA}
+
+
+def _schema_soglie() -> Dict[str, object]:
+    """Schema del blocco "soglie" derivato da CONFIG_THRESHOLDS:
+    la spec segue il registro delle soglie per costruzione (chiavi,
+    tipi e intervalli non possono divergere)."""
+    proprieta: Dict[str, object] = {}
+    for chiave in sorted(CONFIG_THRESHOLDS):
+        _, kind, minimo, massimo = CONFIG_THRESHOLDS[chiave]
+        proprieta[chiave] = {
+            "type": "integer" if kind is int else "number",
+            "minimum": minimo, "maximum": massimo}
+    return {
+        "type": "object",
+        "properties": proprieta,
+        "additionalProperties": False,
+        "description": "Soglie di prassi personalizzate "
+                       "(equivalente di --config della CLI): i "
+                       "rilievi dichiarano sempre la soglia "
+                       "usata e il referto JSON le echeggia nel "
+                       "blocco 'thresholds'. Coppie min/max "
+                       "validate sul valore efficace.",
+    }
 
 
 # Conferma {ok, user}: registrazione, login, profilo.
@@ -576,6 +603,30 @@ ROUTES: Tuple[Route, ...] = (
                                               "sentence-transformers"
                                               "; vuoto = auto, "
                                               "'none' = proxy."},
+                "lang": {"type": "string",
+                         "enum": list(HTML_LANGS),
+                         "default": "it",
+                         "description": "Lingua dei referti "
+                                        "scaricabili (html, text, "
+                                        "md, csv); il JSON resta "
+                                        "canonico in italiano."},
+                "soglie": _schema_soglie(),
+                "queries_gsc": {
+                    "type": "string",
+                    "description": "Contenuto dell'export CSV "
+                                   "\"Query\" di Google Search "
+                                   "Console (rapporto "
+                                   "Rendimento): prime 15 per "
+                                   "clic e impressioni, "
+                                   "deduplicate. Non combinabile "
+                                   "con 'queries'."},
+                "fail_under": {
+                    "type": ["number", "null"],
+                    "minimum": 0, "maximum": 100,
+                    "description": "Gate di regressione: la "
+                                   "sintesi del job echeggia "
+                                   "soglia ed esito "
+                                   "(fail_under, gate_passed)."},
             },
             "required": ["url"],
             "additionalProperties": False,
