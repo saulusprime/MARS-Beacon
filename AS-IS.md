@@ -718,8 +718,9 @@ Dettaglio nei bullet che seguono, dal più recente.
   `--no-ff` per lasciare l'evento leggibile nella storia; verde
   riverificato alla fusione (405 test, flake8 pulito; AT
   strumentale 31/31 dalla chiusura della voce condizionale). Da
-  qui le release ripartono da `main`; `devapi` resta come branch
-  storico, cancellabile a discrezione del titolare.
+  qui le release ripartono da `main`; il branch `devapi` è stato
+  poi eliminato (locale e remoto) — il merge `--no-ff` ne
+  conserva per intero storia e attribuzione.
 
 - **GUI migrata alle rotte v1 e alias legacy DEPRECATI:
   contratto 1.4.0** (GUI v2.36.0, 2026-08-06 — chiusa la voce
