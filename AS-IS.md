@@ -16,7 +16,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-06.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `mars_audit.py` v1.61.0 (+ package `marsbeacon/`)
+## Strumento CLI — `mars_audit.py` v1.62.0 (+ package `marsbeacon/`)
 
 - **Soglie configurabili da file TOML** (v1.61.0, 2026-08-06,
   chiude la voce P3 "file di configurazione TOML"): `--config FILE`
@@ -691,7 +691,27 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza dichiarata nel modulo.
 
-## API — contratto e registro (programma P1, branch `devapi`)
+## API — contratto e registro (programma P1 API-first, branch `devapi`)
+
+**Stato: programma CONCLUSO il 2026-08-06** (otto commit su
+`devapi`, da fc29029 a 51d9580; il branch NON è ancora fuso in
+`main`). In sintesi: contratto OpenAPI 3.1 **auto-generato** dal
+registro dichiarativo delle rotte (`marsbeacon/api.py`, 26 rotte,
+`API_CONTRACT_VERSION` **1.3.0**, golden `docs/openapi.json`,
+spec servita da `GET /api/v1/openapi.json`, documentazione Scalar
+su `GET /api/docs`); **parità CLI↔API** (lang, soglie,
+queries_gsc, fail_under); **backend puro** (motore in
+`marsbeacon/api.py`, combinato `mars_gui.py` v2.35.0 come
+facciata, entry solo-API `mars_api.py` v0.2.0 su porta 8766 con
+`--cors` e `--max-audit`); **job con id** e referti per job in
+ogni formato e lingua on-demand; **token Bearer** e CORS
+esplicito; **frontend statico separato** (`MARS_API_BASE` in
+config.js, accesso token cross-origin); e2e a origini separate,
+job CI "Contratto API", `docs/API.md`, `deploy/mars-api.service`
+e `deploy/nginx-mars.conf.example`. Resta nel TO-DO la sola voce
+condizionale (migrazione GUI alle rotte v1 + deprecazione alias
+legacy) e la decisione di merge. Dettaglio nei bullet che
+seguono, dal più recente.
 
 - **Qualità, deploy e documentazione — FASE 4 CONCLUSA: il
   programma P1 API-first è COMPLETO** (2026-08-06; resta solo la
@@ -1375,7 +1395,7 @@ sono nel [README.md](README.md).
 - Testato senza chiamate reali: server API finti locali per entrambi i
   provider (8 test dedicati).
 
-## Fork Lighthouse — strategia di manutenzione (P1, 2026-08-05)
+## Fork Lighthouse — strategia di manutenzione (P1 Lighthouse, 2026-08-05)
 
 - **P1 — Integrazione Lighthouse: COMPLETATA** (2026-08-05, in
   un'unica giornata di lavoro, v1.46.0→v1.55.0 / GUI

@@ -1,94 +1,30 @@
 # TO-DO — sviluppi e idee di miglioramento
 
-Elenco di ciò che **resta da fare** (codice alla v1.61.0 / GUI
-v2.30.0 / citations v1.2.0). Quanto già realizzato — e quanto scartato
+Elenco di ciò che **resta da fare** (codice alla v1.62.0 / GUI
+v2.35.0 / API mars_api v0.2.0, contratto 1.3.0 / citations v1.2.0;
+lo sviluppo API-first vive sul branch **`devapi`**, non ancora fuso
+in `main`). Quanto già realizzato — e quanto scartato
 consapevolmente, per non rivalutarlo — è documentato in
 [AS-IS.md](AS-IS.md): le voci completate vengono spostate lì, non
 spuntate qui. Le voci marcate **[bug/rischio]** sono comportamenti
 osservati nel codice; il resto sono proposte.
 
-## P1 — API-first: apizzazione completa e separazione frontend/backend
+## P1 — API-first (programma CONCLUSO il 2026-08-06; voce residua)
 
-Rendere il progetto "totalmente apizzato" significa tre cose, in
-quest'ordine: un **contratto formale** (la spec OpenAPI — lo
-"swagger" — come unica fonte di verità su endpoint, schemi, errori e
-autenticazione), la **parità funzionale** (tutto ciò che fanno CLI e
-GUI dev'essere possibile via API, da qualunque client), e la
-**separazione fisica** (backend che serve solo JSON+SSE, frontend
-statico servibile da qualunque web server, anche su un'altra
-origine). Oggi la GUI è già un frontend vanilla JS che parla
-JSON+SSE con 17 endpoint: l'accoppiamento non è nel protocollo ma
-nel processo unico, nel contratto implicito, nel cookie same-origin
-come unica autenticazione e nell'audit come singleton globale (409)
-invece che risorsa con identità.
-
-**Vincoli non negoziabili** (coerenti con "Scartato
-consapevolmente" in AS-IS): API-first **non** significa SaaS — lo
-stack FastAPI/Celery/Redis resta escluso; server in sola libreria
-standard, spec **auto-generata dal codice** e verificata dai test,
-lettore della spec (Scalar) vendorizzato (pattern Bootstrap Italia:
-funziona offline, mai CDN), default di binding su 127.0.0.1 e
-sicurezza dichiarata. Il referto
-JSON con `schema_version` resta il cuore del contratto dati.
-Sinergie: il frontend separato è il pacchetto da brandizzare del
-white-label (P2); il modello a job è il prerequisito della modalità
-batch (P3).
-
-Le **sei decisioni preliminari (Fase 0)** sono state ratificate il
-2026-08-06 e spostate in AS-IS ("qui per memoria", come le quattro
-decisioni della P1 Lighthouse): contratto auto-generato dal
-registro delle rotte, autenticazione a doppio binario
-(cookie + token Bearer, CORS spento di default), versionamento
-`/api/v1` con alias legacy deprecati dichiaratamente, audit come
-job con id, errori uniformi con chiave+parametri, documentazione
-della spec con solo Scalar vendorizzato (Swagger UI scartato per
-scelta — non rivalutare).
-
-### Fase 1 — Il contratto (lo "swagger")
-
-**COMPLETATA il 2026-08-06 su `devapi`** (vedi AS-IS "API —
-contratto e registro"): registro dichiarativo e generatore
-OpenAPI 3.1, censimento totale (18 rotte), golden
-`docs/openapi.json`, validazione runtime dagli stessi schemi,
-contract test, parità CLI↔API (lang, soglie, queries_gsc,
-fail_under) e documentazione Scalar vendorizzata su `/api/docs`.
-`API_CONTRACT_VERSION` 1.2.0.
-
-### Fase 2 — Backend puro
-
-**COMPLETATA il 2026-08-06 su `devapi`** (vedi AS-IS "API —
-contratto e registro"): motore server estratto in
-`marsbeacon/api.py` con entry solo-API `mars_api.py`; job di
-audit con id (POST/GET/DELETE su `/api/v1/audits`, referti per
-job in ogni formato e lingua on-demand, SSE per-job, concorrenza
-configurabile); token Bearer (`/api/v1/tokens`, SHA-256
-dichiarato, stesso perimetro del cookie, gestione solo via
-sessione); CORS opzionale esplicito senza credenziali, storico
-paginato, errori uniformi `{code, key, message, params}` sulle
-rotte v1. `API_CONTRACT_VERSION` 1.3.0.
-
-### Fase 3 — Frontend statico separato
-
-**COMPLETATA il 2026-08-06 su `devapi`** (vedi AS-IS "API —
-contratto e registro"): bundle `gui/` autonomo con
-`MARS_API_BASE` in config.js (vuota = combinato a zero
-configurazione), wrapper `apiUrl`/`apiFetch` su fetch/SSE/download,
-accesso con token API nella stessa UI per il cross-origin
-(SSE→polling, download via blob), esempio nginx coi due scenari
-in `deploy/`, AT 31/31 riconfermata.
-
-### Fase 4 — Qualità, deploy, documentazione
-
-**COMPLETATA il 2026-08-06 su `devapi`** (vedi AS-IS "API —
-contratto e registro"): e2e a origini separate nella suite, job
-CI "Contratto API", `docs/API.md` con gli esempi curl, unit
-systemd `deploy/mars-api.service`. **Il programma P1 API-first è
-concluso**; resta solo la voce condizionale qui sotto.
+Il programma — contratto OpenAPI auto-generato dal registro delle
+rotte, parità CLI↔API, backend puro con job a id e token Bearer,
+frontend statico separato, e2e/CI/docs/deploy — è **completo**:
+storia, decisioni ratificate e dettagli nella sezione "API —
+contratto e registro" di AS-IS. Resta una sola voce, condizionale:
 
 - [ ] Migrazione della GUI dalle rotte legacy `/api/*` alle
       `/api/v1` (job con id) e, a migrazione completata,
       **deprecazione dichiarata degli alias legacy** nella spec
       (data e sostituto per rotta — mai rimozione silenziosa).
+
+- [ ] **Merge di `devapi` in `main`** quando il titolare decide:
+      il branch è verde (suite completa, CI, AT 31/31) e
+      documentato; da quel momento le release ripartono da `main`.
 
 ## P2 — Interfaccia grafica (mars_gui.py)
 
