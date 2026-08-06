@@ -1641,10 +1641,12 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             "Esempi: %s" % " | ".join(
                 "%r (%d car.)" % (p.title, len(p.title))
                 for p in bad_title[:3]),
-            "Title unico, 30-65 caratteri, con i termini di ricerca "
-            "reali; evita il nome dominio come titolo.", weight=2.0,
+            "Title unico, %d-%d caratteri, con i termini di ricerca "
+            "reali; evita il nome dominio come titolo."
+            % (TITLE_MIN, TITLE_MAX), weight=2.0,
             key="lex.title.bad",
             params={"n": len(bad_title),
+                    "min": TITLE_MIN, "max": TITLE_MAX,
                     "examples": " | ".join(
                         "%r (%d car.)" % (p.title, len(p.title))
                         for p in bad_title[:3])},
@@ -1675,9 +1677,11 @@ def audit_lexical(pages: List[Page]) -> List[Finding]:
             AREA_LEX, SEV_CRITICAL,
             "%d pagina/e senza meta description" % len(no_desc),
             ", ".join(p.url for p in no_desc[:5]),
-            "Scrivi 110-165 caratteri con servizio e territorio.",
+            "Scrivi %d-%d caratteri con servizio e territorio."
+            % (DESC_MIN, DESC_MAX),
             weight=1.5, key="lex.desc.missing",
             params={"n": len(no_desc),
+                    "min": DESC_MIN, "max": DESC_MAX,
                     "urls": ", ".join(p.url for p in no_desc[:5])},
             example="<meta name=\"description\" content=\"Drenaggio "
                     "linfatico manuale a Parma:\nsedute da 45 minuti "

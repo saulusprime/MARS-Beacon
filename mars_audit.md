@@ -689,6 +689,18 @@ salvati nei params). Cataloghi e resolver vivono nel nuovo modulo
 `marsbeacon/i18n.py`. Il JSON resta canonico in italiano; l'output
 italiano è identico per costruzione.
 
+Novità 1.61.0 (2026-08-06): **soglie di prassi configurabili** da
+file TOML (`--config FILE`, tabella `[soglie]`): title_min/max,
+description_min/max, parole_scarse/obiettivo, estraibilita_minima,
+varieta_anchor_minima — registro `CONFIG_THRESHOLDS` che espone solo
+le soglie i cui rilievi dichiarano il valore usato (i fix di title e
+description, che hardcodavano 30-65 e 110-165, ora sono
+parametrizzati anche nei cataloghi di traduzione). Validazione
+completa come errore d'uso, applicazione cross-modulo, eco delle
+personalizzazioni nel blocco JSON `thresholds`, esempio commentato
+in `docs/soglie.esempio.toml`. Parsing con `tomllib` (stdlib da
+Python 3.11; su 3.10 ripiego dichiarato sul pacchetto `tomli`).
+
 ## Uso
 
 ```
@@ -724,6 +736,8 @@ Lighthouse col fork installato da `tools/update-lighthouse.sh`;
 richiede Node ≥ 22.19 e Chrome — `auto` salta con motivo dichiarato
 se mancano, `always` li pretende), `--history FILE` (storico JSONL:
 delta nei referti e riga compatta accodata a ogni esecuzione),
+`--config FILE` (soglie di prassi personalizzate da file TOML,
+tabella `[soglie]`; esempio in `docs/soglie.esempio.toml`),
 `--format text|json|html|md|csv`, `--lang it|en|fr|de|es`,
 `--output`, `--quiet`, `--version`.
 

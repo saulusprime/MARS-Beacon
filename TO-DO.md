@@ -1,6 +1,6 @@
 # TO-DO — sviluppi e idee di miglioramento
 
-Elenco di ciò che **resta da fare** (codice alla v1.60.0 / GUI
+Elenco di ciò che **resta da fare** (codice alla v1.61.0 / GUI
 v2.30.0 / citations v1.2.0). Quanto già realizzato — e quanto scartato
 consapevolmente, per non rivalutarlo — è documentato in
 [AS-IS.md](AS-IS.md): le voci completate vengono spostate lì, non
@@ -26,5 +26,3 @@ osservati nel codice; il resto sono proposte.
       notifica sulle regressioni (codice di uscita 0/1 e `--fail-under`
       già pronti per fungere da gate; per il sito singolo esistono le
       unit systemd in `deploy/`).
-- [ ] File di configurazione TOML per soglie (title, description, conteggi
-      parole) oggi hardcoded come costanti.

@@ -119,6 +119,13 @@ from marsbeacon.base import (  # noqa: F401
     CITATION_RE,
     CLICKBAIT_RE)
 from marsbeacon.base import (  # noqa: F401
+    CONFIG_ORDERED_PAIRS,
+    CONFIG_TABLE,
+    CONFIG_THRESHOLDS,
+    _CONFIG_MODULES,
+    apply_thresholds,
+    load_thresholds)
+from marsbeacon.base import (  # noqa: F401
     CONTACT_SLUGS,
     CROSS_GAIN_MIN,
     Chunk,
@@ -781,6 +788,21 @@ def build_parser() -> argparse.ArgumentParser:
                              "'orientale' Qwen e Kimi, 'globale' "
                              "pesa tutti allo stesso modo "
                              "(default %s)" % DEFAULT_MARKET)
+    parser.add_argument("--config", metavar="FILE",
+                        help="file TOML con le soglie di prassi "
+                             "personalizzate (tabella [soglie]: "
+                             "title_min/max, description_min/max, "
+                             "parole_scarse/obiettivo, "
+                             "estraibilita_minima, "
+                             "varieta_anchor_minima — esempio "
+                             "commentato in "
+                             "docs/soglie.esempio.toml). I valori "
+                             "sostituiscono i default in tutto "
+                             "l'audit, i rilievi dichiarano le "
+                             "soglie usate e il referto JSON le "
+                             "echeggia nel blocco 'thresholds'. "
+                             "Richiede Python >= 3.11 (tomllib) "
+                             "oppure il pacchetto tomli")
     parser.add_argument("--history", metavar="FILE",
                         help="storico JSONL delle esecuzioni: "
                              "legge l'ultima riga dello stesso "
@@ -1014,6 +1036,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               file=sys.stderr)
         return 2
 
+    soglie: Dict[str, object] = {}
+    if args.config:
+        try:
+            soglie = load_thresholds(args.config)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        apply_thresholds(soglie)
+        if soglie and not args.quiet:
+            print("Soglie personalizzate da %s: %s"
+                  % (args.config,
+                     ", ".join("%s=%s" % coppia
+                               for coppia in sorted(soglie.items()))),
+                  file=sys.stderr)
+
     if args.queries and args.queries_gsc:
         print("--queries e --queries-gsc non sono combinabili: "
               "scegli una sola sorgente di query.", file=sys.stderr)
@@ -1109,6 +1146,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "weights": list(rrf_weights),
             "chunk_words": args.chunk_words,
         }
+        extra["thresholds"] = soglie or None
     if args.format in ("html", "text", "md", "csv"):
         extra["lang"] = args.lang
     report = renderers[args.format](

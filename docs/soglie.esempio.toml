@@ -1,0 +1,22 @@
+# Soglie di prassi di MARS Beacon — esempio per --config.
+#
+#     python3 mars_audit.py https://esempio.it --config soglie.toml
+#
+# Tutte le chiavi sono facoltative: ometti quelle che non vuoi
+# cambiare. I valori qui sotto sono i default dello strumento, cosi'
+# copiare questo file e' un punto di partenza neutro. Le soglie sono
+# valori di prassi SEO dichiarati nei referti, non standard
+# normativi: i rilievi riportano sempre la soglia effettivamente
+# usata, e il referto JSON echeggia le personalizzazioni nel blocco
+# "thresholds" (due referti con soglie diverse non sono
+# confrontabili alla pari).
+
+[soglie]
+title_min = 30              # caratteri minimi del <title>
+title_max = 65              # caratteri massimi del <title>
+description_min = 110       # caratteri minimi della meta description
+description_max = 165       # caratteri massimi della meta description
+parole_scarse = 300         # sotto: pagina scarna (rilievo critico)
+parole_obiettivo = 700      # obiettivo suggerito nella correzione
+estraibilita_minima = 0.20  # quota di paragrafi a risposta diretta
+varieta_anchor_minima = 0.80  # testi unici / coppie testo-destinazione

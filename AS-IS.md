@@ -16,7 +16,43 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-06.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `mars_audit.py` v1.60.0 (+ package `marsbeacon/`)
+## Strumento CLI — `mars_audit.py` v1.61.0 (+ package `marsbeacon/`)
+
+- **Soglie configurabili da file TOML** (v1.61.0, 2026-08-06,
+  chiude la voce P3 "file di configurazione TOML"): `--config FILE`
+  con la tabella `[soglie]` — otto chiavi nel **registro
+  `CONFIG_THRESHOLDS`** di `base.py` (title_min/max,
+  description_min/max, parole_scarse/obiettivo,
+  estraibilita_minima, varieta_anchor_minima), che espone **solo le
+  soglie di prassi i cui rilievi dichiarano il valore nei params**:
+  il referto non deve mai mentire — per questo i fix di
+  `lex.title.bad` e `lex.desc.missing`, che hardcodavano "30-65" e
+  "110-165", ora sono parametrizzati (canonico italiano dinamico e
+  `%(min)d`/`%(max)d` nei quattro cataloghi). `load_thresholds`
+  valida tutto con messaggi in italiano (tabella/chiavi
+  sconosciute, tipi — i bool respinti —, intervalli, coppie min/max
+  sul **valore efficace**) come errore d'uso (uscita 2), mai audit
+  fallito; `apply_thresholds` riassegna le costanti in ogni modulo
+  che le espone (stesso motivo dell'helper `_patch`: dopo la
+  scomposizione conta il namespace del consumatore) e ritorna i
+  valori precedenti per il ripristino nei test. Parsing con
+  `tomllib` della stdlib (Python ≥ 3.11) e ripiego dichiarato sul
+  pacchetto `tomli` per il 3.10 (in `requirements-dev.txt` con
+  marker, cosi' la CI lo copre; a runtime resta opzionale: errore
+  d'uso col motivo solo se `--config` viene usato senza supporto).
+  Il log dichiara le soglie personalizzate, il **referto JSON le
+  echeggia nel blocco additivo `thresholds`** (None coi default,
+  `schema_version` invariato): due referti con soglie diverse non
+  sono confrontabili alla pari e il JSON lo dichiara. Esempio
+  commentato coi default in **`docs/soglie.esempio.toml`** (un test
+  verifica che carichi esattamente i default: il file non puo'
+  invecchiare in silenzio). La GUI non espone `--config`: i default
+  di prassi restano quelli dichiarati. 8 test in
+  `tests/test_config.py` (esempio=default, file parziale,
+  validazioni respinte con messaggio, apply/ripristino
+  cross-modulo, audit reale con soglie alzate e fix dichiarato in
+  it/en/fr, CLI a uscita 2, e2e con eco nel JSON); suite 357 test,
+  flake8 pulito.
 
 - **Referti in cinque lingue** (v1.60.0, 2026-08-06, chiude la voce
   P3 "altre lingue del referto"): `--lang it|en|fr|de|es` —
@@ -1153,7 +1189,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 349 test in ~30 secondi** (inclusa
+- **Suite pytest: 357 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

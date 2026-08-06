@@ -6,7 +6,7 @@ Audit*)
 [![CI](https://github.com/saulusprime/MARS-Beacon/actions/workflows/ci.yml/badge.svg)](https://github.com/saulusprime/MARS-Beacon/actions/workflows/ci.yml)
 [![Licenza: Apache 2.0](https://img.shields.io/badge/licenza-Apache_2.0-blue)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#installazione)
-[![Versione 1.60.0](https://img.shields.io/badge/versione-1.60.0-186078)](AS-IS.md)
+[![Versione 1.61.0](https://img.shields.io/badge/versione-1.61.0-186078)](AS-IS.md)
 [![Stato: attivo](https://img.shields.io/badge/stato-attivo-success)](AS-IS.md)
 [![Referti in 5 lingue](https://img.shields.io/badge/referti-it_%C2%B7_en_%C2%B7_fr_%C2%B7_de_%C2%B7_es-186078)](#opzioni)
 [![Accessibilità WCAG 2.2 AA](https://img.shields.io/badge/accessibilit%C3%A0-WCAG_2.2_AA-6f42c1)](docs/ACCESSIBILITA.md)
@@ -117,6 +117,7 @@ python3 mars_audit.py https://esempio.it \
 | `--delay SEC` | 0.5 | pausa fra le richieste HTTP |
 | `--competitor URL` | — | sito concorrente da confrontare (ripetibile, massimo 3). Ogni concorrente viene scansionato con gli stessi limiti; i corpora vengono fusi negli stessi indici BM25+vettoriale e interrogati con le stesse query (i temi del **tuo** sito): il referto riporta la **share of voice** — quanti dei primi 5 posti fusi appartengono a ciascun sito, con soglie rispetto alla parità — e le query vinte interamente dai concorrenti |
 | `--market occidentale\|globale\|orientale` | occidentale | pesi dei **profili di citabilità per assistente IA** nell'indice composito: `occidentale` privilegia ChatGPT/Perplexity (50%) e Claude (30%), `orientale` Qwen e Kimi (35% ciascuno), `globale` pesa tutti allo stesso modo. I profili sono stime euristiche derivate dai punteggi di area — la nota di onestà è sempre inclusa nel referto |
+| `--config FILE` | — | **soglie di prassi personalizzate** da file TOML (tabella `[soglie]`: `title_min`/`title_max`, `description_min`/`description_max`, `parole_scarse`/`parole_obiettivo`, `estraibilita_minima`, `varieta_anchor_minima` — esempio commentato coi default in [docs/soglie.esempio.toml](docs/soglie.esempio.toml)). Chiavi, tipi, intervalli e coppie min/max sono validati (errore d'uso con motivo); i valori sostituiscono i default in tutto l'audit, **i rilievi dichiarano sempre la soglia usata** (anche nei referti tradotti) e il JSON le echeggia nel blocco `thresholds` — due referti con soglie diverse non sono confrontabili alla pari. Richiede Python ≥ 3.11 (`tomllib` in libreria standard) oppure il pacchetto `tomli` |
 | `--history FILE` | — | **storico JSONL delle esecuzioni**: legge l'ultima riga dello stesso sito e riporta nei referti la sezione "Rispetto all'esecuzione precedente" (variazioni dei punteggi per area, rilievi nuovi/risolti), poi accoda una riga compatta per l'esecuzione corrente. Con un audit schedulato (cron/systemd) trasforma l'audit in monitoraggio anche senza GUI |
 | `--fail-under PUNTI` | — | **gate di regressione**: esce con codice `1` anche quando il punteggio complessivo (0–100) è sotto la soglia, dichiarandolo su stderr. Pensato per gli audit schedulati con `--history` (cron/systemd): il fallimento del servizio diventa la notifica — vedi le unit in `deploy/` |
 | `--judge auto\|on\|off` | auto | **giudizio LLM sulla citabilità**: un modello (Claude, SDK ufficiale Anthropic) valuta i passaggi migliori della simulazione RRF — max 5, una sola richiesta API per audit — con punteggio e motivazione per ciascuno e **scarto rispetto all'indice euristico**. `auto` (default) parte solo se `ANTHROPIC_API_KEY` è nell'ambiente, altrimenti viene saltato con motivo dichiarato nel referto: senza chiave l'audit resta interamente offline. `on` pretende la chiave (errore d'uso senza); `off` disattiva. I costi API sono a carico della chiave configurata |
@@ -589,7 +590,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 349 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 357 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

@@ -1377,8 +1377,9 @@ _FINDINGS_EN: Dict[str, Dict[str, str]] = {
     "lex.title.bad": {
         "title": "%(n)d titles not optimised",
         "detail": "Examples: %(examples)s",
-        "fix": "Unique title, 30-65 characters, with the real "
-               "search terms; avoid the domain name as a title.",
+        "fix": "Unique title, %(min)d-%(max)d characters, with the "
+               "real search terms; avoid the domain name as a "
+               "title.",
         "example": "<title>Drenaggio linfatico manuale a Parma | "
                    "Centro Esempio</title>\n"
                    "(52 characters: service + territory + brand)",
@@ -1394,7 +1395,7 @@ _FINDINGS_EN: Dict[str, Dict[str, str]] = {
     "lex.desc.missing": {
         "title": "%(n)d page(s) without a meta description",
         "detail": "%(urls)s",
-        "fix": "Write 110-165 characters with service and "
+        "fix": "Write %(min)d-%(max)d characters with service and "
                "territory.",
     },
     "lex.desc.short": {
@@ -2347,9 +2348,9 @@ _FINDINGS_FR: Dict[str, Dict[str, str]] = {
     "lex.title.bad": {
         "title": "%(n)d title non optimisés",
         "detail": "Exemples : %(examples)s",
-        "fix": "Un title unique, de 30 à 65 caractères, avec les "
-               "vrais termes de recherche ; évitez le nom de "
-               "domaine comme titre.",
+        "fix": "Un title unique, de %(min)d à %(max)d caractères, "
+               "avec les vrais termes de recherche ; évitez le nom "
+               "de domaine comme titre.",
         "example": "<title>Drenaggio linfatico manuale a Parma | "
                    "Centro Esempio</title>\n"
                    "(52 caractères : service + territoire + "
@@ -2366,8 +2367,8 @@ _FINDINGS_FR: Dict[str, Dict[str, str]] = {
     "lex.desc.missing": {
         "title": "%(n)d page(s) sans meta description",
         "detail": "%(urls)s",
-        "fix": "Rédigez 110-165 caractères avec le service et le "
-               "territoire.",
+        "fix": "Rédigez %(min)d-%(max)d caractères avec le service "
+               "et le territoire.",
     },
     "lex.desc.short": {
         "title": "%(n)d meta descriptions trop courtes",
@@ -3373,8 +3374,8 @@ _FINDINGS_DE: Dict[str, Dict[str, str]] = {
     "lex.title.bad": {
         "title": "%(n)d Title nicht optimiert",
         "detail": "Beispiele: %(examples)s",
-        "fix": "Eindeutiger Title, 30-65 Zeichen, mit den "
-               "echten Suchbegriffen; vermeiden Sie den "
+        "fix": "Eindeutiger Title, %(min)d-%(max)d Zeichen, mit "
+               "den echten Suchbegriffen; vermeiden Sie den "
                "Domainnamen als Titel.",
         "example": "<title>Drenaggio linfatico manuale a Parma "
                    "| Centro Esempio</title>\n"
@@ -3391,8 +3392,8 @@ _FINDINGS_DE: Dict[str, Dict[str, str]] = {
     "lex.desc.missing": {
         "title": "%(n)d Seite(n) ohne Meta-Description",
         "detail": "%(urls)s",
-        "fix": "Schreiben Sie 110-165 Zeichen mit Leistung und "
-               "Gebiet.",
+        "fix": "Schreiben Sie %(min)d-%(max)d Zeichen mit Leistung "
+               "und Gebiet.",
     },
     "lex.desc.short": {
         "title": "%(n)d zu kurze Meta-Descriptions",
@@ -4404,9 +4405,9 @@ _FINDINGS_ES: Dict[str, Dict[str, str]] = {
     "lex.title.bad": {
         "title": "%(n)d title no optimizados",
         "detail": "Ejemplos: %(examples)s",
-        "fix": "Un title único, de 30-65 caracteres, con los "
-               "términos de búsqueda reales; evite el nombre de "
-               "dominio como título.",
+        "fix": "Un title único, de %(min)d-%(max)d caracteres, con "
+               "los términos de búsqueda reales; evite el nombre "
+               "de dominio como título.",
         "example": "<title>Drenaggio linfatico manuale a Parma "
                    "| Centro Esempio</title>\n"
                    "(52 caracteres: servicio + territorio + "
@@ -4423,8 +4424,8 @@ _FINDINGS_ES: Dict[str, Dict[str, str]] = {
     "lex.desc.missing": {
         "title": "%(n)d página(s) sin meta description",
         "detail": "%(urls)s",
-        "fix": "Redacte 110-165 caracteres con el servicio y el "
-               "territorio.",
+        "fix": "Redacte %(min)d-%(max)d caracteres con el servicio "
+               "y el territorio.",
     },
     "lex.desc.short": {
         "title": "%(n)d meta descriptions demasiado cortas",

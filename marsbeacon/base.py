@@ -35,7 +35,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.60.0"
+__version__ = "1.61.0"
 
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
@@ -1004,6 +1004,139 @@ THIN_CONTENT_WORDS = 300
 
 
 GOOD_CONTENT_WORDS = 700
+
+
+# Soglie configurabili da file TOML (--config): chiave del file ->
+# (nome della costante, tipo, minimo, massimo). Sono le soglie "di
+# prassi" dichiarate nei referti — non standard normativi — che una
+# consulenza puo' tarare per settore o mercato; il registro e' il
+# posto dove esporne di nuove (solo soglie i cui testi di rilievo
+# portano il valore nei params: il referto non deve mai mentire).
+CONFIG_TABLE = "soglie"
+
+
+CONFIG_THRESHOLDS: Dict[str, Tuple[str, type, float, float]] = {
+    "title_min": ("TITLE_MIN", int, 1, 200),
+    "title_max": ("TITLE_MAX", int, 1, 300),
+    "description_min": ("DESC_MIN", int, 1, 400),
+    "description_max": ("DESC_MAX", int, 1, 600),
+    "parole_scarse": ("THIN_CONTENT_WORDS", int, 1, 100000),
+    "parole_obiettivo": ("GOOD_CONTENT_WORDS", int, 1, 100000),
+    "estraibilita_minima": ("EXTRACT_GOOD_SHARE", float, 0.01, 1.0),
+    "varieta_anchor_minima": ("ANCHOR_VARIETY_GOOD", float,
+                              0.01, 1.0),
+}
+
+
+# Coppie che devono restare ordinate (minore < maggiore) anche dopo
+# le sostituzioni: si valida il valore efficace, non il singolo file.
+CONFIG_ORDERED_PAIRS = (
+    ("title_min", "title_max"),
+    ("description_min", "description_max"),
+    ("parole_scarse", "parole_obiettivo"),
+)
+
+
+# Moduli in cui riassegnare le costanti: dopo la scomposizione in
+# package (v1.58.0) i consumatori importano i nomi per valore,
+# quindi conta il namespace di chi li usa — stesso motivo
+# dell'helper _patch della suite di test.
+_CONFIG_MODULES = (
+    "mars_audit", "marsbeacon.base", "marsbeacon.crawler",
+    "marsbeacon.indexes", "marsbeacon.audits", "marsbeacon.render",
+    "marsbeacon.i18n")
+
+
+def load_thresholds(path: str) -> Dict[str, object]:
+    """Legge e valida il file TOML delle soglie (``--config``).
+
+    Ritorna il dizionario {chiave: valore} delle sole soglie
+    presenti nel file. Ogni problema — file illeggibile, TOML
+    malformato, tabella o chiave sconosciuta, tipo o intervallo
+    sbagliato, coppia min/max invertita — solleva ``ValueError``
+    con un messaggio in italiano: il chiamante lo tratta come
+    errore d'uso (uscita 2), mai come audit fallito.
+    """
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # Python 3.10: ripiego dichiarato
+        try:
+            import tomli as tomllib  # type: ignore[no-redef]
+        except ModuleNotFoundError:
+            raise ValueError(
+                "--config richiede Python >= 3.11 (modulo tomllib) "
+                "oppure il pacchetto 'tomli' (pip install tomli).")
+    try:
+        with open(path, "rb") as handle:
+            data = tomllib.load(handle)
+    except OSError as exc:
+        raise ValueError("Impossibile leggere %s: %s" % (path, exc))
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError("TOML non valido in %s: %s" % (path, exc))
+
+    sconosciute = sorted(set(data) - {CONFIG_TABLE})
+    if sconosciute:
+        raise ValueError(
+            "Tabella sconosciuta in %s: %s. L'unica tabella "
+            "prevista e' [%s]."
+            % (path, ", ".join(sconosciute), CONFIG_TABLE))
+    table = data.get(CONFIG_TABLE, {})
+    if not isinstance(table, dict):
+        raise ValueError("[%s] deve essere una tabella TOML."
+                         % CONFIG_TABLE)
+
+    overrides: Dict[str, object] = {}
+    for key, value in table.items():
+        spec = CONFIG_THRESHOLDS.get(key)
+        if spec is None:
+            raise ValueError(
+                "Soglia sconosciuta in %s: %r. Soglie previste: %s."
+                % (path, key,
+                   ", ".join(sorted(CONFIG_THRESHOLDS))))
+        _, kind, minimo, massimo = spec
+        if isinstance(value, bool) \
+                or not isinstance(value, (int, float)):
+            raise ValueError(
+                "La soglia %r vuole un numero, non %r."
+                % (key, value))
+        if kind is int and not isinstance(value, int):
+            raise ValueError(
+                "La soglia %r vuole un numero intero, non %r."
+                % (key, value))
+        if not minimo <= value <= massimo:
+            raise ValueError(
+                "La soglia %r deve stare fra %s e %s (trovato %s)."
+                % (key, minimo, massimo, value))
+        overrides[key] = kind(value)
+
+    for prima, dopo in CONFIG_ORDERED_PAIRS:
+        eff = {
+            k: overrides.get(k, globals()[CONFIG_THRESHOLDS[k][0]])
+            for k in (prima, dopo)}
+        if eff[prima] >= eff[dopo]:  # type: ignore[operator]
+            raise ValueError(
+                "La soglia %r (%s) deve restare minore di %r (%s)."
+                % (prima, eff[prima], dopo, eff[dopo]))
+    return overrides
+
+
+def apply_thresholds(
+        overrides: Dict[str, object]) -> Dict[str, object]:
+    """Applica le soglie su ogni modulo che espone la costante.
+
+    Ritorna {chiave: valore precedente}, riutilizzabile con la
+    stessa funzione per ripristinare i default (utile nei test; la
+    CLI e' un processo usa-e-getta e non ne ha bisogno).
+    """
+    moduli = [sys.modules.get(nome) for nome in _CONFIG_MODULES]
+    precedenti: Dict[str, object] = {}
+    for key, value in overrides.items():
+        nome_costante = CONFIG_THRESHOLDS[key][0]
+        precedenti[key] = globals()[nome_costante]
+        for modulo in moduli:
+            if modulo is not None and hasattr(modulo, nome_costante):
+                setattr(modulo, nome_costante, value)
+    return precedenti
 
 
 def tokenize(text: str, keep_stopwords: bool = False) -> List[str]:

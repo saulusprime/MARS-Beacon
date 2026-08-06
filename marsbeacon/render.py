@@ -1906,9 +1906,16 @@ def render_json(base: str, pages: List[Page],
                 delta: Optional[Dict[str, object]] = None,
                 lighthouse: Optional[Dict[str, object]] = None,
                 search_check: Optional[Dict[str, object]] = None,
-                rrf_params: Optional[Dict[str, object]] = None
+                rrf_params: Optional[Dict[str, object]] = None,
+                thresholds: Optional[Dict[str, object]] = None
                 ) -> str:
-    """Referto JSON, adatto a essere versionato o messo in pipeline."""
+    """Referto JSON, adatto a essere versionato o messo in pipeline.
+
+    ``thresholds`` echeggia le soglie personalizzate da --config
+    (None con i default): campo additivo, per la riproducibilita'
+    — due referti con soglie diverse non sono confrontabili alla
+    pari e il JSON lo dichiara.
+    """
     rrf_obj: Dict[str, object] = {
         "k": k, "formula": "score(d)=sum w_i/(k+rank_i(d))"}
     rrf_obj.update(rrf_params or
@@ -1921,6 +1928,7 @@ def render_json(base: str, pages: List[Page],
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "vector_retriever": mode,
         "rrf": rrf_obj,
+        "thresholds": thresholds,
         "scores": {**scores, "overall": overall_score(scores)},
         "citability": citability_profiles(pages, scores, market),
         "citability_actions": citability_top_actions(

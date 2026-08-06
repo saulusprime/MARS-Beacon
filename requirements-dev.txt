@@ -4,3 +4,6 @@ pytest>=7
 flake8>=6
 anthropic>=0.120
 playwright>=1.40
+# --config (soglie TOML) usa tomllib della stdlib da Python 3.11:
+# su 3.10 i test la coprono col pacchetto equivalente.
+tomli>=2; python_version < "3.11"
