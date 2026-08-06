@@ -17,6 +17,10 @@ referto*.html
 storico*.jsonl
 citazioni*.jsonl
 
+# I golden file dei renderer sono fixture VERSIONATE della suite
+# (tests/test_golden.py), non referti generati a runtime
+!tests/golden/referto*
+
 # IDE e sistema
 .vscode/
 .idea/

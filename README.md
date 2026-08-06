@@ -590,7 +590,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 357 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 363 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
@@ -612,6 +612,11 @@ con aree mancanti, mercati), coerenza dei tre renderer,
 **i18n dei referti in en/fr/de/es** (parità di chiavi e campi fra i
 cataloghi, copertura della cornice verificata sull'AST dei renderer,
 audit reale con traduzione effettiva di ogni rilievo),
+**golden file completi dei cinque renderer** (`tests/golden/`: un
+dataset sintetico deterministico attraversa tutte le sezioni dei
+referti e l'output è confrontato riga per riga, normalizzando solo
+versione e timestamp; rigenerazione intenzionale con
+`MARS_RIGENERA_GOLDEN=1` e revisione del diff),
 codici di uscita CLI, API della GUI (account, limite orario, SSE,
 storico, CSP, path traversal, annullamento), **integrazione
 Lighthouse offline per costruzione** (LHR finti e `subprocess.Popen`

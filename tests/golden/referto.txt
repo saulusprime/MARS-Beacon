@@ -1,0 +1,212 @@
+======================================================================
+MARS BEACON  ·  https://esempio.test/
+Meta-fusion, Accessibility, Ranking & Security Audit
+======================================================================
+Pagine analizzate : 3
+Chunk indicizzati : 4
+Recuperatore vett.: char-tfidf
+
+PUNTEGGI
+  Tecnica                   52.5/100  ##########
+  Lessicale (BM25)          61.0/100  ############
+  Semantica (vettoriale)    58.5/100  ###########
+  Dati strutturati          30.0/100  ######
+  Simulazione RRF           66.7/100  #############
+  Performance (Lighthouse)  74.0/100  ##############
+  COMPLESSIVO               58.1/100
+
+RISPETTO ALL'ESECUZIONE PRECEDENTE  ·  2026-07-30T10:00:00+0200
+  Tecnica +2.5 · Lessicale (BM25) = · Complessivo +1.8
+  Risolti (1):
+    [X] n pagina/e senza <title>
+  Nuovi (1):
+    [!] Nessuna sezione FAQ
+  Nota: rilievi confrontati per tipo (i conteggi nei titoli possono variare).
+
+PROFILI DI CITABILITA' PER ASSISTENTE IA
+  Claude (Anthropic)        53.7/100  ##########
+  ChatGPT / Perplexity      61.9/100  ############
+  Qwen (Alibaba)            46.0/100  #########
+  Kimi (Moonshot AI)        49.8/100  #########
+  INDICE COMPOSITO          56.6/100
+  Pesi (mercato occidentale): claude 30%, chatgpt 50%, qwen 10%, kimi 10%
+  Azioni con maggior guadagno di profilo:
+   1. [sforzo: giorni] 1 query senza alcun risultato -> ChatGPT / Perplexity (+30.0 punti profilo)
+   2. [sforzo: minuti] 1 title non ottimizzati -> Claude (Anthropic) (+10.0 punti profilo)
+   3. [sforzo: giorni] 1 pagina/e sotto 300 parole -> Claude (Anthropic) (+10.0 punti profilo)
+  Nota: Stime euristiche ricavate dalle metriche di questo audit: le preferenze attribuite a ciascun assistente non sono comportamento documentato dai vendor.
+
+GIUDIZIO LLM SULLA CITABILITA'
+  Modello: claude-esempio · passaggi valutati: 2 · media: 71.5/100
+  Indice euristico: 56.6 — scarto giudice-euristica: +14.9
+   78.0/100  drenaggio linfatico costi
+             Risposta diretta con durata e prezzo.
+   65.0/100  controindicazioni drenaggio
+             Passaggio pertinente ma senza elenco esplicito.
+  Nota: Parere di un modello su un campione: non e' una misura riproducibile.
+
+AUDIT LIGHTHOUSE
+  Eseguito su 1 pagina/e (mobile), fork v13.4.1-mars.1
+  Prestazioni 74/100 · SEO 88/100
+
+ANCORA DI REALTA' (BRAVE SEARCH)
+  Sito trovato per 1 query su 2 (primi 20 risultati)
+  [v] drenaggio linfatico costi — posizione #4 · consenso RRF 3
+  [x] controindicazioni drenaggio — assente dai primi 20 · consenso RRF 0
+  Nota: Il ranking reale dipende anche da personalizzazione, localita' e freschezza: confronto direzionale, non una validazione.
+
+----------------------------------------------------------------------
+TECNICA
+----------------------------------------------------------------------
+[X] Sito non in HTTPS
+    -> Fix: Attiva un certificato TLS e reindirizza tutto su HTTPS.
+[X] Crawler IA bloccati: GPTBot, ClaudeBot
+    Questi agenti non possono accedere alla home. Se sono bloccati non entri in nessuna lista di recupero e l'RRF non ha nulla da fondere.
+    -> Fix: Rimuovi i Disallow per gli agenti da cui vuoi essere citato.
+[!] 1 pagina/e a piu' di 3 click dalla home
+    https://esempio.test/vecchia-pagina/.
+    -> Fix: Accorcia i percorsi: le pagine profonde vengono scansionate e pesate meno.
+[v] robots.txt presente
+    12 righe.
+
+----------------------------------------------------------------------
+LESSICALE (BM25)
+----------------------------------------------------------------------
+[X] 1 title non ottimizzati
+    Esempi: 'Centro' (6 car.)
+    -> Fix: Title unico, 30-65 caratteri, con i termini di ricerca reali; evita il nome dominio come titolo.
+[X] 1 pagina/e sotto 300 parole
+    Media sito: 440 parole. Con cosi' poco testo i termini utili non raggiungono una frequenza sufficiente perche' BM25 li valorizzi.
+    -> Fix: Porta le pagine chiave verso le 700+ parole con contenuto informativo, non promozionale.
+[v] Meta description presenti e di lunghezza adeguata
+
+----------------------------------------------------------------------
+SEMANTICA (VETTORIALE)
+----------------------------------------------------------------------
+[!] Pochi paragrafi a risposta diretta
+    1 paragrafi su 12 aprono con una risposta esplicita in 20-120 parole (8% contro una soglia di prassi del 20%): sono i passaggi citabili da un assistente cosi' come sono.
+    -> Fix: Riscrivi i paragrafi chiave aprendo con la risposta ("X e' ...", "Si', ...", "In sintesi ...") e tienili fra 20 e 120 parole.
+[!] Nessuna sezione FAQ
+    Le FAQ allineano un chunk a un intento preciso e alimentano entrambi gli assi insieme.
+    -> Fix: Aggiungi FAQ per pagina, marcate con JSON-LD FAQPage.
+[v] E-E-A-T: contatti verificabili presenti
+
+----------------------------------------------------------------------
+DATI STRUTTURATI
+----------------------------------------------------------------------
+[!] Entita' principale non dichiarata
+    -> Fix: Aggiungi Organization o LocalBusiness con nome, indirizzo, contatti e riferimenti fiscali.
+[i] 1 data/e non in formato ISO 8601
+    31/12/2025 (Service).
+    -> Fix: Usa AAAA-MM-GG, con l'ora facoltativa dopo la T (es. 2026-08-03T09:30:00+02:00).
+
+----------------------------------------------------------------------
+SIMULAZIONE RRF
+----------------------------------------------------------------------
+[X] 1 query senza alcun risultato
+    Nessun chunk del sito risponde: 'controindicazioni drenaggio'.
+    -> Fix: Crea contenuti dedicati a questi intenti.
+[!] Consenso medio fra le liste: 1.5/5 (30%)
+    Consenso parziale fra i due recuperatori. Nella formula RRF un documento presente in entrambe le liste somma due addendi 1/(k+rank) e batte chi domina una lista sola. Consenso per query: 'drenaggio linfatico costi' 3/5, 'controindicazioni drenaggio' 0/5.
+    -> Fix: Ottimizza gli stessi passaggi su entrambi gli assi: termini espliciti (BM25) e spiegazione completa (vettoriale).
+
+----------------------------------------------------------------------
+PERFORMANCE (LIGHTHOUSE)
+----------------------------------------------------------------------
+[!] Lighthouse: LCP lento
+    4,1 s; Pagine: https://esempio.test/
+    -> Fix: Riduci il peso dell'immagine principale e servila con priorita' alta.
+[v] Lighthouse SEO: nessun rilievo
+    Punteggio 88/100 sull'unica pagina esaminata.
+
+----------------------------------------------------------------------
+LA MATEMATICA DEL PROBLEMA
+----------------------------------------------------------------------
+  Superficie attuale   : 3 pagine, 4 chunk (~440 parole/pagina)
+  Superficie potenziale: ~15 chunk (ogni pagina esistente portata ad almeno ~900 parole (4 chunk) piu' una FAQ; nessuna pagina nuova)
+  Effetto sull'RRF     : ~3.8x occasioni di comparire nelle liste fuse
+
+----------------------------------------------------------------------
+PIANO DI REMEDIATION  ·  11 interventi per gravita' e guadagno di citabilita' · 2 quick win
+----------------------------------------------------------------------
+ 1. [CRITICO · Simulazione RRF · sforzo: giorni] 1 query senza alcun risultato
+    Fix: Crea contenuti dedicati a questi intenti.
+    Esempio:
+        Per ogni query scoperta, una sezione con un heading uguale alla domanda:
+        <h2>Quanto costa il drenaggio linfatico?</h2>
+        <p>Una seduta costa in media 40-80 euro, secondo durata e zona trattata.</p>
+
+ 2. [CRITICO · Lessicale (BM25) · sforzo: minuti] 1 title non ottimizzati  ** QUICK WIN
+    Trasversale: deprime 4 profili di citabilita' (risolto vale +9.2 sull'indice)
+    Fix: Title unico, 30-65 caratteri, con i termini di ricerca reali; evita il nome dominio come titolo.
+    Esempio:
+        <title>Drenaggio linfatico manuale a Parma | Centro Esempio</title>
+        (52 caratteri: servizio + territorio + brand)
+
+ 3. [CRITICO · Lessicale (BM25) · sforzo: giorni] 1 pagina/e sotto 300 parole
+    Trasversale: deprime 4 profili di citabilita' (risolto vale +9.2 sull'indice)
+    Fix: Porta le pagine chiave verso le 700+ parole con contenuto informativo, non promozionale.
+    Esempio:
+        Struttura tipo per una pagina servizio:
+        <h2>Cos'e' ...?</h2> <h2>Come funziona una seduta</h2>
+        <h2>Quando serve</h2> <h2>Quanto costa</h2> <h2>Domande frequenti</h2>
+
+ 4. [CRITICO · Tecnica · sforzo: ore] Sito non in HTTPS
+    Trasversale: deprime 3 profili di citabilita' (risolto vale +5.3 sull'indice)
+    Fix: Attiva un certificato TLS e reindirizza tutto su HTTPS.
+
+ 5. [CRITICO · Tecnica · sforzo: minuti] Crawler IA bloccati: GPTBot, ClaudeBot  ** QUICK WIN
+    Trasversale: deprime 3 profili di citabilita' (risolto vale +5.3 sull'indice)
+    Fix: Rimuovi i Disallow per gli agenti da cui vuoi essere citato.
+    Esempio:
+        # robots.txt - sblocca gli agenti IA
+        User-agent: GPTBot
+        Disallow:
+        
+        User-agent: ClaudeBot
+        Disallow:
+
+ 6. [AVVISO · Dati strutturati · sforzo: ore] Entita' principale non dichiarata
+    Trasversale: deprime 3 profili di citabilita' (risolto vale +5.2 sull'indice)
+    Fix: Aggiungi Organization o LocalBusiness con nome, indirizzo, contatti e riferimenti fiscali.
+
+ 7. [AVVISO · Semantica (vettoriale) · sforzo: ore] Pochi paragrafi a risposta diretta
+    Trasversale: deprime 4 profili di citabilita' (risolto vale +4.1 sull'indice)
+    Fix: Riscrivi i paragrafi chiave aprendo con la risposta ("X e' ...", "Si', ...", "In sintesi ...") e tienili fra 20 e 120 parole.
+    Esempio:
+        Prima: "Nel panorama del benessere di oggi, molti si chiedono quale percorso..."
+        Dopo:  "Il drenaggio linfatico e' un massaggio delicato che favorisce il deflusso della linfa: una seduta dura 45 minuti e costa 40-80 euro."
+
+ 8. [AVVISO · Semantica (vettoriale) · sforzo: giorni] Nessuna sezione FAQ
+    Trasversale: deprime 4 profili di citabilita' (risolto vale +4.1 sull'indice)
+    Fix: Aggiungi FAQ per pagina, marcate con JSON-LD FAQPage.
+
+ 9. [AVVISO · Simulazione RRF · sforzo: giorni] Consenso medio fra le liste: 1.5/5 (30%)
+    Fix: Ottimizza gli stessi passaggi su entrambi gli assi: termini espliciti (BM25) e spiegazione completa (vettoriale).
+
+10. [AVVISO · Tecnica · sforzo: ore] 1 pagina/e a piu' di 3 click dalla home
+    Trasversale: deprime 3 profili di citabilita' (risolto vale +1.3 sull'indice)
+    Fix: Accorcia i percorsi: le pagine profonde vengono scansionate e pesate meno.
+
+11. [AVVISO · Performance (Lighthouse) · sforzo: ore] Lighthouse: LCP lento
+    Fix: Riduci il peso dell'immagine principale e servila con priorita' alta.
+
+----------------------------------------------------------------------
+DETTAGLIO SIMULAZIONE RRF
+----------------------------------------------------------------------
+Query: drenaggio linfatico costi   (consenso 3)
+   1. /  ·  Quanto costa una seduta?                        0.03252
+   2. /servizi/  ·  Percorso post-operatorio                0.01639
+   3. /faq/  ·  Il drenaggio e' doloroso?                   0.01613
+
+Query: controindicazioni drenaggio   (consenso 0)
+   (nessun passaggio recuperato)
+
+----------------------------------------------------------------------
+CONFRONTO COMPETITIVO  ·  share of voice sui primi 5 posti fusi
+----------------------------------------------------------------------
+  esempio.test                            40.0%  <- tuo sito
+  concorrente.test                        60.0%
+
+  drenaggio linfatico costi                       tuoi 2/5 · miglior posizione 2
+  controindicazioni drenaggio                     tuoi 0/5 · ASSENTE

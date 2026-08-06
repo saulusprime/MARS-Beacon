@@ -18,9 +18,6 @@ osservati nel codice; il resto sono proposte.
 - [ ] Packaging: `pyproject.toml`, entry point `mars-audit`,
       pubblicazione su PyPI (la scomposizione in moduli è fatta:
       package `marsbeacon/` + facciata dalla v1.58.0 — vedi AS-IS).
-- [ ] Aggiungere alla suite i golden file completi dei renderer
-      (la CI GitHub Actions con flake8 + pytest su Python 3.10/3.12 e
-      audit Pa11y esiste dalla sessione del 2026-08-03).
 - [ ] Immagine Docker per esecuzioni riproducibili (utile con Playwright).
 - [ ] Modalità server/batch: audit schedulati di una lista di siti con
       notifica sulle regressioni (codice di uscita 0/1 e `--fail-under`

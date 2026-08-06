@@ -1,0 +1,17 @@
+﻿sito;area;gravita;peso;titolo;dettaglio;correzione;url;sforzo;quick_win
+https://esempio.test/;Tecnica;critical;2.0;Sito non in HTTPS;;Attiva un certificato TLS e reindirizza tutto su HTTPS.;;ore;
+https://esempio.test/;Tecnica;critical;2.0;Crawler IA bloccati: GPTBot, ClaudeBot;Questi agenti non possono accedere alla home. Se sono bloccati non entri in nessuna lista di recupero e l'RRF non ha nulla da fondere.;Rimuovi i Disallow per gli agenti da cui vuoi essere citato.;;minuti;si
+https://esempio.test/;Tecnica;warning;1.0;1 pagina/e a piu' di 3 click dalla home;https://esempio.test/vecchia-pagina/.;Accorcia i percorsi: le pagine profonde vengono scansionate e pesate meno.;;ore;
+https://esempio.test/;Tecnica;ok;1.0;robots.txt presente;12 righe.;;;;
+https://esempio.test/;Lessicale (BM25);critical;2.0;1 title non ottimizzati;Esempi: 'Centro' (6 car.);"Title unico, 30-65 caratteri, con i termini di ricerca reali; evita il nome dominio come titolo.";https://esempio.test/faq/;minuti;si
+https://esempio.test/;Lessicale (BM25);critical;2.0;1 pagina/e sotto 300 parole;Media sito: 440 parole. Con cosi' poco testo i termini utili non raggiungono una frequenza sufficiente perche' BM25 li valorizzi.;Porta le pagine chiave verso le 700+ parole con contenuto informativo, non promozionale.;https://esempio.test/faq/;giorni;
+https://esempio.test/;Lessicale (BM25);ok;1.0;Meta description presenti e di lunghezza adeguata;;;;;
+https://esempio.test/;Semantica (vettoriale);warning;1.0;Pochi paragrafi a risposta diretta;1 paragrafi su 12 aprono con una risposta esplicita in 20-120 parole (8% contro una soglia di prassi del 20%): sono i passaggi citabili da un assistente cosi' come sono.;"Riscrivi i paragrafi chiave aprendo con la risposta (""X e' ..."", ""Si', ..."", ""In sintesi ..."") e tienili fra 20 e 120 parole.";;ore;
+https://esempio.test/;Semantica (vettoriale);warning;1.0;Nessuna sezione FAQ;Le FAQ allineano un chunk a un intento preciso e alimentano entrambi gli assi insieme.;Aggiungi FAQ per pagina, marcate con JSON-LD FAQPage.;;giorni;
+https://esempio.test/;Semantica (vettoriale);ok;1.0;E-E-A-T: contatti verificabili presenti;;;;;
+https://esempio.test/;Dati strutturati;warning;1.0;Entita' principale non dichiarata;;Aggiungi Organization o LocalBusiness con nome, indirizzo, contatti e riferimenti fiscali.;;ore;
+https://esempio.test/;Dati strutturati;info;1.0;1 data/e non in formato ISO 8601;31/12/2025 (Service).;Usa AAAA-MM-GG, con l'ora facoltativa dopo la T (es. 2026-08-03T09:30:00+02:00).;;;
+https://esempio.test/;Simulazione RRF;warning;1.0;Consenso medio fra le liste: 1.5/5 (30%);Consenso parziale fra i due recuperatori. Nella formula RRF un documento presente in entrambe le liste somma due addendi 1/(k+rank) e batte chi domina una lista sola. Consenso per query: 'drenaggio linfatico costi' 3/5, 'controindicazioni drenaggio' 0/5.;Ottimizza gli stessi passaggi su entrambi gli assi: termini espliciti (BM25) e spiegazione completa (vettoriale).;;giorni;
+https://esempio.test/;Simulazione RRF;critical;2.0;1 query senza alcun risultato;Nessun chunk del sito risponde: 'controindicazioni drenaggio'.;Crea contenuti dedicati a questi intenti.;;giorni;
+https://esempio.test/;Performance (Lighthouse);warning;2.0;Lighthouse: LCP lento;"4,1 s; Pagine: https://esempio.test/";Riduci il peso dell'immagine principale e servila con priorita' alta.;https://esempio.test/;ore;
+https://esempio.test/;Performance (Lighthouse);ok;1.0;Lighthouse SEO: nessun rilievo;Punteggio 88/100 sull'unica pagina esaminata.;;;;

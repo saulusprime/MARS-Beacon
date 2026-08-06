@@ -1,0 +1,1136 @@
+{
+  "tool": "mars_audit.py",
+  "version": "X.Y.Z",
+  "schema_version": 1,
+  "site": "https://esempio.test/",
+  "generated_at": "NORMALIZZATO",
+  "vector_retriever": "char-tfidf",
+  "rrf": {
+    "k": 60,
+    "formula": "score(d)=sum w_i/(k+rank_i(d))",
+    "top_n": 5,
+    "weights": [
+      1.0,
+      1.0
+    ],
+    "chunk_words": 220
+  },
+  "thresholds": null,
+  "scores": {
+    "Tecnica": 52.5,
+    "Lessicale (BM25)": 61.0,
+    "Semantica (vettoriale)": 58.5,
+    "Dati strutturati": 30.0,
+    "Simulazione RRF": 66.7,
+    "Performance (Lighthouse)": 74.0,
+    "overall": 58.1
+  },
+  "citability": {
+    "market": "occidentale",
+    "market_weights": {
+      "claude": 0.3,
+      "chatgpt": 0.5,
+      "qwen": 0.1,
+      "kimi": 0.1
+    },
+    "depth_target_words": 900,
+    "profiles": [
+      {
+        "key": "claude",
+        "label": "Claude (Anthropic)",
+        "focus": "contenuto estraibile, strutturato e autoconsistente",
+        "score": 53.7,
+        "weights": {
+          "Semantica (vettoriale)": 0.4,
+          "Lessicale (BM25)": 0.25,
+          "Tecnica": 0.2,
+          "Dati strutturati": 0.15
+        },
+        "components": {
+          "Semantica (vettoriale)": 58.5,
+          "Lessicale (BM25)": 61.0,
+          "Tecnica": 52.5,
+          "Dati strutturati": 30.0
+        }
+      },
+      {
+        "key": "chatgpt",
+        "label": "ChatGPT / Perplexity",
+        "focus": "consenso fra piu' indici (RRF) e segnali lessicali",
+        "score": 61.9,
+        "weights": {
+          "Simulazione RRF": 0.45,
+          "Lessicale (BM25)": 0.25,
+          "Tecnica": 0.15,
+          "Semantica (vettoriale)": 0.15
+        },
+        "components": {
+          "Simulazione RRF": 66.7,
+          "Lessicale (BM25)": 61.0,
+          "Tecnica": 52.5,
+          "Semantica (vettoriale)": 58.5
+        }
+      },
+      {
+        "key": "qwen",
+        "label": "Qwen (Alibaba)",
+        "focus": "markup semantico e dati strutturati",
+        "score": 46.0,
+        "weights": {
+          "Dati strutturati": 0.4,
+          "Tecnica": 0.25,
+          "Semantica (vettoriale)": 0.2,
+          "Lessicale (BM25)": 0.15
+        },
+        "components": {
+          "Dati strutturati": 30.0,
+          "Tecnica": 52.5,
+          "Semantica (vettoriale)": 58.5,
+          "Lessicale (BM25)": 61.0
+        }
+      },
+      {
+        "key": "kimi",
+        "label": "Kimi (Moonshot AI)",
+        "focus": "profondita' editoriale e completezza dell'argomento",
+        "score": 49.8,
+        "weights": {
+          "Profondita' editoriale": 0.35,
+          "Semantica (vettoriale)": 0.3,
+          "Dati strutturati": 0.2,
+          "Lessicale (BM25)": 0.15
+        },
+        "components": {
+          "Profondita' editoriale": 48.9,
+          "Semantica (vettoriale)": 58.5,
+          "Dati strutturati": 30.0,
+          "Lessicale (BM25)": 61.0
+        }
+      }
+    ],
+    "index": 56.6,
+    "note": "Stime euristiche ricavate dalle metriche di questo audit: le preferenze attribuite a ciascun assistente non sono comportamento documentato dai vendor."
+  },
+  "citability_actions": [
+    {
+      "priority": 1,
+      "severity": "critical",
+      "area": "Simulazione RRF",
+      "title": "1 query senza alcun risultato",
+      "fix": "Crea contenuti dedicati a questi intenti.",
+      "example": "Per ogni query scoperta, una sezione con un heading uguale alla domanda:\n<h2>Quanto costa il drenaggio linfatico?</h2>\n<p>Una seduta costa in media 40-80 euro, secondo durata e zona trattata.</p>",
+      "url": "",
+      "effort": "giorni",
+      "quick_win": false,
+      "key": "rrf.uncovered",
+      "params": {
+        "n": 1,
+        "queries": "'controindicazioni drenaggio'"
+      },
+      "gains": {
+        "claude": 0.0,
+        "chatgpt": 30.0,
+        "qwen": 0.0,
+        "kimi": 0.0
+      },
+      "best_profile": "chatgpt",
+      "best_label": "ChatGPT / Perplexity",
+      "best_gain": 30.0,
+      "index_gain": 15.0,
+      "profiles_hit": [
+        "chatgpt"
+      ],
+      "cross": false
+    },
+    {
+      "priority": 2,
+      "severity": "critical",
+      "area": "Lessicale (BM25)",
+      "title": "1 title non ottimizzati",
+      "fix": "Title unico, 30-65 caratteri, con i termini di ricerca reali; evita il nome dominio come titolo.",
+      "example": "<title>Drenaggio linfatico manuale a Parma | Centro Esempio</title>\n(52 caratteri: servizio + territorio + brand)",
+      "url": "https://esempio.test/faq/",
+      "effort": "minuti",
+      "quick_win": true,
+      "key": "lex.title.bad",
+      "params": {
+        "n": 1,
+        "min": 30,
+        "max": 65,
+        "examples": "'Centro' (6 car.)"
+      },
+      "gains": {
+        "claude": 10.0,
+        "chatgpt": 10.0,
+        "qwen": 6.0,
+        "kimi": 6.0
+      },
+      "best_profile": "claude",
+      "best_label": "Claude (Anthropic)",
+      "best_gain": 10.0,
+      "index_gain": 9.2,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen",
+        "kimi"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 3,
+      "severity": "critical",
+      "area": "Lessicale (BM25)",
+      "title": "1 pagina/e sotto 300 parole",
+      "fix": "Porta le pagine chiave verso le 700+ parole con contenuto informativo, non promozionale.",
+      "example": "Struttura tipo per una pagina servizio:\n<h2>Cos'e' ...?</h2> <h2>Come funziona una seduta</h2>\n<h2>Quando serve</h2> <h2>Quanto costa</h2> <h2>Domande frequenti</h2>",
+      "url": "https://esempio.test/faq/",
+      "effort": "giorni",
+      "quick_win": false,
+      "key": "lex.words.thin",
+      "params": {
+        "n": 1,
+        "min": 300,
+        "avg": 440,
+        "target": 700
+      },
+      "gains": {
+        "claude": 10.0,
+        "chatgpt": 10.0,
+        "qwen": 6.0,
+        "kimi": 6.0
+      },
+      "best_profile": "claude",
+      "best_label": "Claude (Anthropic)",
+      "best_gain": 10.0,
+      "index_gain": 9.2,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen",
+        "kimi"
+      ],
+      "cross": true
+    }
+  ],
+  "judge": {
+    "status": "ok",
+    "model": "claude-esempio",
+    "sampled": 2,
+    "average": 71.5,
+    "note": "Parere di un modello su un campione: non e' una misura riproducibile.",
+    "verdicts": [
+      {
+        "query": "drenaggio linfatico costi",
+        "score": 78.0,
+        "reason": "Risposta diretta con durata e prezzo."
+      },
+      {
+        "query": "controindicazioni drenaggio",
+        "score": 65.0,
+        "reason": "Passaggio pertinente ma senza elenco esplicito."
+      }
+    ]
+  },
+  "lighthouse": {
+    "status": "ok",
+    "mode": "auto",
+    "device": "mobile",
+    "fork": "v13.4.1-mars.1",
+    "pages": [
+      "https://esempio.test/"
+    ],
+    "categories": [
+      {
+        "id": "performance",
+        "title": "Prestazioni",
+        "score": 74
+      },
+      {
+        "id": "seo",
+        "title": "SEO",
+        "score": 88
+      }
+    ],
+    "errors": []
+  },
+  "search_check": {
+    "status": "ok",
+    "engine": "brave",
+    "site": "esempio.test",
+    "top_n": 20,
+    "found": 1,
+    "note": "Il ranking reale dipende anche da personalizzazione, localita' e freschezza: confronto direzionale, non una validazione.",
+    "queries": [
+      {
+        "query": "drenaggio linfatico costi",
+        "rrf_covered": true,
+        "rrf_consensus": 3,
+        "position": 4,
+        "url": "https://esempio.test/"
+      },
+      {
+        "query": "controindicazioni drenaggio",
+        "rrf_covered": false,
+        "rrf_consensus": 0,
+        "position": null,
+        "url": ""
+      }
+    ]
+  },
+  "delta": {
+    "previous_generated_at": "2026-07-30T10:00:00+0200",
+    "scores": {
+      "Tecnica": 2.5,
+      "Lessicale (BM25)": 0.0,
+      "Complessivo": 1.8
+    },
+    "resolved": [
+      {
+        "severity": "critical",
+        "title": "n pagina/e senza <title>"
+      }
+    ],
+    "new": [
+      {
+        "severity": "warning",
+        "title": "Nessuna sezione FAQ"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "url": "https://esempio.test/",
+      "status": 200,
+      "final_url": "",
+      "redirects": 0,
+      "title": "Drenaggio linfatico a Parma | Centro Esempio",
+      "description": "Centro specializzato in drenaggio linfatico manuale: sedute, prezzi e percorsi post-operatori a Parma.",
+      "word_count": 430,
+      "rendered": false,
+      "headings": 3,
+      "chunks": 2,
+      "jsonld_types": [
+        "Organization"
+      ]
+    },
+    {
+      "url": "https://esempio.test/servizi/",
+      "status": 200,
+      "final_url": "",
+      "redirects": 0,
+      "title": "Servizi di drenaggio | Centro Esempio",
+      "description": "Tutti i percorsi: post-operatorio, linfedema, sportivo. Durate e modalita' delle sedute nel centro di Parma.",
+      "word_count": 610,
+      "rendered": false,
+      "headings": 2,
+      "chunks": 1,
+      "jsonld_types": [
+        "Service"
+      ]
+    },
+    {
+      "url": "https://esempio.test/faq/",
+      "status": 200,
+      "final_url": "",
+      "redirects": 0,
+      "title": "Domande frequenti | Centro Esempio",
+      "description": "Risposte alle domande piu' comuni su drenaggio linfatico, controindicazioni, durata e costi delle sedute.",
+      "word_count": 280,
+      "rendered": false,
+      "headings": 2,
+      "chunks": 1,
+      "jsonld_types": []
+    },
+    {
+      "url": "https://esempio.test/vecchia-pagina/",
+      "status": 404,
+      "final_url": "",
+      "redirects": 0,
+      "title": "",
+      "description": "",
+      "word_count": 0,
+      "rendered": false,
+      "headings": 0,
+      "chunks": 0,
+      "jsonld_types": []
+    }
+  ],
+  "findings": [
+    {
+      "area": "Tecnica",
+      "severity": "critical",
+      "title": "Sito non in HTTPS",
+      "detail": "",
+      "fix": "Attiva un certificato TLS e reindirizza tutto su HTTPS.",
+      "url": "",
+      "weight": 2.0,
+      "pillar": "security",
+      "example": "",
+      "key": "tech.https.missing",
+      "params": {}
+    },
+    {
+      "area": "Tecnica",
+      "severity": "critical",
+      "title": "Crawler IA bloccati: GPTBot, ClaudeBot",
+      "detail": "Questi agenti non possono accedere alla home. Se sono bloccati non entri in nessuna lista di recupero e l'RRF non ha nulla da fondere.",
+      "fix": "Rimuovi i Disallow per gli agenti da cui vuoi essere citato.",
+      "url": "",
+      "weight": 2.0,
+      "pillar": "accessibility",
+      "example": "# robots.txt - sblocca gli agenti IA\nUser-agent: GPTBot\nDisallow:\n\nUser-agent: ClaudeBot\nDisallow:",
+      "key": "tech.robots.ai_blocked",
+      "params": {
+        "agents": "GPTBot, ClaudeBot"
+      }
+    },
+    {
+      "area": "Tecnica",
+      "severity": "warning",
+      "title": "1 pagina/e a piu' di 3 click dalla home",
+      "detail": "https://esempio.test/vecchia-pagina/.",
+      "fix": "Accorcia i percorsi: le pagine profonde vengono scansionate e pesate meno.",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "accessibility",
+      "example": "",
+      "key": "tech.links.deep",
+      "params": {
+        "n": 1,
+        "urls": "https://esempio.test/vecchia-pagina/."
+      }
+    },
+    {
+      "area": "Tecnica",
+      "severity": "ok",
+      "title": "robots.txt presente",
+      "detail": "12 righe.",
+      "fix": "",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "accessibility",
+      "example": "",
+      "key": "tech.robots.present",
+      "params": {
+        "n": 12
+      }
+    },
+    {
+      "area": "Lessicale (BM25)",
+      "severity": "critical",
+      "title": "1 title non ottimizzati",
+      "detail": "Esempi: 'Centro' (6 car.)",
+      "fix": "Title unico, 30-65 caratteri, con i termini di ricerca reali; evita il nome dominio come titolo.",
+      "url": "https://esempio.test/faq/",
+      "weight": 2.0,
+      "pillar": "ranking",
+      "example": "<title>Drenaggio linfatico manuale a Parma | Centro Esempio</title>\n(52 caratteri: servizio + territorio + brand)",
+      "key": "lex.title.bad",
+      "params": {
+        "n": 1,
+        "min": 30,
+        "max": 65,
+        "examples": "'Centro' (6 car.)"
+      }
+    },
+    {
+      "area": "Lessicale (BM25)",
+      "severity": "critical",
+      "title": "1 pagina/e sotto 300 parole",
+      "detail": "Media sito: 440 parole. Con cosi' poco testo i termini utili non raggiungono una frequenza sufficiente perche' BM25 li valorizzi.",
+      "fix": "Porta le pagine chiave verso le 700+ parole con contenuto informativo, non promozionale.",
+      "url": "https://esempio.test/faq/",
+      "weight": 2.0,
+      "pillar": "ranking",
+      "example": "Struttura tipo per una pagina servizio:\n<h2>Cos'e' ...?</h2> <h2>Come funziona una seduta</h2>\n<h2>Quando serve</h2> <h2>Quanto costa</h2> <h2>Domande frequenti</h2>",
+      "key": "lex.words.thin",
+      "params": {
+        "n": 1,
+        "min": 300,
+        "avg": 440,
+        "target": 700
+      }
+    },
+    {
+      "area": "Lessicale (BM25)",
+      "severity": "ok",
+      "title": "Meta description presenti e di lunghezza adeguata",
+      "detail": "",
+      "fix": "",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "ranking",
+      "example": "",
+      "key": "lex.desc.ok",
+      "params": {}
+    },
+    {
+      "area": "Semantica (vettoriale)",
+      "severity": "warning",
+      "title": "Pochi paragrafi a risposta diretta",
+      "detail": "1 paragrafi su 12 aprono con una risposta esplicita in 20-120 parole (8% contro una soglia di prassi del 20%): sono i passaggi citabili da un assistente cosi' come sono.",
+      "fix": "Riscrivi i paragrafi chiave aprendo con la risposta (\"X e' ...\", \"Si', ...\", \"In sintesi ...\") e tienili fra 20 e 120 parole.",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "ranking",
+      "example": "Prima: \"Nel panorama del benessere di oggi, molti si chiedono quale percorso...\"\nDopo:  \"Il drenaggio linfatico e' un massaggio delicato che favorisce il deflusso della linfa: una seduta dura 45 minuti e costa 40-80 euro.\"",
+      "key": "sem.extract.low",
+      "params": {
+        "direct": 1,
+        "total": 12,
+        "min": 20,
+        "max": 120,
+        "pct": 8.0,
+        "threshold": 20.0
+      }
+    },
+    {
+      "area": "Semantica (vettoriale)",
+      "severity": "warning",
+      "title": "Nessuna sezione FAQ",
+      "detail": "Le FAQ allineano un chunk a un intento preciso e alimentano entrambi gli assi insieme.",
+      "fix": "Aggiungi FAQ per pagina, marcate con JSON-LD FAQPage.",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "ranking",
+      "example": "",
+      "key": "sem.faq.missing",
+      "params": {}
+    },
+    {
+      "area": "Semantica (vettoriale)",
+      "severity": "ok",
+      "title": "E-E-A-T: contatti verificabili presenti",
+      "detail": "",
+      "fix": "",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "ranking",
+      "example": "",
+      "key": "sem.eeat.contact.ok",
+      "params": {}
+    },
+    {
+      "area": "Dati strutturati",
+      "severity": "warning",
+      "title": "Entita' principale non dichiarata",
+      "detail": "",
+      "fix": "Aggiungi Organization o LocalBusiness con nome, indirizzo, contatti e riferimenti fiscali.",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "ranking",
+      "example": "",
+      "key": "sd.entity.missing",
+      "params": {}
+    },
+    {
+      "area": "Dati strutturati",
+      "severity": "info",
+      "title": "1 data/e non in formato ISO 8601",
+      "detail": "31/12/2025 (Service).",
+      "fix": "Usa AAAA-MM-GG, con l'ora facoltativa dopo la T (es. 2026-08-03T09:30:00+02:00).",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "ranking",
+      "example": "",
+      "key": "sd.check.dates",
+      "params": {
+        "n": 1,
+        "list": "31/12/2025 (Service)"
+      }
+    },
+    {
+      "area": "Simulazione RRF",
+      "severity": "warning",
+      "title": "Consenso medio fra le liste: 1.5/5 (30%)",
+      "detail": "Consenso parziale fra i due recuperatori. Nella formula RRF un documento presente in entrambe le liste somma due addendi 1/(k+rank) e batte chi domina una lista sola. Consenso per query: 'drenaggio linfatico costi' 3/5, 'controindicazioni drenaggio' 0/5.",
+      "fix": "Ottimizza gli stessi passaggi su entrambi gli assi: termini espliciti (BM25) e spiegazione completa (vettoriale).",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "meta-fusion",
+      "example": "",
+      "key": "rrf.consensus.mid",
+      "params": {
+        "avg": 1.5,
+        "top_n": 5,
+        "pct": 30.0,
+        "per_query": "'drenaggio linfatico costi' 3/5, 'controindicazioni drenaggio' 0/5"
+      }
+    },
+    {
+      "area": "Simulazione RRF",
+      "severity": "critical",
+      "title": "1 query senza alcun risultato",
+      "detail": "Nessun chunk del sito risponde: 'controindicazioni drenaggio'.",
+      "fix": "Crea contenuti dedicati a questi intenti.",
+      "url": "",
+      "weight": 2.0,
+      "pillar": "meta-fusion",
+      "example": "Per ogni query scoperta, una sezione con un heading uguale alla domanda:\n<h2>Quanto costa il drenaggio linfatico?</h2>\n<p>Una seduta costa in media 40-80 euro, secondo durata e zona trattata.</p>",
+      "key": "rrf.uncovered",
+      "params": {
+        "n": 1,
+        "queries": "'controindicazioni drenaggio'"
+      }
+    },
+    {
+      "area": "Performance (Lighthouse)",
+      "severity": "warning",
+      "title": "Lighthouse: LCP lento",
+      "detail": "4,1 s; Pagine: https://esempio.test/",
+      "fix": "Riduci il peso dell'immagine principale e servila con priorita' alta.",
+      "url": "https://esempio.test/",
+      "weight": 2.0,
+      "pillar": "accessibility",
+      "example": "",
+      "key": "lh.performance.lcp",
+      "params": {
+        "audit": "lcp",
+        "category": "performance",
+        "score": 0.42,
+        "lh_weight": 25,
+        "urls": "https://esempio.test/",
+        "display": "4,1 s",
+        "evidence": [
+          "img.hero (1,8 MB)"
+        ],
+        "title_en": "Slow LCP",
+        "fix_en": "Reduce the hero image weight.",
+        "title_msg": "audit.js | lcpTitle",
+        "fix_msg": "audit.js | lcpDescription"
+      }
+    },
+    {
+      "area": "Performance (Lighthouse)",
+      "severity": "ok",
+      "title": "Lighthouse SEO: nessun rilievo",
+      "detail": "Punteggio 88/100 sull'unica pagina esaminata.",
+      "fix": "",
+      "url": "",
+      "weight": 1.0,
+      "pillar": "ranking",
+      "example": "",
+      "key": "lh.seo.ok",
+      "params": {
+        "category": "seo",
+        "score": 88,
+        "pages": 1,
+        "cat_title_en": "SEO",
+        "cat_title_msg": "config.js | seoCategoryTitle"
+      }
+    }
+  ],
+  "surface_math": {
+    "pages": 3,
+    "chunks_now": 4,
+    "words_avg": 440,
+    "chunks_potential": 15,
+    "multiplier": 3.8,
+    "assumption": "ogni pagina esistente portata ad almeno ~900 parole (4 chunk) piu' una FAQ; nessuna pagina nuova"
+  },
+  "depth_distribution": {
+    "pages": 3,
+    "buckets": [
+      {
+        "label": "0 (home)",
+        "count": 1
+      },
+      {
+        "label": "1 click",
+        "count": 0
+      },
+      {
+        "label": "2 click",
+        "count": 0
+      },
+      {
+        "label": "3 click",
+        "count": 0
+      },
+      {
+        "label": "4+ click",
+        "count": 0
+      },
+      {
+        "label": "solo da sitemap",
+        "count": 2
+      }
+    ]
+  },
+  "link_graph": {
+    "width": 780.0,
+    "height": 540.0,
+    "total": 3,
+    "nodes": [
+      {
+        "url": "https://esempio.test/",
+        "label": "/",
+        "incoming": 2,
+        "depth": 0,
+        "home": true,
+        "x": 390.0,
+        "y": 270.0
+      },
+      {
+        "url": "https://esempio.test/faq",
+        "label": "/faq",
+        "incoming": 0,
+        "depth": null,
+        "home": false,
+        "x": 116.4,
+        "y": 526.0
+      },
+      {
+        "url": "https://esempio.test/servizi",
+        "label": "/servizi",
+        "incoming": 0,
+        "depth": null,
+        "home": false,
+        "x": 116.4,
+        "y": 14.0
+      }
+    ],
+    "links": [
+      {
+        "source": 2,
+        "target": 0
+      },
+      {
+        "source": 1,
+        "target": 0
+      }
+    ]
+  },
+  "remediation": [
+    {
+      "priority": 1,
+      "severity": "critical",
+      "area": "Simulazione RRF",
+      "title": "1 query senza alcun risultato",
+      "fix": "Crea contenuti dedicati a questi intenti.",
+      "example": "Per ogni query scoperta, una sezione con un heading uguale alla domanda:\n<h2>Quanto costa il drenaggio linfatico?</h2>\n<p>Una seduta costa in media 40-80 euro, secondo durata e zona trattata.</p>",
+      "url": "",
+      "effort": "giorni",
+      "quick_win": false,
+      "key": "rrf.uncovered",
+      "params": {
+        "n": 1,
+        "queries": "'controindicazioni drenaggio'"
+      },
+      "gains": {
+        "claude": 0.0,
+        "chatgpt": 30.0,
+        "qwen": 0.0,
+        "kimi": 0.0
+      },
+      "best_profile": "chatgpt",
+      "best_label": "ChatGPT / Perplexity",
+      "best_gain": 30.0,
+      "index_gain": 15.0,
+      "profiles_hit": [
+        "chatgpt"
+      ],
+      "cross": false
+    },
+    {
+      "priority": 2,
+      "severity": "critical",
+      "area": "Lessicale (BM25)",
+      "title": "1 title non ottimizzati",
+      "fix": "Title unico, 30-65 caratteri, con i termini di ricerca reali; evita il nome dominio come titolo.",
+      "example": "<title>Drenaggio linfatico manuale a Parma | Centro Esempio</title>\n(52 caratteri: servizio + territorio + brand)",
+      "url": "https://esempio.test/faq/",
+      "effort": "minuti",
+      "quick_win": true,
+      "key": "lex.title.bad",
+      "params": {
+        "n": 1,
+        "min": 30,
+        "max": 65,
+        "examples": "'Centro' (6 car.)"
+      },
+      "gains": {
+        "claude": 10.0,
+        "chatgpt": 10.0,
+        "qwen": 6.0,
+        "kimi": 6.0
+      },
+      "best_profile": "claude",
+      "best_label": "Claude (Anthropic)",
+      "best_gain": 10.0,
+      "index_gain": 9.2,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen",
+        "kimi"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 3,
+      "severity": "critical",
+      "area": "Lessicale (BM25)",
+      "title": "1 pagina/e sotto 300 parole",
+      "fix": "Porta le pagine chiave verso le 700+ parole con contenuto informativo, non promozionale.",
+      "example": "Struttura tipo per una pagina servizio:\n<h2>Cos'e' ...?</h2> <h2>Come funziona una seduta</h2>\n<h2>Quando serve</h2> <h2>Quanto costa</h2> <h2>Domande frequenti</h2>",
+      "url": "https://esempio.test/faq/",
+      "effort": "giorni",
+      "quick_win": false,
+      "key": "lex.words.thin",
+      "params": {
+        "n": 1,
+        "min": 300,
+        "avg": 440,
+        "target": 700
+      },
+      "gains": {
+        "claude": 10.0,
+        "chatgpt": 10.0,
+        "qwen": 6.0,
+        "kimi": 6.0
+      },
+      "best_profile": "claude",
+      "best_label": "Claude (Anthropic)",
+      "best_gain": 10.0,
+      "index_gain": 9.2,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen",
+        "kimi"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 4,
+      "severity": "critical",
+      "area": "Tecnica",
+      "title": "Sito non in HTTPS",
+      "fix": "Attiva un certificato TLS e reindirizza tutto su HTTPS.",
+      "example": "",
+      "url": "",
+      "effort": "ore",
+      "quick_win": false,
+      "key": "tech.https.missing",
+      "params": {},
+      "gains": {
+        "claude": 6.7,
+        "chatgpt": 5.0,
+        "qwen": 8.3,
+        "kimi": 0.0
+      },
+      "best_profile": "qwen",
+      "best_label": "Qwen (Alibaba)",
+      "best_gain": 8.3,
+      "index_gain": 5.3,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 5,
+      "severity": "critical",
+      "area": "Tecnica",
+      "title": "Crawler IA bloccati: GPTBot, ClaudeBot",
+      "fix": "Rimuovi i Disallow per gli agenti da cui vuoi essere citato.",
+      "example": "# robots.txt - sblocca gli agenti IA\nUser-agent: GPTBot\nDisallow:\n\nUser-agent: ClaudeBot\nDisallow:",
+      "url": "",
+      "effort": "minuti",
+      "quick_win": true,
+      "key": "tech.robots.ai_blocked",
+      "params": {
+        "agents": "GPTBot, ClaudeBot"
+      },
+      "gains": {
+        "claude": 6.7,
+        "chatgpt": 5.0,
+        "qwen": 8.3,
+        "kimi": 0.0
+      },
+      "best_profile": "qwen",
+      "best_label": "Qwen (Alibaba)",
+      "best_gain": 8.3,
+      "index_gain": 5.3,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 6,
+      "severity": "warning",
+      "area": "Dati strutturati",
+      "title": "Entita' principale non dichiarata",
+      "fix": "Aggiungi Organization o LocalBusiness con nome, indirizzo, contatti e riferimenti fiscali.",
+      "example": "",
+      "url": "",
+      "effort": "ore",
+      "quick_win": false,
+      "key": "sd.entity.missing",
+      "params": {},
+      "gains": {
+        "claude": 7.5,
+        "chatgpt": 0.0,
+        "qwen": 20.0,
+        "kimi": 10.0
+      },
+      "best_profile": "qwen",
+      "best_label": "Qwen (Alibaba)",
+      "best_gain": 20.0,
+      "index_gain": 5.2,
+      "profiles_hit": [
+        "claude",
+        "qwen",
+        "kimi"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 7,
+      "severity": "warning",
+      "area": "Semantica (vettoriale)",
+      "title": "Pochi paragrafi a risposta diretta",
+      "fix": "Riscrivi i paragrafi chiave aprendo con la risposta (\"X e' ...\", \"Si', ...\", \"In sintesi ...\") e tienili fra 20 e 120 parole.",
+      "example": "Prima: \"Nel panorama del benessere di oggi, molti si chiedono quale percorso...\"\nDopo:  \"Il drenaggio linfatico e' un massaggio delicato che favorisce il deflusso della linfa: una seduta dura 45 minuti e costa 40-80 euro.\"",
+      "url": "",
+      "effort": "ore",
+      "quick_win": false,
+      "key": "sem.extract.low",
+      "params": {
+        "direct": 1,
+        "total": 12,
+        "min": 20,
+        "max": 120,
+        "pct": 8.0,
+        "threshold": 20.0
+      },
+      "gains": {
+        "claude": 6.7,
+        "chatgpt": 2.5,
+        "qwen": 3.3,
+        "kimi": 5.0
+      },
+      "best_profile": "claude",
+      "best_label": "Claude (Anthropic)",
+      "best_gain": 6.7,
+      "index_gain": 4.1,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen",
+        "kimi"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 8,
+      "severity": "warning",
+      "area": "Semantica (vettoriale)",
+      "title": "Nessuna sezione FAQ",
+      "fix": "Aggiungi FAQ per pagina, marcate con JSON-LD FAQPage.",
+      "example": "",
+      "url": "",
+      "effort": "giorni",
+      "quick_win": false,
+      "key": "sem.faq.missing",
+      "params": {},
+      "gains": {
+        "claude": 6.7,
+        "chatgpt": 2.5,
+        "qwen": 3.3,
+        "kimi": 5.0
+      },
+      "best_profile": "claude",
+      "best_label": "Claude (Anthropic)",
+      "best_gain": 6.7,
+      "index_gain": 4.1,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen",
+        "kimi"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 9,
+      "severity": "warning",
+      "area": "Simulazione RRF",
+      "title": "Consenso medio fra le liste: 1.5/5 (30%)",
+      "fix": "Ottimizza gli stessi passaggi su entrambi gli assi: termini espliciti (BM25) e spiegazione completa (vettoriale).",
+      "example": "",
+      "url": "",
+      "effort": "giorni",
+      "quick_win": false,
+      "key": "rrf.consensus.mid",
+      "params": {
+        "avg": 1.5,
+        "top_n": 5,
+        "pct": 30.0,
+        "per_query": "'drenaggio linfatico costi' 3/5, 'controindicazioni drenaggio' 0/5"
+      },
+      "gains": {
+        "claude": 0.0,
+        "chatgpt": 7.5,
+        "qwen": 0.0,
+        "kimi": 0.0
+      },
+      "best_profile": "chatgpt",
+      "best_label": "ChatGPT / Perplexity",
+      "best_gain": 7.5,
+      "index_gain": 3.8,
+      "profiles_hit": [
+        "chatgpt"
+      ],
+      "cross": false
+    },
+    {
+      "priority": 10,
+      "severity": "warning",
+      "area": "Tecnica",
+      "title": "1 pagina/e a piu' di 3 click dalla home",
+      "fix": "Accorcia i percorsi: le pagine profonde vengono scansionate e pesate meno.",
+      "example": "",
+      "url": "",
+      "effort": "ore",
+      "quick_win": false,
+      "key": "tech.links.deep",
+      "params": {
+        "n": 1,
+        "urls": "https://esempio.test/vecchia-pagina/."
+      },
+      "gains": {
+        "claude": 1.7,
+        "chatgpt": 1.2,
+        "qwen": 2.1,
+        "kimi": 0.0
+      },
+      "best_profile": "qwen",
+      "best_label": "Qwen (Alibaba)",
+      "best_gain": 2.1,
+      "index_gain": 1.3,
+      "profiles_hit": [
+        "claude",
+        "chatgpt",
+        "qwen"
+      ],
+      "cross": true
+    },
+    {
+      "priority": 11,
+      "severity": "warning",
+      "area": "Performance (Lighthouse)",
+      "title": "Lighthouse: LCP lento",
+      "fix": "Riduci il peso dell'immagine principale e servila con priorita' alta.",
+      "example": "",
+      "url": "https://esempio.test/",
+      "effort": "ore",
+      "quick_win": false,
+      "key": "lh.performance.lcp",
+      "params": {
+        "audit": "lcp",
+        "category": "performance",
+        "score": 0.42,
+        "lh_weight": 25,
+        "urls": "https://esempio.test/",
+        "display": "4,1 s",
+        "evidence": [
+          "img.hero (1,8 MB)"
+        ],
+        "title_en": "Slow LCP",
+        "fix_en": "Reduce the hero image weight.",
+        "title_msg": "audit.js | lcpTitle",
+        "fix_msg": "audit.js | lcpDescription"
+      },
+      "gains": {
+        "claude": 0.0,
+        "chatgpt": 0.0,
+        "qwen": 0.0,
+        "kimi": 0.0
+      },
+      "best_profile": "",
+      "best_label": "",
+      "best_gain": 0.0,
+      "index_gain": 0.0,
+      "profiles_hit": [],
+      "cross": false
+    }
+  ],
+  "rrf_simulation": [
+    {
+      "query": "drenaggio linfatico costi",
+      "lexical_top": [
+        "/  ·  Quanto costa una seduta?",
+        "/servizi/  ·  Percorso post-operatorio"
+      ],
+      "vector_top": [
+        "/  ·  Quanto costa una seduta?",
+        "/faq/  ·  Il drenaggio e' doloroso?"
+      ],
+      "fused_top": [
+        [
+          "/  ·  Quanto costa una seduta?",
+          0.03252
+        ],
+        [
+          "/servizi/  ·  Percorso post-operatorio",
+          0.01639
+        ],
+        [
+          "/faq/  ·  Il drenaggio e' doloroso?",
+          0.01613
+        ]
+      ],
+      "consensus": 3,
+      "covered": true
+    },
+    {
+      "query": "controindicazioni drenaggio",
+      "lexical_top": [],
+      "vector_top": [],
+      "fused_top": [],
+      "consensus": 0,
+      "covered": false
+    }
+  ],
+  "competitive": {
+    "top_n": 5,
+    "main": "esempio.test",
+    "sites": [
+      "esempio.test",
+      "concorrente.test"
+    ],
+    "share": {
+      "esempio.test": 40.0,
+      "concorrente.test": 60.0
+    },
+    "presence": {
+      "esempio.test": 1,
+      "concorrente.test": 2
+    },
+    "chunks": {
+      "esempio.test": 4,
+      "concorrente.test": 9
+    },
+    "queries_total": 2,
+    "queries": [
+      {
+        "query": "drenaggio linfatico costi",
+        "mine_in_top": 2,
+        "best_rank_mine": 2
+      },
+      {
+        "query": "controindicazioni drenaggio",
+        "mine_in_top": 0,
+        "best_rank_mine": 0
+      }
+    ]
+  }
+}

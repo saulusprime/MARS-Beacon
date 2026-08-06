@@ -1137,6 +1137,30 @@ sono nel [README.md](README.md).
 
 ## Qualità e verifica
 
+- **Golden file completi dei cinque renderer** (2026-08-06, chiude
+  la voce P3 "golden file"): `tests/golden/referto.{txt,json,html,
+  md,csv}` (~180 KB totali) generati da un **dataset sintetico
+  deterministico** in `tests/test_golden.py` — niente crawl: i
+  tempi di rete non sono riproducibili — che attraversa tutte le
+  sezioni dei referti: 16 rilievi nelle sei aree e quattro gravita'
+  (con chiavi, params, esempi e pesi come in produzione, inclusi
+  due rilievi `lh.*` con id dei messaggi), 4 pagine con link
+  interni e chunk (hero, treemap, grafo dei link, profondita' di
+  crawl, matematica del problema, citabilita'), simulazione RRF
+  con query coperta e scoperta, giudizio LLM, blocco Lighthouse,
+  ancora di realta', delta storico e confronto competitivo con
+  mappa a bolle. Confronto riga per riga con **normalizzazione dei
+  soli campi volatili** (versione dello strumento e `generated_at`
+  del JSON): ogni cambiamento di resa non intenzionale diventa un
+  diff visibile; su mismatch il messaggio mostra le prime righe
+  del diff unificato. **Rigenerazione intenzionale** con
+  `MARS_RIGENERA_GOLDEN=1 pytest tests/test_golden.py` e revisione
+  del diff in git. Determinismo verificato su processi separati
+  con `PYTHONHASHSEED` diversi (1, 424242, random) piu' un test di
+  stabilita' nello stesso processo; suite 363 test (+6), flake8
+  pulito. Nessuna modifica agli script: versione invariata
+  (v1.61.0).
+
 - **Test d'integrazione con Lighthouse vero e job CI dedicato**
   (2026-08-05, ultimo bullet della P1):
   `test_integrazione_lighthouse_reale` esegue il runner vero —
@@ -1189,7 +1213,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 357 test in ~30 secondi** (inclusa
+- **Suite pytest: 363 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
