@@ -1,0 +1,67 @@
+# Unit systemd per il server SOLO API di MARS Beacon (mars_api.py,
+# programma API-first): contratto su /api/v1/openapi.json,
+# documentazione su /api/docs, nessuna pagina della GUI. Per il
+# combinato statici+API c'e' mars-gui.service; per l'assetto
+# separato dietro nginx vedi nginx-mars.conf.example.
+#
+# Installazione (stessa base di mars-gui.service):
+#   1. Copia il progetto in /opt/seorrf (script, marsbeacon/, gui/
+#      — servono gli asset di /api/docs — e requirements.txt)
+#   2. python3 -m venv /opt/seorrf/venv
+#      /opt/seorrf/venv/bin/pip install -r /opt/seorrf/requirements.txt
+#   3. facoltativo, audit Lighthouse: Node >= 22.19 e
+#      Chrome/Chromium di sistema, poi tools/update-lighthouse.sh
+#      da /opt/seorrf (prerequisiti in mars-audit.service)
+#   4. sudo cp deploy/mars-api.service /etc/systemd/system/
+#   5. sudo systemctl daemon-reload
+#      sudo systemctl enable --now mars-api
+#
+# Il server ascolta solo su 127.0.0.1:8766 — esporlo SOLO dietro
+# un reverse proxy (nginx-mars.conf.example). Per il cross-origin
+# aggiungere --cors https://gui.esempio.it (ripetibile) alla
+# ExecStart; per piu' audit in parallelo --max-audit N.
+#
+# Il database (utenti, sessioni, token API, storico) e' lo STESSO
+# della GUI combinata se MARS_GUI_DB punta allo stesso file: i due
+# server possono convivere sulla stessa macchina e condividere gli
+# account (GUI su 8765, API su 8766).
+
+[Unit]
+Description=Lympha Technologies - MARS Beacon (server solo API)
+Documentation=file:///opt/seorrf/docs/API.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/seorrf
+ExecStart=/opt/seorrf/venv/bin/python /opt/seorrf/mars_api.py \
+    --host 127.0.0.1 --port 8766
+Restart=on-failure
+RestartSec=5
+
+# Esecuzione senza privilegi e con superficie ridotta (stesso
+# hardening di mars-gui.service).
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadOnlyPaths=/opt/seorrf
+
+# Dati persistenti in /var/lib/seorrf (condivisi con la GUI se si
+# usa lo stesso MARS_GUI_DB). HOME scrivibile per Chrome headless
+# dell'audit Lighthouse.
+StateDirectory=seorrf
+Environment=MARS_GUI_DB=%S/seorrf/mars_gui.db
+Environment=HOME=%S/seorrf
+# Node fuori dal PATH standard di systemd? Decommenta e adegua.
+#Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+# Nota di hardening (come mars-gui.service): NON aggiungere
+# MemoryDenyWriteExecute (JIT di Node/V8 e Chrome) ne'
+# RestrictNamespaces (la sandbox di Chrome richiede user/pid/net
+# namespace; --no-sandbox sarebbe un hardening peggiore).
+
+[Install]
+WantedBy=multi-user.target

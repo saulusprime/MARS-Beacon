@@ -7,3 +7,7 @@ playwright>=1.40
 # --config (soglie TOML) usa tomllib della stdlib da Python 3.11:
 # su 3.10 i test la coprono col pacchetto equivalente.
 tomli>=2; python_version < "3.11"
+# Contract test dell'API (P1 API-first): valida le risposte reali
+# contro gli schemi del registro. Solo suite: a runtime la
+# validazione usa il mini-validatore stdlib di marsbeacon/api.py.
+jsonschema>=4

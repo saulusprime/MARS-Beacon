@@ -20,6 +20,7 @@ from typing import Set
 from typing import Tuple
 from urllib.parse import urlparse
 import csv
+import io
 import datetime
 import importlib.util
 import json
@@ -2840,7 +2841,18 @@ def load_gsc_queries(path: str,
                      limit: int = GSC_QUERIES_LIMIT) -> List[str]:
     """Query reali dall'export CSV di Google Search Console.
 
-    Legge il CSV "Query" dell'export Rendimento (intestazioni
+    Legge il file e delega a :func:`parse_gsc_queries` (usata
+    anche dall'API, dove l'export arriva come testo caricato).
+    """
+    with open(path, encoding="utf-8-sig", newline="") as handle:
+        return parse_gsc_queries(handle.read(), limit=limit)
+
+
+def parse_gsc_queries(text: str,
+                      limit: int = GSC_QUERIES_LIMIT) -> List[str]:
+    """Query reali dal contenuto dell'export CSV Search Console.
+
+    Interpreta il CSV "Query" dell'export Rendimento (intestazioni
     italiane o inglesi, delimitatore virgola o punto e virgola,
     BOM tollerato), ordina per clic e poi impressioni decrescenti
     e restituisce fino a ``limit`` query deduplicate. Righe vuote
@@ -2848,7 +2860,8 @@ def load_gsc_queries(path: str,
     impressioni sono interi, i separatori delle migliaia vengono
     ignorati.
     """
-    with open(path, encoding="utf-8-sig", newline="") as handle:
+    with io.StringIO(text.lstrip("﻿"),
+                     newline="") as handle:
         sample = handle.read(4096)
         handle.seek(0)
         delimiter = (";" if sample.count(";") > sample.count(",")

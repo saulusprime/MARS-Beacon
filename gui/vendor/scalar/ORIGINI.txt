@@ -1,0 +1,55 @@
+# Host esterni presenti nel bundle come STRINGHE (esempi,
+# documentazione, font predefiniti). Sono inerti: la pagina
+# /api/docs disattiva i font con withDefaultFonts:false e
+# la CSP della GUI blocca ogni caricamento esterno a
+# runtime. Denylist telemetria verificata dallo script.
+http://127.0.0.1
+http://api.jquery.com
+http://httpie.org
+http://json-schema.org
+http://localhost
+https://.
+https://apidocumentation.com
+https://api.example.com
+https://api-hub.com
+https://api.scalar.com
+https://avatars.githubusercontent.com
+https://byte-craft.io
+https://client.scalar.com
+https://cloud.google.com
+https://cloud-nest.org
+https://code-base.dev
+https://dashboard.scalar.com
+https://data-flow.co
+https://developer.mozilla.org
+https://developers.cloudflare.com
+https://dev-portal.net
+https://discord.gg
+https://docs.microsoft.com
+https://docs.scalar.com
+https://editor.scalar.com
+https://example.com
+https://fonts.scalar.com
+https://galaxy.scalar.com
+https://github.com
+https://html.spec.whatwg.org
+https://json-schema.org
+https://loremflickr.com
+https://my-app.io
+https://openjdk.java.net
+https://open-source.dev
+https://picsum.photos
+https://proxy.scalar.com
+http://square.github.io
+https://registry.scalar.com
+https://scalar.com
+https://tailwindcss.com
+https://tech-wave.net
+https://test-site.org
+https://unhead.unjs.io
+https://vuejs.org
+https://web-pulse.io
+https://www.scalar.com
+http://unirest.io
+http://www.ibm.com
+http://www.w3.org

@@ -5,6 +5,12 @@ Questo prodotto include componenti di terze parti:
 
 - Bootstrap Italia (gui/vendor/), distribuito con la propria licenza
   BSD-3-Clause; i file vendorizzati conservano le rispettive note.
+- Scalar API Reference (https://github.com/scalar/scalar),
+  Copyright Scalar, licenza MIT. Il bundle standalone è
+  vendorizzato in gui/vendor/scalar/ da tools/update-scalar.sh
+  (versione nel file VERSIONE) e serve la documentazione del
+  contratto su /api/docs; i font predefiniti esterni sono
+  disattivati in favore del Titillium Web già vendorizzato.
 - Google Lighthouse (https://github.com/GoogleChrome/lighthouse),
   Copyright Google LLC, licenza Apache License 2.0. MARS Beacon ne
   usa un fork (https://github.com/saulusprime/lighthouse) con

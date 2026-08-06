@@ -6,7 +6,7 @@ Audit*)
 [![CI](https://github.com/saulusprime/MARS-Beacon/actions/workflows/ci.yml/badge.svg)](https://github.com/saulusprime/MARS-Beacon/actions/workflows/ci.yml)
 [![Licenza: Apache 2.0](https://img.shields.io/badge/licenza-Apache_2.0-blue)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#installazione)
-[![Versione 1.61.0](https://img.shields.io/badge/versione-1.61.0-186078)](AS-IS.md)
+[![Versione 1.62.0](https://img.shields.io/badge/versione-1.62.0-186078)](AS-IS.md)
 [![Stato: attivo](https://img.shields.io/badge/stato-attivo-success)](AS-IS.md)
 [![Referti in 5 lingue](https://img.shields.io/badge/referti-it_%C2%B7_en_%C2%B7_fr_%C2%B7_de_%C2%B7_es-186078)](#opzioni)
 [![Accessibilità WCAG 2.2 AA](https://img.shields.io/badge/accessibilit%C3%A0-WCAG_2.2_AA-6f42c1)](docs/ACCESSIBILITA.md)
@@ -34,12 +34,15 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | File | Descrizione |
 |---|---|
 | [mars_audit.py](mars_audit.py) | Lo strumento: facciata con la CLI (`python3 mars_audit.py URL`), PEP8, `flake8` pulito |
-| [marsbeacon/](marsbeacon/) | Il codice dello strumento, scomposto in moduli: `base`, `crawler`, `indexes`, `audits`, `render`, `i18n` |
-| [mars_gui.py](mars_gui.py) | Interfaccia web locale: server stdlib che pilota lo script ed espone i referti |
+| [marsbeacon/](marsbeacon/) | Il codice dello strumento, scomposto in moduli: `base`, `crawler`, `indexes`, `audits`, `render`, `i18n` (piu' `api`: registro delle rotte, contratto OpenAPI e motore del server) |
+| [mars_gui.py](mars_gui.py) | Interfaccia web locale: il server combinato statici+API a zero configurazione (facciata sul motore `marsbeacon/api.py`) |
+| [mars_api.py](mars_api.py) | Server **solo API** (porta 8766): contratto, documentazione e rotte del motore, niente pagine della GUI |
 | [mars_citations.py](mars_citations.py) | Monitoraggio periodico delle citazioni IA effettive (Claude, Perplexity) con storico e soglie |
 | [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies |
 | [deploy/](deploy/) | Unit systemd per l'esecuzione come servizio automatico sulle macchine dei clienti |
 | [tools/update-lighthouse.sh](tools/update-lighthouse.sh) | Installa il fork di Google Lighthouse in `lighthouse/` (tag pinnato, build inclusa, mai nel repo) |
+| [tools/update-scalar.sh](tools/update-scalar.sh) | Vendorizza il lettore Scalar della spec OpenAPI in `gui/vendor/scalar/` (denylist telemetria, origini dichiarate) |
+| [docs/API.md](docs/API.md) | Guida rapida dell'API con esempi curl: token, job di audit, referti in ogni formato e lingua |
 | [docs/LIGHTHOUSE-FORK.md](docs/LIGHTHOUSE-FORK.md) | Strategia di manutenzione del fork: pin alla release, patch-set versionato, procedura di sync |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI GitHub Actions: flake8 + pytest multi-Python, job d'integrazione Lighthouse (Node + Chrome) e audit accessibilità Pa11y |
 | [tests/](tests/) | Suite pytest: unit test del nucleo numerico, fixture site locale, end-to-end CLI e GUI |
@@ -312,6 +315,13 @@ fallimento è visibile in `systemctl` e può attivare una **notifica
 webhook** (ntfy/Slack/Teams) tramite la unit modello
 [deploy/mars-notify@.service](deploy/mars-notify@.service),
 agganciabile via `OnFailure=` anche al monitoraggio citazioni.
+Per il **server solo-API** (branch `devapi`) c'è
+[deploy/mars-api.service](deploy/mars-api.service) — stesso
+hardening, database condivisibile con la GUI, convivenza su
+8765/8766 — e l'esempio nginx
+[deploy/nginx-mars.conf.example](deploy/nginx-mars.conf.example)
+per l'assetto separato (statici + proxy, oppure origini diverse
+con `--cors` e token).
 
 ## Monitoraggio delle citazioni IA effettive
 
@@ -362,10 +372,26 @@ protezione dal path traversal ed esegue un audit alla volta.
 
 API esposte (usate dal frontend, utilizzabili anche da script):
 `GET /api/env` (versioni, RAM disponibile, valori suggeriti),
-`POST /api/audit` (avvio; `409` se un audit è già in corso),
+`POST /api/audit` (avvio; `409` se un audit è già in corso; dal
+branch `devapi` anche `lang`, `soglie`, `queries_gsc` e
+`fail_under` per la parità con la CLI),
 `GET /api/status` (stato, log, sintesi, rilievi, esiti RRF),
-`GET /api/report/{html,json,text}` (referti, `?download=1` per lo
-scarico).
+`GET /api/report/{html,json,text,md,csv}` (referti, `?download=1`
+per lo scarico) — queste cinque rotte del ciclo audit sono
+**deprecate dichiaratamente** dal 2026-08-06 (restano attive; data
+e sostituto nella spec) in favore del **modello a risorse**:
+`POST /api/v1/audits` crea un job con id da seguire su
+`GET /api/v1/audits/{id}` (o via SSE per-job), annullare con
+`DELETE` e da cui scaricare i referti **in ogni formato e lingua**
+(`.../report?format=…&lang=…`, resi on-demand dalla stessa
+scansione); **token Bearer** personali su `/api/v1/tokens` per i
+client macchina (stesso perimetro del cookie), CORS opzionale a
+origini esplicite, storico paginato. Il **contratto OpenAPI 3.1**
+è generato dal registro dichiarativo delle rotte
+(`marsbeacon/api.py`) e servito da `GET /api/v1/openapi.json`
+(snapshot golden in [docs/openapi.json](docs/openapi.json)); la
+**documentazione navigabile** è su `GET /api/docs` (Scalar
+vendorizzato, nessuna origine esterna).
 
 ## Le aree misurate
 
@@ -590,7 +616,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 363 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 405 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

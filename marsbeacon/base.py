@@ -35,7 +35,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.61.0"
+__version__ = "1.62.0"
 
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
@@ -1084,15 +1084,26 @@ def load_thresholds(path: str) -> Dict[str, object]:
     if not isinstance(table, dict):
         raise ValueError("[%s] deve essere una tabella TOML."
                          % CONFIG_TABLE)
+    return check_thresholds(table)
 
+
+def check_thresholds(
+        table: Dict[str, object]) -> Dict[str, object]:
+    """Valida {chiave: valore} delle soglie e li normalizza.
+
+    Il cuore di ``load_thresholds`` (--config), usato direttamente
+    anche dall'API (campo "soglie" di POST /api/audit): chiave
+    sconosciuta, tipo o intervallo sbagliato e coppie min/max
+    invertite (valutate sul valore efficace) sollevano
+    ``ValueError`` con messaggio in italiano.
+    """
     overrides: Dict[str, object] = {}
     for key, value in table.items():
         spec = CONFIG_THRESHOLDS.get(key)
         if spec is None:
             raise ValueError(
-                "Soglia sconosciuta in %s: %r. Soglie previste: %s."
-                % (path, key,
-                   ", ".join(sorted(CONFIG_THRESHOLDS))))
+                "Soglia sconosciuta: %r. Soglie previste: %s."
+                % (key, ", ".join(sorted(CONFIG_THRESHOLDS))))
         _, kind, minimo, massimo = spec
         if isinstance(value, bool) \
                 or not isinstance(value, (int, float)):

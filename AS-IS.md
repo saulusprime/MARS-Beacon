@@ -16,7 +16,7 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-06.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `mars_audit.py` v1.61.0 (+ package `marsbeacon/`)
+## Strumento CLI — `mars_audit.py` v1.62.0 (+ package `marsbeacon/`)
 
 - **Soglie configurabili da file TOML** (v1.61.0, 2026-08-06,
   chiude la voce P3 "file di configurazione TOML"): `--config FILE`
@@ -691,7 +691,384 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza dichiarata nel modulo.
 
-## Interfaccia grafica locale — `mars_gui.py` v2.30.0 + `gui/`
+## API — contratto e registro (programma P1 API-first, branch `devapi`)
+
+**Stato: programma CONCLUSO il 2026-08-06, inclusa la voce
+condizionale** (migrazione GUI alle rotte v1 e deprecazione degli
+alias — bullet in testa); il branch `devapi` NON è ancora fuso in
+`main`. In sintesi: contratto OpenAPI 3.1 **auto-generato** dal
+registro dichiarativo delle rotte (`marsbeacon/api.py`, 26 rotte,
+`API_CONTRACT_VERSION` **1.4.0**, golden `docs/openapi.json`,
+spec servita da `GET /api/v1/openapi.json`, documentazione Scalar
+su `GET /api/docs`); **parità CLI↔API** (lang, soglie,
+queries_gsc, fail_under); **backend puro** (motore in
+`marsbeacon/api.py`, combinato `mars_gui.py` v2.36.0 come
+facciata, entry solo-API `mars_api.py` v0.2.0 su porta 8766 con
+`--cors` e `--max-audit`); **job con id** e referti per job in
+ogni formato e lingua on-demand; **token Bearer** e CORS
+esplicito; **frontend statico separato** (`MARS_API_BASE` in
+config.js, accesso token cross-origin); e2e a origini separate,
+job CI "Contratto API", `docs/API.md`, `deploy/mars-api.service`
+e `deploy/nginx-mars.conf.example`. Nel TO-DO resta solo la
+decisione di merge. Dettaglio nei bullet che seguono, dal più
+recente.
+
+- **GUI migrata alle rotte v1 e alias legacy DEPRECATI:
+  contratto 1.4.0** (GUI v2.36.0, 2026-08-06 — chiusa la voce
+  condizionale del programma). Il **ciclo audit della GUI usa il
+  modello a risorse**: avvio su `POST /api/v1/audits` con **id del
+  job persistito** in localStorage (`mars_job_id`: il
+  ricaricamento della pagina ripristina i risultati dal job, e un
+  job sparito o di un altro utente azzera l'id), polling e SSE
+  per-job, annullamento con `DELETE`, **link dei referti legati al
+  job** (`setReportLinks` su `.../report?format=…`; gli href
+  statici in index.html sono diventati dinamici, `bindApiLink`
+  reso idempotente per i rebind a ogni audit) e adattatore
+  `messaggioErrore` per l'oggetto d'errore uniforme v1. Sistemata
+  en passant una lacuna della guardia download (non copriva
+  dl-md/dl-csv; ora copre anche l'assenza di job). Nel registro il
+  modello `Route` ha il campo **`deprecated`** ({since,
+  replacement}) e le **cinque rotte legacy del ciclo audit**
+  (`POST /api/audit`, `GET /api/status`, `POST /api/cancel`,
+  `GET /api/events`, `GET /api/report/{formato}`) sono dichiarate
+  **DEPRECATE dal 2026-08-06** nella spec — `deprecated: true` +
+  data e sostituto nella description, "mai rimozione silenziosa":
+  **gli alias restano attivi** e i contract test continuano a
+  esercitarli; le altre rotte legacy (env, me, account, history,
+  citations) non hanno sostituto v1 e restano il contratto
+  corrente. `API_CONTRACT_VERSION` 1.4.0, golden rigenerato.
+  2 test in più (le cinque deprecazioni dichiarate con data e
+  sostituto, nessuna rotta v1 deprecata; app.js senza riferimenti
+  alle rotte legacy del ciclo audit, con job id persistito e
+  referti per job); **verifica AT strumentale 31/31 con la GUI
+  migrata in Chrome reale** (i flussi ora esercitano davvero le
+  rotte v1). Suite 405 test, flake8 pulito.
+
+- **Qualità, deploy e documentazione — FASE 4 CONCLUSA: il
+  programma P1 API-first è COMPLETO** (2026-08-06; resta solo la
+  deprecazione degli alias legacy, condizionata alla futura
+  migrazione della GUI sulle rotte v1 — vedi TO-DO). **E2E a
+  origini separate nella suite** (`tests/test_e2e_separato.py`):
+  il bundle si distribuisce per copia con `MARS_API_BASE`
+  valorizzata in config.js, servito da un web server statico
+  qualunque su un'origine, l'API (`mars_api.Handler`) sull'altra
+  con CORS dichiarato — il ciclo completo registrazione → token →
+  `POST /api/v1/audits` → polling → referto `text` in **francese
+  on-demand** viaggia con header `Origin` + Bearer come farebbe
+  il browser, con l'ACAO verificato su ogni risposta, il
+  preflight OPTIONS, l'origine estranea senza header, e i due
+  server che rifiutano l'uno i file dell'altro. **Job CI
+  dedicato** "Contratto API" in `.github/workflows/ci.yml`
+  (contract test + bundle separato + e2e a due origini; Pa11y
+  invariato sul frontend). **`docs/API.md`**: guida rapida con
+  esempi curl — account e token, job con soglie/lang/fail_under,
+  polling e SSE (`curl -N`), referti in ogni formato e lingua,
+  storico paginato e confronti, oggetto d'errore uniforme, CORS e
+  assetto separato. **`deploy/mars-api.service`**: unit systemd
+  del server solo-API (hardening identico a mars-gui.service,
+  stessa nota Node/Chrome; database condivisibile con la GUI via
+  `MARS_GUI_DB`, i due server convivono su 8765/8766), validata
+  con `systemd-analyze verify` (unico rilievo: i percorsi
+  /opt/seorrf assenti in sviluppo, atteso). Suite 403 test,
+  flake8 pulito.
+
+- **Frontend statico separato — FASE 3 CONCLUSA** (GUI v2.35.0,
+  2026-08-06). Il bundle `gui/` è **autonomo e configurabile**:
+  `config.js` espone **`MARS_API_BASE`** (vuota di default: il
+  combinato resta a zero configurazione) e in `app.js` tutte le
+  chiamate passano dai wrapper centralizzati **`apiUrl`/
+  `apiFetch`** — le 11 fetch, l'helper `postJson`, l'SSE e i link
+  di download. **Cross-origin con la stessa UI**: quando la base
+  punta a un'altra origine il blocco "Accesso con token API"
+  (etichetta, hint con `aria-describedby`, errore nel riquadro
+  esistente) sostituisce login e registrazione — il cookie
+  SameSite=Strict non viaggia — e il token (persistito in
+  localStorage, revocabile dal logout) viaggia come Bearer su
+  ogni richiesta; **l'SSE con token ripiega sul polling** (gli
+  EventSource non portano header: il ripiego era già nel
+  protocollo) e i **download passano da fetch+blob** (`bindApiLink`
+  con nome file suggerito; in stessa origine restano href
+  semplici). Nuovo **`deploy/nginx-mars.conf.example`** con i due
+  scenari dichiarati: A (consigliato) statici+proxy sulla stessa
+  origine — niente CORS, niente token obbligatorio, SSE con
+  `proxy_buffering off` — e B a origini diverse con `--cors` e
+  token; nota white-label (il bundle è il pacchetto da
+  brandizzare, P2). **Accessibilità riconfermata**: verifica
+  strumentale AT **31/31** sul combinato (il blocco token resta
+  nascosto in stessa origine: DOM invariato; i campi nuovi hanno
+  label e hint verificati dai test). 6 test strutturali in
+  `tests/test_frontend_separato.py` (base configurabile con
+  fonts-loader intatto, config.js prima di app.js, **nessuna
+  fetch o EventSource fuori dal wrapper** — regex sull'app.js —,
+  accesso token accessibile e commutabile, `node --check`,
+  esempio nginx coi due scenari): suite 402 test, flake8 pulito.
+
+- **Job con id, token Bearer, CORS e paginazione: contratto 1.3.0
+  — FASE 2 CONCLUSA** (mars_api v0.2.0, 2026-08-06). Il **modello
+  a risorse** della Fase 0: `POST /api/v1/audits` crea un job con
+  id (202; anche la rotta legacy ora restituisce l'id) registrato
+  in `JOBS` (potatura oltre 20 conclusi; `JOB` resta il "corrente"
+  legacy), **concorrenza configurabile** `AUDIT_CONCURRENCY`
+  (default 1 = comportamento storico, 409 `busy` oltre;
+  `--max-audit` su mars_api); `GET /api/v1/audits/{id}` (snapshot
+  con `id`, solo del proprietario: i job altrui sono 404, nessuna
+  esistenza rivelata), `DELETE` (annullamento cooperativo per id),
+  **`GET .../report?format=…&lang=…`** — il job conserva il
+  **contesto di rendering** e i referti in altre lingue si rendono
+  **on-demand** con cache: parità con `--lang` senza rifare la
+  scansione — e **SSE per-job** su `.../events`. **Token Bearer**
+  (`/api/v1/tokens`: POST con valore in chiaro solo alla
+  creazione, GET solo metadati, DELETE revoca): hash **SHA-256**
+  in tabella `api_tokens` — scelta dichiarata: token casuale ad
+  alta entropia, il PBKDF2 serve alle password e costerebbe 200k
+  round a ogni richiesta —, `_auth_user` = cookie O Bearer con lo
+  **stesso perimetro** (slot orario, gating del profilo), gestione
+  dei token **solo via sessione** (un token non può crearne
+  altri; `AUTH_COOKIE` nel registro, `bearerAuth` negli schemi di
+  sicurezza). **CORS spento di default**: header solo per le
+  origini dichiarate (`CORS_ORIGINS`, `--cors` ripetibile su
+  mars_api), preflight OPTIONS, **mai Allow-Credentials**
+  (cross-origin = token, il cookie SameSite non viaggia).
+  **Storico paginato** (`limit`/`offset` validati, echeggiati
+  nella risposta). **Errori uniformi sulle rotte v1**
+  `{code, key, message, params}` (chiave i18n col meccanismo dei
+  rilievi, messaggio italiano canonico; `retry_in_s` nei params
+  del 429); le rotte legacy conservano `{"error"}` con lo stesso
+  handler a doppio stile. Registro: **8 rotte nuove** (26
+  totali), snapshot con `id`, contratto **1.3.0**, golden
+  rigenerato. 6 test in più (e2e v1 completo sul sito fixture con
+  referto francese on-demand e SSE a stato terminale, proprietà e
+  401/404 uniformi, concorrenza esaurita nei due stili, ciclo
+  token completo — creazione/uso Bearer su rotte protette/limite
+  di gestione/revoca con 401 successivo —, CORS
+  spento/acceso/estraneo/preflight, paginazione con 400 sui
+  parametri): suite 396 test, flake8 pulito.
+
+- **Backend puro: motore server in `marsbeacon/api.py` ed entry
+  `mars_api.py`** (GUI v2.34.0, mars_api v0.1.0, 2026-08-06 —
+  primo blocco della Fase 2). Il motore del server — store utenti
+  SQLite, job di audit, lettori citazioni, `validate_config` e
+  l'handler delle rotte del contratto — è **estratto da
+  mars_gui.py** in `marsbeacon/api.py` col metodo della
+  scomposizione v1.58.0 (spostamento meccanico, facciata
+  invariata: i nomi storici restano importabili da mars_gui, che
+  passa da ~1.360 a ~150 righe). Architettura a eredità:
+  **`ApiHandler`** nel motore serve le sole rotte del contratto
+  più la pagina `/api/docs` coi suoi asset in **whitelist
+  puntuale** (`DOCS_ASSETS`: bundle Scalar e tre woff2 del
+  Titillium — lettura di file noti, nessuna navigazione del
+  filesystem); l'hook **`_fallback`** risponde 404 a tutto il
+  resto, e **`mars_gui.Handler`** lo sovrascrive per servire il
+  frontend statico della GUI: il combinato a zero configurazione
+  resta identico. Il nuovo entry **`mars_api.py`** (porta 8766 di
+  default, per convivere col combinato) monta il motore così
+  com'è: niente filesystem statico, niente pagine. Adeguamenti
+  dichiarati nello spostamento: cookie di sessione unificato
+  sulla costante del contratto (`SESSION_COOKIE_NAME`; mars_gui
+  conserva l'alias storico `SESSION_COOKIE`), `gui_version` di
+  `/api/env` ora arriva dall'attributo **`app_version`**
+  dell'applicazione che monta il motore (2.34.0 sul combinato,
+  0.1.0 sul solo-API), gli **stati mutabili (JOB, STORE,
+  CITATIONS_HISTORY) vivono nel motore**: fixture dei test e
+  `tools/verifica_at.py` adeguati a impostarli su
+  `marsbeacon.api`. 3 test in più (il solo-API rifiuta con 404
+  ogni percorso statico della GUI ma serve contratto, docs e
+  asset in whitelist con `gui_version` proprio; il combinato
+  continua a servire il frontend); contratto invariato (1.2.0,
+  golden intatto). Verifica dal vivo dei due server affiancati
+  (8765 combinato, 8766 solo-API). Suite 390 test, flake8 pulito.
+
+- **Documentazione Scalar su /api/docs: contratto 1.2.0 — FASE 1
+  CONCLUSA** (GUI v2.33.0, 2026-08-06). **Scalar API Reference
+  1.64.0 vendorizzato** in `gui/vendor/scalar/` (3,6 MB, licenza
+  MIT verificata dal package.json e attribuita nel NOTICE) dal
+  nuovo **`tools/update-scalar.sh`** sul modello di update-vendor:
+  scarica da npm, pota al solo bundle standalone (**verificato
+  autonomo**: niente chunk dinamici, lo script rifiuta
+  l'aggiornamento se il bundle smette di esserlo), **denylist
+  telemetria** che ferma l'aggiornamento (sentry/analytics/
+  posthog/segment/hotjar/plausible — pattern anti-telemetria del
+  fork Lighthouse; oggi: zero occorrenze), file `VERSIONE` e
+  **`ORIGINI.txt`** con l'elenco dichiarato degli host esterni
+  presenti nel bundle come stringhe inerti (esempi, documentazione
+  e i font predefiniti di fonts.scalar.com). Pagina
+  **`gui/api-docs.html`** servita da `GET /api/docs` in
+  **modalità markup** (`data-url` verso la spec, zero JavaScript
+  inline: la CSP stretta della GUI resta intatta e blocca comunque
+  ogni caricamento fuori da 'self'), con
+  **`withDefaultFonts: false`** e `--scalar-font` sul **Titillium
+  Web del brand** già vendorizzato (@font-face 400/600/700):
+  nessuna origine esterna nella pagina, documentazione con il look
+  Lympha. Rotta censita nel registro (tag "contratto", 18 rotte
+  totali), `API_CONTRACT_VERSION` 1.2.0, golden rigenerato,
+  docstring di mars_gui aggiornata. 2 test in più (pagina servita
+  con content-type e CSP giusti, spec puntata, withDefaultFonts
+  spento, Titillium presente, **nessun http(s):// nella pagina**;
+  bundle presente con VERSIONE/ORIGINI, denylist telemetria,
+  autonomia senza chunk); verifica dal vivo: /api/docs 200,
+  bundle servito, spec 1.2.0 con 18 rotte. Suite 387 test, flake8
+  pulito. **Con questo la Fase 1 del programma API-first è
+  completa**: contratto auto-generato, censimento totale, parità
+  CLI↔API e documentazione navigabile — restano le Fasi 2-4.
+
+- **Parità CLI↔API su POST /api/audit: contratto 1.1.0** (core
+  v1.62.0, GUI v2.32.0, 2026-08-06 — chiude il "gap di parità"
+  della Fase 1). Quattro campi nuovi, validati in
+  `validate_config` con messaggi in italiano:
+  **`lang`** (it|en|fr|de|es: i quattro referti di prosa
+  scaricabili escono nella lingua scelta, il JSON resta canonico
+  in italiano — parità con `--lang`); **`soglie`** (oggetto
+  validato da **`check_thresholds`**, il cuore di
+  `load_thresholds` estratto in `base.py` proprio per questo:
+  stessa validazione del `--config` TOML senza passare da un
+  file; applicate con `apply_thresholds` **solo attorno a
+  `run_audit`** con ripristino garantito dal `finally`, echeggiate
+  nel blocco `thresholds` del referto JSON e nella sintesi);
+  **`queries_gsc`** (contenuto dell'export CSV Search Console
+  come testo: **`parse_gsc_queries`** estratta da
+  `load_gsc_queries` in `audits.py` — il file delega al parser di
+  testo, comportamento CLI invariato; non combinabile con
+  `queries`, stessa regola della CLI); **`fail_under`** (0-100:
+  la sintesi del job echeggia `fail_under` e **`gate_passed`** —
+  l'equivalente API del codice d'uscita 1 della CLI). La sintesi
+  porta anche `lang` e `thresholds`. Nel registro API lo schema
+  del blocco `soglie` è **derivato da `CONFIG_THRESHOLDS`**
+  (chiavi, tipi e intervalli non possono divergere dal registro
+  delle soglie), `lang` enum da `HTML_LANGS`;
+  `API_CONTRACT_VERSION` 1.1.0, golden rigenerato. 4 test in più
+  (validate_config coi messaggi, parse da testo con BOM,
+  **e2e reale sul sito fixture**: audit con lang=en + soglie
+  190-195 + fail_under=100 → sintesi echeggiata, referto text in
+  inglese con la soglia dichiarata "190-195 characters", JSON con
+  `thresholds`, gate_passed false, **default ripristinati a fine
+  job**); suite 385 test, flake8 pulito. Il frontend della GUI
+  non espone ancora i campi nuovi (come fu per Lighthouse in
+  v2.24.0: via API sono già utilizzabili).
+
+- **Le sei decisioni preliminari della P1 API-first**, ratificate
+  il 2026-08-06, qui per memoria (pattern delle quattro decisioni
+  P1 Lighthouse): *contratto* **auto-generato** da un registro
+  dichiarativo delle rotte — la prima stesura "spec scritta a
+  mano" e' stata bocciata dal titolare: una spec a mano deriva
+  sempre dal codice; il generatore e' nostro, in stdlib, come lo
+  squarify — con snapshot `docs/openapi.json` a pattern golden;
+  *autenticazione* a doppio binario (cookie HttpOnly same-origin
+  com'e' oggi + token Bearer per macchine e cross-origin, CORS
+  spento di default con origini esplicite); *versionamento* con
+  prefisso `/api/v1` e alias legacy `/api/*` deprecati
+  dichiaratamente, mai rimossi in silenzio; *modello a risorse*
+  con l'audit come job a id (202+id, stato/referti/annullamento
+  per id, coda a concorrenza configurabile con default 1, slot
+  orario invariato); *errori uniformi* `{code, key, params,
+  message}` col meccanismo i18n dei rilievi; *documentazione*
+  della spec con **solo Scalar** vendorizzato (MIT; la
+  coesistenza con Swagger UI, analizzata e fattibile, e' scartata
+  per scelta — un solo lettore da mantenere, la spec grezza resta
+  importabile ovunque; `withDefaultFonts: false` obbligatorio
+  perche' di default Scalar carica font da fonts.scalar.com,
+  `--scalar-font` sul Titillium Web del brand).
+
+- **Censimento completo: contratto 1.0.0** (2026-08-06, secondo
+  blocco della Fase 1): il registro copre **tutte le 17 rotte**
+  della superficie attuale. Modello `Route` esteso con **parametri
+  di percorso e query** (`/api/report/{formato}` col formato come
+  path param enum; `id`, `a`/`b`, `download` in query), **risposte
+  multi-formato** (chiave `content`: i referti dichiarano i cinque
+  media type), **content type non-JSON** (`/api/events` come
+  `text/event-stream` con lo snapshot serializzato) e **header
+  documentati** (`Set-Cookie` su register/login/logout). Censite
+  con schemi fedeli agli handler: account (register con i quattro
+  messaggi storici via `x-errore` — tos, nome, email, password —
+  login, logout, profile), audit (`POST /api/audit` con **tutti i
+  campi di `validate_config`**: limiti numerici min/max dalle
+  costanti del core, enum per render/market/judge/lighthouse/
+  device/search_check/robots, `robots_ack`, 202/400/401/409 e
+  **429 con `retry_in_s`**), stato (`SNAPSHOT_SCHEMA` condiviso
+  fra `/api/status` e SSE: primo livello preciso, strutture
+  profonde dichiarate della stessa natura del referto JSON gia'
+  versionato da `schema_version`), storico (righe `RUN_SCHEMA`,
+  referto per id con 403 `profile_incomplete` a **schema con
+  codice macchina** `CODED_ERROR_SCHEMA`, confronto fra audit) e
+  citazioni. **`API_CONTRACT_VERSION` 1.0.0** (censimento
+  completo dichiarato), golden `docs/openapi.json` rigenerato
+  (~1.950 righe). Contract test estesi a **18** (account con
+  201+Set-Cookie/400/409, login 200/401, logout, profile
+  401/400/200 con `profile_complete`, status/history/citations
+  401+200 validati, referti e storico protetti — 401/403/404/400
+  — audit 401/400 coi messaggi storici, SSE 401): suite 381
+  test, flake8 pulito. Restano le fasi 2-4 del TO-DO (backend
+  puro con job a id, frontend separato, Scalar, deploy).
+
+- **Contratto auto-generato dal registro delle rotte** (GUI
+  v2.31.0, 2026-08-06 — primo blocco della Fase 1 del programma
+  API-first; decisione di Fase 0 ratificata: la spec a mano e'
+  stata bocciata dal titolare). Nuovo modulo **`marsbeacon/api.py`**
+  (fuori dalla facciata dello strumento: e' il livello API,
+  consumato dal server): dataclass `Route` (metodo, percorso,
+  riassunto, tag, autenticazione, schema di richiesta, risposte
+  per stato) e registro `ROUTES` come **unica fonte di verita'**,
+  da cui derivano tre cose insieme — la **spec OpenAPI 3.1**
+  (`openapi_spec()`, servita al volo da `GET /api/v1/openapi.json`,
+  mai letta da file), la **validazione delle richieste a runtime**
+  (`validate_request` col mini-validatore in sola stdlib:
+  sottoinsieme di JSON Schema con type/required/properties/
+  additionalProperties/min-maxLength/pattern/enum/min-maximum/
+  items; il pacchetto `jsonschema` resta confinato alla suite) e i
+  **contract test**. La chiave `x-errore` negli schemi preserva i
+  messaggi storici in italiano della GUI (l'endpoint
+  `POST /api/citations/events` ora valida dal registro con gli
+  stessi messaggi di prima, byte per byte) e viene rimossa dalla
+  spec pubblicata. **Versione del contratto** separata dalla
+  versione dello strumento (`API_CONTRACT_VERSION`, oggi `0.1.0`:
+  resta 0.x finche' il censimento non e' completo — dichiarato
+  nella spec stessa); il nome del cookie di sessione e' parte del
+  contratto (`SESSION_COOKIE_NAME`, coerenza con mars_gui
+  verificata da un test). **Snapshot golden** `docs/openapi.json`
+  versionato e verificato dalla suite (stessa rigenerazione
+  intenzionale dei golden dei renderer, `MARS_RIGENERA_GOLDEN=1`).
+  Prima tranche censita: `GET /api/v1/openapi.json` (la spec
+  descrive se stessa), `GET /api/env`, `GET /api/me`,
+  `POST /api/cancel`, `POST /api/citations/events` — 13 test in
+  `tests/test_api_contract.py` (copertura spec↔registro, schemi
+  JSON Schema validi, x-errore fuori dalla spec, golden,
+  validatore coi messaggi storici, contract test sul server reale:
+  risposte 200/201/400/401/409 validate contro gli schemi del
+  registro con `jsonschema`). Suite 376 test, flake8 pulito.
+  Il censimento delle altre 12 rotte e' stato completato nel
+  blocco successivo (bullet qui sopra: contratto 1.0.0).
+
+## Interfaccia grafica locale — `mars_gui.py` v2.36.0 + `gui/`
+
+- **Ciclo audit sulle rotte v1** (v2.36.0, 2026-08-06, branch
+  `devapi`): job con id persistito, referti per job, alias legacy
+  deprecati — dettaglio nella sezione "API — contratto e
+  registro" più sopra.
+
+- **Bundle statico separato** (v2.35.0, 2026-08-06, branch
+  `devapi`): base API configurabile, accesso con token API
+  cross-origin, download via blob — dettaglio nella sezione
+  "API — contratto e registro" più sopra.
+
+- **Facciata sul motore server** (v2.34.0, 2026-08-06, branch
+  `devapi`): il motore vive in `marsbeacon/api.py`, mars_gui
+  eredita `ApiHandler` e aggiunge i file statici — dettaglio
+  nella sezione "API — contratto e registro" più sopra.
+
+- **Documentazione del contratto su /api/docs** (v2.33.0,
+  2026-08-06, branch `devapi`): Scalar vendorizzato, pagina
+  `gui/api-docs.html` — dettaglio nella sezione "API — contratto
+  e registro" più sopra.
+
+- **Parità CLI↔API nel POST /api/audit** (v2.32.0, 2026-08-06,
+  branch `devapi`): lang, soglie, queries_gsc e fail_under —
+  dettaglio nella sezione "API — contratto e registro" più sopra;
+  il form della GUI non li espone ancora.
+
+- **Contratto API dal registro delle rotte** (v2.31.0,
+  2026-08-06, branch `devapi`): il server serve la spec generata
+  su `GET /api/v1/openapi.json` e valida
+  `POST /api/citations/events` con gli schemi del registro —
+  dettaglio nella sezione "API — contratto e registro" piu' sopra.
 
 - **Grafo dei link, motore evoluto** (v2.30.0, 2026-08-05): vedi
   la voce v1.59.0 dello strumento CLI — fisica viva, anelli di
@@ -1054,7 +1431,7 @@ sono nel [README.md](README.md).
 - Testato senza chiamate reali: server API finti locali per entrambi i
   provider (8 test dedicati).
 
-## Fork Lighthouse — strategia di manutenzione (P1, 2026-08-05)
+## Fork Lighthouse — strategia di manutenzione (P1 Lighthouse, 2026-08-05)
 
 - **P1 — Integrazione Lighthouse: COMPLETATA** (2026-08-05, in
   un'unica giornata di lavoro, v1.46.0→v1.55.0 / GUI
@@ -1213,7 +1590,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 363 test in ~30 secondi** (inclusa
+- **Suite pytest: 405 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

@@ -6,6 +6,122 @@
 "use strict";
 
 (function () {
+  /* ------- assetto separato (Fase 3 API-first) -------
+     API_BASE vuota = stessa origine (combinato mars_gui.py);
+     valorizzata in config.js quando il bundle statico vive su
+     un'altra origine. Cross-origin il cookie SameSite=Strict non
+     viaggia: ci si autentica con un token API personale
+     (Authorization: Bearer), l'avanzamento usa il polling (l'SSE
+     non porta header) e i download passano da fetch+blob. */
+  const API_BASE = (window.MARS_API_BASE || "")
+    .replace(/\/+$/, "");
+  const REMOTE_API = API_BASE !== "";
+  let apiToken = "";
+  try {
+    apiToken = window.localStorage.getItem("mars_api_token") || "";
+  } catch (err) { /* storage non disponibile */ }
+
+  function apiUrl(path) {
+    return REMOTE_API ? API_BASE + "/" + path : path;
+  }
+
+  function apiFetch(path, options) {
+    const opts = options || {};
+    if (apiToken) {
+      opts.headers = opts.headers || {};
+      opts.headers.Authorization = "Bearer " + apiToken;
+    }
+    return fetch(apiUrl(path), opts);
+  }
+
+  /* Il ciclo audit usa il modello a risorse (/api/v1/audits, job
+     con id): l'id dell'ultimo job vive in localStorage cosi' il
+     ricaricamento della pagina ripristina i risultati. Gli alias
+     legacy /api/audit-status-cancel-events-report restano attivi
+     sul server ma la GUI non li usa piu' (deprecazione dichiarata
+     nella spec). */
+  let jobId = "";
+  try {
+    jobId = window.localStorage.getItem("mars_job_id") || "";
+  } catch (err) { /* niente persistenza */ }
+
+  function setJobId(nuovo) {
+    jobId = nuovo || "";
+    try {
+      if (jobId) {
+        window.localStorage.setItem("mars_job_id", jobId);
+      } else {
+        window.localStorage.removeItem("mars_job_id");
+      }
+    } catch (err) { /* ignora */ }
+  }
+
+  /* Le rotte /api/v1 usano l'oggetto d'errore uniforme
+     {code, key, message, params}; le legacy la stringa. */
+  function messaggioErrore(data, fallback) {
+    if (data && data.error) {
+      if (typeof data.error === "string") { return data.error; }
+      if (data.error.message) { return data.error.message; }
+    }
+    return fallback;
+  }
+
+  /* Nome di download suggerito per i link API (nell'assetto
+     remoto il server non puo' imporlo: il blob e' anonimo). */
+  function apiFileName(path) {
+    if (path.indexOf("api/history/report") === 0) {
+      const match = path.match(/id=(\d+)/);
+      return "audit-" + (match ? match[1] : "n") + ".json";
+    }
+    const fmt = (path.match(/api\/report\/(\w+)/) || [])[1] || "";
+    const ext = { html: "html", json: "json", text: "txt",
+                  md: "md", csv: "csv" }[fmt] || "bin";
+    return (fmt === "csv" ? "rilievi-mars." : "referto-mars.") +
+      ext;
+  }
+
+  /* Link a un endpoint API: href normale in stessa origine; con
+     token il download passa da fetch+blob (il Bearer non viaggia
+     negli href). */
+  function bindApiLink(link, path) {
+    link.href = apiUrl(path);
+    if (link._marsClick) {
+      link.removeEventListener("click", link._marsClick);
+      link._marsClick = null;
+    }
+    if (!apiToken) { return; }
+    const gestore = (ev) => {
+      if (link.classList.contains("disabled")) { return; }
+      ev.preventDefault();
+      apiFetch(path)
+        .then((r) => (r.ok ? r.blob() : Promise.reject(r.status)))
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          if (link.target === "_blank") {
+            window.open(url, "_blank", "noopener");
+          } else {
+            const ancora = document.createElement("a");
+            ancora.href = url;
+            ancora.download = apiFileName(path);
+            document.body.appendChild(ancora);
+            ancora.click();
+            ancora.remove();
+          }
+          window.setTimeout(
+            () => URL.revokeObjectURL(url), 60000);
+        })
+        .catch(() => {});
+    };
+    link._marsClick = gestore;
+    link.addEventListener("click", gestore);
+  }
+
+  function adaptStaticApiLinks() {
+    if (!apiToken && !REMOTE_API) { return; }
+    document.querySelectorAll('a[href^="api/"]').forEach((a) => {
+      bindApiLink(a, a.getAttribute("href"));
+    });
+  }
   const AREAS = [
     "Tecnica",
     "Lessicale (BM25)",
@@ -107,7 +223,7 @@
   el("btn-add-event").addEventListener("click", () => {
     const feedback = el("event-feedback");
     feedback.textContent = "";
-    fetch("api/citations/events", {
+    apiFetch("api/citations/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -143,9 +259,10 @@
   el("register-form").addEventListener("submit", onRegister);
   el("profile-form").addEventListener("submit", onProfile);
   el("logout-btn").addEventListener("click", onLogout);
-  ["dl-html", "dl-json", "dl-text", "open-report"].forEach((id) => {
+  ["dl-html", "dl-json", "dl-text", "dl-md", "dl-csv",
+   "open-report"].forEach((id) => {
     el(id).addEventListener("click", (event) => {
-      if (!me || !me.profile_complete) {
+      if (!jobId || !me || !me.profile_complete) {
         event.preventDefault();
       }
     });
@@ -154,6 +271,8 @@
   el("preset-load").addEventListener("click", loadPreset);
   el("preset-delete").addEventListener("click", deletePreset);
   refreshPresetSelect();
+  bindTokenLogin();
+  adaptStaticApiLinks();
   loadEnv();
   refreshAuth();
 
@@ -167,7 +286,7 @@
   }
 
   function postJson(path, payload) {
-    return fetch(path, {
+    return apiFetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -175,8 +294,44 @@
       (data) => ({ status: r.status, data })));
   }
 
+  function bindTokenLogin() {
+    if (REMOTE_API) {
+      el("token-login").hidden = false;
+      el("password-login").hidden = true;
+    }
+    el("token-form").addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const valore = el("t-token").value.trim();
+      if (!valore) {
+        showAuthError("Inserisci un token API.");
+        return;
+      }
+      apiToken = valore;
+      try {
+        window.localStorage.setItem("mars_api_token", valore);
+      } catch (err) { /* niente persistenza */ }
+      apiFetch("api/me")
+        .then((r) => r.json())
+        .then((info) => {
+          if (info.authenticated) {
+            el("t-token").value = "";
+            adaptStaticApiLinks();
+            applyAuth(info.user);
+          } else {
+            apiToken = "";
+            try {
+              window.localStorage.removeItem("mars_api_token");
+            } catch (err) { /* ignora */ }
+            showAuthError("Token non valido o revocato.");
+          }
+        })
+        .catch(() => showAuthError(
+          "Server API non raggiungibile."));
+    });
+  }
+
   function refreshAuth() {
-    fetch("api/me")
+    apiFetch("api/me")
       .then((r) => r.json())
       .then((info) => {
         applyAuth(info.authenticated ? info.user : null);
@@ -282,6 +437,12 @@
   }
 
   function onLogout() {
+    if (apiToken) {
+      apiToken = "";
+      try {
+        window.localStorage.removeItem("mars_api_token");
+      } catch (err) { /* ignora */ }
+    }
     postJson("api/logout", {}).finally(() => applyAuth(null));
   }
 
@@ -291,7 +452,7 @@
     if (!me) {
       return;
     }
-    fetch("api/history")
+    apiFetch("api/history")
       .then((r) => r.json())
       .then((data) => renderHistory(data.runs || []))
       .catch(() => { /* lo storico non blocca il resto */ });
@@ -367,8 +528,8 @@
       const report = document.createElement("td");
       if (run.has_report) {
         const link = document.createElement("a");
-        link.href = "api/history/report?id=" + run.id +
-          "&download=1";
+        bindApiLink(link, "api/history/report?id=" + run.id +
+          "&download=1");
         link.textContent = "JSON";
         link.setAttribute("aria-label",
           "Scarica il referto JSON dell'audit di " + run.site +
@@ -429,7 +590,7 @@
     const a = el("f-cmp-a").value;
     const b = el("f-cmp-b").value;
     el("compare-error").textContent = "";
-    fetch("api/history/compare?a=" + a + "&b=" + b)
+    apiFetch("api/history/compare?a=" + a + "&b=" + b)
       .then((r) => r.json().then(
         (data) => ({ status: r.status, data })))
       .then(({ status, data }) => {
@@ -580,7 +741,7 @@
     if (!me) {
       return;
     }
-    fetch("api/citations")
+    apiFetch("api/citations")
       .then((r) => r.json())
       .then((data) => {
         citEvents = data.events || [];
@@ -945,7 +1106,8 @@
     btn.disabled = true;
     btn.textContent = "Annullamento…";
     el("announcer").textContent = "Annullamento richiesto…";
-    fetch("api/cancel", { method: "POST" }).catch(() => {
+    apiFetch("api/v1/audits/" + jobId,
+             { method: "DELETE" }).catch(() => {
       btn.disabled = false;
       btn.textContent = "Annulla audit";
     });
@@ -961,7 +1123,10 @@
   /* Se un audit e' gia' concluso (es. pagina ricaricata), i
      risultati vengono ripristinati senza rilanciare nulla. */
   function restoreResults() {
-    fetch("api/status")
+    if (!jobId) {
+      return;
+    }
+    apiFetch("api/v1/audits/" + jobId)
       .then((r) => r.json())
       .then((snap) => {
         if (!running && snap.state === "done" &&
@@ -971,6 +1136,8 @@
           el("progress-section").hidden = false;
           setOpen("sec-config", false);
           showResults(snap);
+        } else if (!snap.state) {
+          setJobId("");  // job sparito o di un altro utente
         }
       })
       .catch(() => { /* nessun audit precedente */ });
@@ -979,7 +1146,7 @@
   /* ---------------- ambiente ---------------- */
 
   function loadEnv() {
-    fetch("api/env")
+    apiFetch("api/env")
       .then((r) => r.json())
       .then((env) => {
         if (env.suggested_max_body_mb && env.available_ram_mb) {
@@ -1141,7 +1308,7 @@
   /* ---------------- ciclo dell'audit ---------------- */
 
   function startAudit(config) {
-    fetch("api/audit", {
+    apiFetch("api/v1/audits", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(config),
@@ -1149,9 +1316,11 @@
       .then((r) => r.json().then((data) => ({ status: r.status, data })))
       .then(({ status, data }) => {
         if (status !== 202) {
-          showFormError(data.error || "Avvio non riuscito.");
+          showFormError(messaggioErrore(
+            data, "Avvio non riuscito."));
           return;
         }
+        setJobId(data.id);
         running = true;
         lastPhase = "";
         setSubmitState(true);
@@ -1202,9 +1371,13 @@
 
   function watchProgress() {
     stopEvents();
-    if (window.EventSource) {
+    if (window.EventSource && !apiToken) {
+      /* con token Bearer l'SSE non puo' autenticarsi (niente
+         header sugli EventSource): si va di polling, il ripiego
+         gia' previsto dal protocollo. */
       try {
-        events = new EventSource("api/events");
+        events = new EventSource(
+          apiUrl("api/v1/audits/" + jobId + "/events"));
         events.onmessage = (msg) => {
           handleSnapshot(JSON.parse(msg.data));
         };
@@ -1223,7 +1396,8 @@
   function handleSnapshot(snap) {
     if (!snap.state) {
       stopEvents();
-      fail(snap.error || "Sessione scaduta: accedi di nuovo.");
+      fail(messaggioErrore(
+        snap, "Sessione scaduta: accedi di nuovo."));
       return;
     }
     renderLog(snap.log || []);
@@ -1240,7 +1414,7 @@
   }
 
   function poll() {
-    fetch("api/status")
+    apiFetch("api/v1/audits/" + jobId)
       .then((r) => r.json())
       .then((snap) => {
         handleSnapshot(snap);
@@ -1308,7 +1482,23 @@
     el("results-toggle").focus();
   }
 
+  const REPORT_LINKS = {
+    "dl-html": ["html", true], "dl-json": ["json", true],
+    "dl-text": ["text", true], "dl-md": ["md", true],
+    "dl-csv": ["csv", true], "open-report": ["html", false],
+  };
+
+  function setReportLinks() {
+    Object.keys(REPORT_LINKS).forEach((id) => {
+      const fmt = REPORT_LINKS[id][0];
+      const scarica = REPORT_LINKS[id][1];
+      bindApiLink(el(id), "api/v1/audits/" + jobId +
+        "/report?format=" + fmt + (scarica ? "&download=1" : ""));
+    });
+  }
+
   function showResults(snap) {
+    setReportLinks();
     renderMeta(snap.summary);
     renderHero(snap.summary);
     renderDelta((snap.summary || {}).delta);

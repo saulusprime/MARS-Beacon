@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MARS Beacon — Documentazione API</title>
+<!-- Lettore Scalar vendorizzato (decisione P1 API-first: solo
+     Scalar). Modalita' markup: nessun JavaScript inline, la CSP
+     stretta della GUI resta intatta. I font predefiniti di Scalar
+     (fonts.scalar.com) sono disattivati con withDefaultFonts e
+     rimpiazzati dal Titillium Web del brand, gia' vendorizzato:
+     la pagina non ha alcuna origine esterna e la CSP bloccherebbe
+     comunque ogni caricamento fuori da 'self'. -->
+<style>
+  @font-face {
+    font-family: "Titillium Web";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/vendor/bootstrap-italia/fonts/Titillium_Web/titillium-web-v10-latin-ext_latin-regular.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Titillium Web";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("/vendor/bootstrap-italia/fonts/Titillium_Web/titillium-web-v10-latin-ext_latin-600.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Titillium Web";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("/vendor/bootstrap-italia/fonts/Titillium_Web/titillium-web-v10-latin-ext_latin-700.woff2") format("woff2");
+  }
+  :root {
+    --scalar-font: "Titillium Web", system-ui, sans-serif;
+    --scalar-font-code: ui-monospace, "SF Mono", "Cascadia Mono",
+      Consolas, monospace;
+  }
+</style>
+</head>
+<body>
+<script
+  id="api-reference"
+  data-url="/api/v1/openapi.json"
+  data-configuration='{"withDefaultFonts": false}'
+  src="/vendor/scalar/standalone.js"></script>
+</body>
+</html>

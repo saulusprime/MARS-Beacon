@@ -106,7 +106,28 @@
           la registrazione è gratuita e consente
           <strong>un check all'ora</strong>.
         </p>
-        <div class="row">
+        <div id="token-login" hidden>
+          <h3 class="h6">Accesso con token API</h3>
+          <p id="token-hint" class="form-text mb-2">
+            Questa interfaccia usa un server API su un'altra
+            origine: si accede con un token API personale
+            (si crea dal server combinato con
+            POST /api/v1/tokens — documentazione su /api/docs).
+            Il token resta solo in questo browser.
+          </p>
+          <form id="token-form" novalidate>
+            <div class="form-group">
+              <label for="t-token" class="active">Token API</label>
+              <input type="password" class="form-control"
+                     id="t-token" autocomplete="off"
+                     spellcheck="false"
+                     aria-describedby="token-hint">
+            </div>
+            <button type="submit" class="btn btn-outline-primary">
+              Usa il token</button>
+          </form>
+        </div>
+        <div class="row" id="password-login">
           <div class="col-12 col-lg-5">
             <h3 class="h6">Hai già un account? Accedi</h3>
             <form id="login-form" novalidate>
@@ -678,37 +699,37 @@
 
       <div class="mb-4 d-flex flex-wrap gap-2">
         <a class="btn btn-outline-primary" id="dl-html"
-           href="api/report/html?download=1">
+           href="#">
           <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
                focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
           Scarica HTML
         </a>
         <a class="btn btn-outline-primary" id="dl-json"
-           href="api/report/json?download=1">
+           href="#">
           <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
                focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
           Scarica JSON
         </a>
         <a class="btn btn-outline-primary" id="dl-text"
-           href="api/report/text?download=1">
+           href="#">
           <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
                focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
           Scarica testo
         </a>
         <a class="btn btn-outline-primary" id="dl-md"
-           href="api/report/md?download=1">
+           href="#">
           <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
                focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
           Scarica Markdown
         </a>
         <a class="btn btn-outline-primary" id="dl-csv"
-           href="api/report/csv?download=1">
+           href="#">
           <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
                focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
           Scarica CSV rilievi
         </a>
         <a class="btn btn-outline-secondary" id="open-report"
-           href="api/report/html" target="_blank" rel="noopener">
+           href="#" target="_blank" rel="noopener">
           <svg class="icon icon-sm me-1" aria-hidden="true"
                focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-external-link"></use></svg>
           Apri il referto HTML

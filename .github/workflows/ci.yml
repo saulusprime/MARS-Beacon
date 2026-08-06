@@ -77,3 +77,27 @@ jobs:
         env:
           PA11Y_CHROME: /usr/bin/google-chrome
         run: npx --yes pa11y-ci@3 --config .pa11yci.js
+
+  api:
+    name: Contratto API (contract test + e2e a origini separate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dipendenze
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Contract test, bundle separato ed e2e a due origini
+        # Il contratto OpenAPI e' verificato contro il registro
+        # (golden docs/openapi.json), le risposte reali contro gli
+        # schemi; l'e2e replica l'assetto separato: statici su
+        # un'origine, API sull'altra con CORS, ciclo completo
+        # audit -> referti via token Bearer. node --check sul
+        # bundle (Node preinstallato sui runner ubuntu).
+        run: >
+          pytest -q tests/test_api_contract.py
+          tests/test_frontend_separato.py
+          tests/test_e2e_separato.py
