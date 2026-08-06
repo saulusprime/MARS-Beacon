@@ -69,17 +69,13 @@ rotte v1. `API_CONTRACT_VERSION` 1.3.0.
 
 ### Fase 3 — Frontend statico separato
 
-- [ ] `gui/` diventa un bundle autonomo: **base URL dell'API
-      configurabile** (default: stessa origine — il combinato
-      resta a zero configurazione), usata da fetch, SSE e link di
-      download.
-- [ ] Cross-origin: login via token quando l'origine è diversa
-      (il cookie SameSite=Strict non viaggia), stessa UI.
-- [ ] Servibile da qualunque static server: esempio nginx in
-      `deploy/` (statici + proxy verso mars_api) e nota sul
-      white-label P2 (il bundle è il pacchetto da brandizzare).
-- [ ] Accessibilità riconfermata: verifica strumentale AT sui due
-      assetti (combinato e separato), annunci e focus invariati.
+**COMPLETATA il 2026-08-06 su `devapi`** (vedi AS-IS "API —
+contratto e registro"): bundle `gui/` autonomo con
+`MARS_API_BASE` in config.js (vuota = combinato a zero
+configurazione), wrapper `apiUrl`/`apiFetch` su fetch/SSE/download,
+accesso con token API nella stessa UI per il cross-origin
+(SSE→polling, download via blob), esempio nginx coi due scenari
+in `deploy/`, AT 31/31 riconfermata.
 
 ### Fase 4 — Qualità, deploy, documentazione
 

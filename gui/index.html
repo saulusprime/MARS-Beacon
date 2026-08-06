@@ -106,7 +106,28 @@
           la registrazione è gratuita e consente
           <strong>un check all'ora</strong>.
         </p>
-        <div class="row">
+        <div id="token-login" hidden>
+          <h3 class="h6">Accesso con token API</h3>
+          <p id="token-hint" class="form-text mb-2">
+            Questa interfaccia usa un server API su un'altra
+            origine: si accede con un token API personale
+            (si crea dal server combinato con
+            POST /api/v1/tokens — documentazione su /api/docs).
+            Il token resta solo in questo browser.
+          </p>
+          <form id="token-form" novalidate>
+            <div class="form-group">
+              <label for="t-token" class="active">Token API</label>
+              <input type="password" class="form-control"
+                     id="t-token" autocomplete="off"
+                     spellcheck="false"
+                     aria-describedby="token-hint">
+            </div>
+            <button type="submit" class="btn btn-outline-primary">
+              Usa il token</button>
+          </form>
+        </div>
+        <div class="row" id="password-login">
           <div class="col-12 col-lg-5">
             <h3 class="h6">Hai già un account? Accedi</h3>
             <form id="login-form" novalidate>

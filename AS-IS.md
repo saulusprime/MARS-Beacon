@@ -693,6 +693,37 @@ sono nel [README.md](README.md).
 
 ## API — contratto e registro (programma P1, branch `devapi`)
 
+- **Frontend statico separato — FASE 3 CONCLUSA** (GUI v2.35.0,
+  2026-08-06). Il bundle `gui/` è **autonomo e configurabile**:
+  `config.js` espone **`MARS_API_BASE`** (vuota di default: il
+  combinato resta a zero configurazione) e in `app.js` tutte le
+  chiamate passano dai wrapper centralizzati **`apiUrl`/
+  `apiFetch`** — le 11 fetch, l'helper `postJson`, l'SSE e i link
+  di download. **Cross-origin con la stessa UI**: quando la base
+  punta a un'altra origine il blocco "Accesso con token API"
+  (etichetta, hint con `aria-describedby`, errore nel riquadro
+  esistente) sostituisce login e registrazione — il cookie
+  SameSite=Strict non viaggia — e il token (persistito in
+  localStorage, revocabile dal logout) viaggia come Bearer su
+  ogni richiesta; **l'SSE con token ripiega sul polling** (gli
+  EventSource non portano header: il ripiego era già nel
+  protocollo) e i **download passano da fetch+blob** (`bindApiLink`
+  con nome file suggerito; in stessa origine restano href
+  semplici). Nuovo **`deploy/nginx-mars.conf.example`** con i due
+  scenari dichiarati: A (consigliato) statici+proxy sulla stessa
+  origine — niente CORS, niente token obbligatorio, SSE con
+  `proxy_buffering off` — e B a origini diverse con `--cors` e
+  token; nota white-label (il bundle è il pacchetto da
+  brandizzare, P2). **Accessibilità riconfermata**: verifica
+  strumentale AT **31/31** sul combinato (il blocco token resta
+  nascosto in stessa origine: DOM invariato; i campi nuovi hanno
+  label e hint verificati dai test). 6 test strutturali in
+  `tests/test_frontend_separato.py` (base configurabile con
+  fonts-loader intatto, config.js prima di app.js, **nessuna
+  fetch o EventSource fuori dal wrapper** — regex sull'app.js —,
+  accesso token accessibile e commutabile, `node --check`,
+  esempio nginx coi due scenari): suite 402 test, flake8 pulito.
+
 - **Job con id, token Bearer, CORS e paginazione: contratto 1.3.0
   — FASE 2 CONCLUSA** (mars_api v0.2.0, 2026-08-06). Il **modello
   a risorse** della Fase 0: `POST /api/v1/audits` crea un job con
@@ -927,7 +958,12 @@ sono nel [README.md](README.md).
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.34.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.35.0 + `gui/`
+
+- **Bundle statico separato** (v2.35.0, 2026-08-06, branch
+  `devapi`): base API configurabile, accesso con token API
+  cross-origin, download via blob — dettaglio nella sezione
+  "API — contratto e registro" più sopra.
 
 - **Facciata sul motore server** (v2.34.0, 2026-08-06, branch
   `devapi`): il motore vive in `marsbeacon/api.py`, mars_gui
@@ -1470,7 +1506,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 396 test in ~30 secondi** (inclusa
+- **Suite pytest: 402 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
