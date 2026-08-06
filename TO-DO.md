@@ -79,17 +79,16 @@ in `deploy/`, AT 31/31 riconfermata.
 
 ### Fase 4 — Qualità, deploy, documentazione
 
-- [ ] E2E a origini separate nella suite: API su una porta,
-      frontend statico su un'altra, CORS attivo, ciclo completo
-      audit→referti via token.
-- [ ] Job CI dedicato (contract test + e2e separato); Pa11y
-      invariato sul frontend.
-- [ ] `docs/API.md` con esempi curl (audit, polling, referto in
-      un'altra lingua, soglie personalizzate); README aggiornato;
-      unit systemd `deploy/mars-api.service` (hardening delle unit
-      esistenti).
-- [ ] A migrazione della GUI completata: deprecazione dichiarata
-      degli alias `/api/*` legacy (mai rimozione silenziosa).
+**COMPLETATA il 2026-08-06 su `devapi`** (vedi AS-IS "API —
+contratto e registro"): e2e a origini separate nella suite, job
+CI "Contratto API", `docs/API.md` con gli esempi curl, unit
+systemd `deploy/mars-api.service`. **Il programma P1 API-first è
+concluso**; resta solo la voce condizionale qui sotto.
+
+- [ ] Migrazione della GUI dalle rotte legacy `/api/*` alle
+      `/api/v1` (job con id) e, a migrazione completata,
+      **deprecazione dichiarata degli alias legacy** nella spec
+      (data e sostituto per rotta — mai rimozione silenziosa).
 
 ## P2 — Interfaccia grafica (mars_gui.py)
 

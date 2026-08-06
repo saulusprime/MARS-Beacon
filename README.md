@@ -42,6 +42,7 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | [deploy/](deploy/) | Unit systemd per l'esecuzione come servizio automatico sulle macchine dei clienti |
 | [tools/update-lighthouse.sh](tools/update-lighthouse.sh) | Installa il fork di Google Lighthouse in `lighthouse/` (tag pinnato, build inclusa, mai nel repo) |
 | [tools/update-scalar.sh](tools/update-scalar.sh) | Vendorizza il lettore Scalar della spec OpenAPI in `gui/vendor/scalar/` (denylist telemetria, origini dichiarate) |
+| [docs/API.md](docs/API.md) | Guida rapida dell'API con esempi curl: token, job di audit, referti in ogni formato e lingua |
 | [docs/LIGHTHOUSE-FORK.md](docs/LIGHTHOUSE-FORK.md) | Strategia di manutenzione del fork: pin alla release, patch-set versionato, procedura di sync |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI GitHub Actions: flake8 + pytest multi-Python, job d'integrazione Lighthouse (Node + Chrome) e audit accessibilità Pa11y |
 | [tests/](tests/) | Suite pytest: unit test del nucleo numerico, fixture site locale, end-to-end CLI e GUI |
@@ -606,7 +607,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 402 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 403 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

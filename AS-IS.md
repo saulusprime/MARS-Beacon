@@ -693,6 +693,34 @@ sono nel [README.md](README.md).
 
 ## API — contratto e registro (programma P1, branch `devapi`)
 
+- **Qualità, deploy e documentazione — FASE 4 CONCLUSA: il
+  programma P1 API-first è COMPLETO** (2026-08-06; resta solo la
+  deprecazione degli alias legacy, condizionata alla futura
+  migrazione della GUI sulle rotte v1 — vedi TO-DO). **E2E a
+  origini separate nella suite** (`tests/test_e2e_separato.py`):
+  il bundle si distribuisce per copia con `MARS_API_BASE`
+  valorizzata in config.js, servito da un web server statico
+  qualunque su un'origine, l'API (`mars_api.Handler`) sull'altra
+  con CORS dichiarato — il ciclo completo registrazione → token →
+  `POST /api/v1/audits` → polling → referto `text` in **francese
+  on-demand** viaggia con header `Origin` + Bearer come farebbe
+  il browser, con l'ACAO verificato su ogni risposta, il
+  preflight OPTIONS, l'origine estranea senza header, e i due
+  server che rifiutano l'uno i file dell'altro. **Job CI
+  dedicato** "Contratto API" in `.github/workflows/ci.yml`
+  (contract test + bundle separato + e2e a due origini; Pa11y
+  invariato sul frontend). **`docs/API.md`**: guida rapida con
+  esempi curl — account e token, job con soglie/lang/fail_under,
+  polling e SSE (`curl -N`), referti in ogni formato e lingua,
+  storico paginato e confronti, oggetto d'errore uniforme, CORS e
+  assetto separato. **`deploy/mars-api.service`**: unit systemd
+  del server solo-API (hardening identico a mars-gui.service,
+  stessa nota Node/Chrome; database condivisibile con la GUI via
+  `MARS_GUI_DB`, i due server convivono su 8765/8766), validata
+  con `systemd-analyze verify` (unico rilievo: i percorsi
+  /opt/seorrf assenti in sviluppo, atteso). Suite 403 test,
+  flake8 pulito.
+
 - **Frontend statico separato — FASE 3 CONCLUSA** (GUI v2.35.0,
   2026-08-06). Il bundle `gui/` è **autonomo e configurabile**:
   `config.js` espone **`MARS_API_BASE`** (vuota di default: il
@@ -1506,7 +1534,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 402 test in ~30 secondi** (inclusa
+- **Suite pytest: 403 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
