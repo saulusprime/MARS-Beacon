@@ -5,7 +5,11 @@
 #   - /opt/seorrf con il progetto e venv (vedi mars-gui.service)
 #   - facoltativo /etc/seorrf/citations.env con ANTHROPIC_API_KEY:
 #     se presente, il giudizio LLM (--judge auto) parte da solo;
-#     senza chiave l'audit resta interamente offline
+#     senza chiave l'audit resta interamente offline. Per il
+#     giudizio multi-modello (--judge-models, v1.63.0) nello
+#     stesso file valgono anche OPENAI_API_KEY (ChatGPT),
+#     DASHSCOPE_API_KEY (Qwen) e MOONSHOT_API_KEY (Kimi): in
+#     auto partecipano i soli provider con la chiave presente
 #   - facoltativo, per l'audit Lighthouse (--lighthouse auto, gia'
 #     nell'ExecStart: senza requisiti viene saltato con motivo
 #     dichiarato nel referto):

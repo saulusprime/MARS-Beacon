@@ -192,6 +192,7 @@
   const PRESET_FIELDS = [
     "f-url", "f-max-pages", "f-delay", "f-max-body", "f-retries",
     "f-workers", "f-render", "f-market", "f-judge",
+    "f-jm-anthropic", "f-jm-openai", "f-jm-qwen", "f-jm-kimi",
     "f-search-check",
     "f-lighthouse", "f-lighthouse-device", "f-lighthouse-pages",
     "f-competitors", "f-robots", "f-robots-ack", "f-queries",
@@ -1179,6 +1180,18 @@
             "Non disponibile sul server: " + env.judge_reason +
             ". In auto il giudizio viene semplicemente saltato.";
         }
+        if (env.judge_providers) {
+          const mancanti = Object.values(env.judge_providers)
+            .filter((p) => !p.available)
+            .map((p) => p.label + " (" + p.reason + ")");
+          if (mancanti.length) {
+            el("h-judge-models").textContent =
+              "Un verdetto per modello sugli stessi passaggi; " +
+              "senza scelta vale Claude. Non disponibili sul " +
+              "server: " + mancanti.join("; ") + ". In auto " +
+              "vengono semplicemente saltati.";
+          }
+        }
         if (env.search_check_available === false) {
           el("h-search-check").textContent =
             "Non disponibile sul server: " +
@@ -1310,6 +1323,7 @@
       render: el("f-render").value,
       market: el("f-market").value,
       judge: el("f-judge").value,
+      judge_models: judgeModelsCsv(),
       lighthouse: el("f-lighthouse").value,
       lighthouse_device: el("f-lighthouse-device").value,
       lighthouse_pages: el("f-lighthouse-pages").valueAsNumber,
@@ -1325,6 +1339,22 @@
       robots_ack: el("f-robots-ack").checked,
       competitors: el("f-competitors").value,
     };
+  }
+
+  const JUDGE_MODEL_FIELDS = [
+    ["f-jm-anthropic", "anthropic"],
+    ["f-jm-openai", "openai"],
+    ["f-jm-qwen", "qwen"],
+    ["f-jm-kimi", "kimi"],
+  ];
+
+  /* Provider del giudizio scelti nel form, come CSV per l'API
+     (parita' con --judge-models); senza scelta vale Claude. */
+  function judgeModelsCsv() {
+    const scelti = JUDGE_MODEL_FIELDS
+      .filter(([id]) => el(id).checked)
+      .map(([, provider]) => provider);
+    return scelti.length ? scelti.join(",") : "anthropic";
   }
 
   /* ---------------- ciclo dell'audit ---------------- */
@@ -1528,7 +1558,9 @@
     renderLighthouseSummary(snap.summary);
     renderTopRilievi(snap.remediation || []);
     renderCitability(snap.summary || {});
-    renderJudge((snap.summary || {}).judge,
+    renderJudge((snap.summary || {}).judges
+      || ((snap.summary || {}).judge
+        ? [(snap.summary || {}).judge] : []),
       (snap.summary || {}).citability);
     renderFindings(snap.findings || [],
       (snap.summary || {}).delta);
@@ -2086,22 +2118,9 @@
     box.hidden = false;
   }
 
-  function renderJudge(judge, cit) {
-    const block = el("judge-block");
-    if (!judge) {
-      block.hidden = true;
-      return;
-    }
-    const intro = el("judge-intro");
-    const tableBox = el("judge-table-box");
-    const tbody = el("judge-table").querySelector("tbody");
-    tbody.textContent = "";
-    if (judge.status !== "ok") {
-      intro.textContent = "Non eseguito: " + (judge.reason || "");
-      tableBox.hidden = true;
-      block.hidden = false;
-      return;
-    }
+  /* Riga descrittiva di un esito del giudice: modello, media,
+     scarto dall'indice euristico e dal profilo corrispondente. */
+  function judgeIntroText(judge, cit) {
     let confronto = "";
     if (cit && cit.index !== null && cit.index !== undefined) {
       const scarto = judge.average - cit.index;
@@ -2111,11 +2130,24 @@
         (scarto >= 0 ? "+" : "") +
         scarto.toFixed(1).replace(".", ",") + ".";
     }
-    intro.textContent = "Modello " + judge.model + " su " +
-      judge.sampled + " passaggio/i · media " +
+    const profilo = cit && judge.profile &&
+      (cit.profiles || []).find(
+        (p) => p.key === judge.profile && p.score !== null);
+    if (profilo) {
+      const scartoP = judge.average - profilo.score;
+      confronto += " Profilo " + profilo.label + ": " +
+        profilo.score.toFixed(1).replace(".", ",") +
+        " — scarto giudice-profilo: " +
+        (scartoP >= 0 ? "+" : "") +
+        scartoP.toFixed(1).replace(".", ",") + ".";
+    }
+    return "Modello " + judge.model + " su " + judge.sampled +
+      " passaggio/i · media " +
       judge.average.toFixed(1).replace(".", ",") + "/100." +
       confronto;
-    el("judge-note").textContent = judge.note || "";
+  }
+
+  function fillJudgeRows(tbody, judge) {
     judge.verdicts.forEach((v) => {
       const row = document.createElement("tr");
       const query = document.createElement("td");
@@ -2132,7 +2164,61 @@
       row.appendChild(reason);
       tbody.appendChild(row);
     });
-    tableBox.hidden = false;
+  }
+
+  /* Esiti oltre il primo (multi-modello): tabella per modello
+     clonata da quella statica, o motivo del salto. */
+  function appendJudgeEntry(judge, cit, extra) {
+    const intro = document.createElement("p");
+    intro.className = "small text-muted mb-2";
+    if (judge.status !== "ok") {
+      intro.textContent = "Non eseguito: " + (judge.reason || "");
+      extra.appendChild(intro);
+      return;
+    }
+    intro.textContent = judgeIntroText(judge, cit);
+    extra.appendChild(intro);
+    const box = el("judge-table-box").cloneNode(true);
+    box.removeAttribute("id");
+    const table = box.querySelector("table");
+    table.removeAttribute("id");
+    const label = "Tabella del giudizio LLM (" + judge.model +
+      "), area scorrevole";
+    box.setAttribute("aria-label", label);
+    const caption = table.querySelector("caption");
+    caption.removeAttribute("id");
+    caption.textContent = "";
+    const tbody = table.querySelector("tbody");
+    tbody.textContent = "";
+    fillJudgeRows(tbody, judge);
+    box.hidden = false;
+    extra.appendChild(box);
+  }
+
+  function renderJudge(judges, cit) {
+    const block = el("judge-block");
+    const list = (judges || []).filter(Boolean);
+    const extra = el("judge-extra");
+    extra.textContent = "";
+    if (!list.length) {
+      block.hidden = true;
+      return;
+    }
+    const judge = list[0];
+    const intro = el("judge-intro");
+    const tableBox = el("judge-table-box");
+    const tbody = el("judge-table").querySelector("tbody");
+    tbody.textContent = "";
+    if (judge.status !== "ok") {
+      intro.textContent = "Non eseguito: " + (judge.reason || "");
+      tableBox.hidden = true;
+    } else {
+      intro.textContent = judgeIntroText(judge, cit);
+      el("judge-note").textContent = judge.note || "";
+      fillJudgeRows(tbody, judge);
+      tableBox.hidden = false;
+    }
+    list.slice(1).forEach((j) => appendJudgeEntry(j, cit, extra));
     block.hidden = false;
   }
 

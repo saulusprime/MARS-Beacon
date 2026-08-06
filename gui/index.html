@@ -395,11 +395,47 @@
                   <option value="off">Spento</option>
                 </select>
                 <small id="h-judge" class="form-text">
-                  Un modello (Claude) valuta i passaggi migliori
-                  con una sola richiesta API. Richiede
-                  ANTHROPIC_API_KEY sul server.
+                  I modelli scelti valutano i passaggi migliori,
+                  una richiesta API per modello. Chiavi solo
+                  dall'ambiente del server.
                 </small>
               </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <fieldset class="form-group"
+                        aria-describedby="h-judge-models">
+                <legend class="active h6 mb-1">Modelli del
+                  giudizio</legend>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox"
+                         id="f-jm-anthropic" checked>
+                  <label class="form-check-label"
+                         for="f-jm-anthropic">Claude</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox"
+                         id="f-jm-openai">
+                  <label class="form-check-label"
+                         for="f-jm-openai">ChatGPT</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox"
+                         id="f-jm-qwen">
+                  <label class="form-check-label"
+                         for="f-jm-qwen">Qwen</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox"
+                         id="f-jm-kimi">
+                  <label class="form-check-label"
+                         for="f-jm-kimi">Kimi</label>
+                </div>
+                <small id="h-judge-models" class="form-text">
+                  Un verdetto per modello sugli stessi passaggi;
+                  senza scelta vale Claude. In auto partecipano
+                  solo i provider con la chiave sul server.
+                </small>
+              </fieldset>
             </div>
           </div>
 
@@ -856,6 +892,7 @@
             <tbody></tbody>
           </table>
         </div>
+        <div id="judge-extra"></div>
       </div>
 
       <div id="surface-math-block" hidden>

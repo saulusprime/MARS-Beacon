@@ -93,6 +93,8 @@ _HTML_I18N: Dict[str, Dict[str, str]] = {
         "judge.h": "Giudizio LLM sulla citabilita'",
         "judge.compare": " Indice euristico: %.1f — scarto "
                          "giudice-euristica: %+.1f.",
+        "judge.profile": " Profilo %s: %.1f — scarto "
+                         "giudice-profilo: %+.1f.",
         "judge.meta": "Modello <code>%s</code> su %d passaggio/i "
                       "&middot; media <b>%.1f</b>/100.%s %s",
         "judge.query": "Query",
@@ -286,6 +288,8 @@ _HTML_I18N: Dict[str, Dict[str, str]] = {
         "judge.h": "LLM judgement on citability",
         "judge.compare": " Heuristic index: %.1f — judge-heuristic "
                          "gap: %+.1f.",
+        "judge.profile": " Profile %s: %.1f — judge-profile "
+                         "gap: %+.1f.",
         "judge.meta": "Model <code>%s</code> on %d passage(s) "
                       "&middot; average <b>%.1f</b>/100.%s %s",
         "judge.query": "Query",
@@ -476,6 +480,8 @@ _HTML_I18N: Dict[str, Dict[str, str]] = {
         "judge.h": "Jugement LLM sur la citabilité",
         "judge.compare": " Indice heuristique : %.1f — écart "
                          "juge-heuristique : %+.1f.",
+        "judge.profile": " Profil %s : %.1f — écart "
+                         "juge-profil : %+.1f.",
         "judge.meta": "Modèle <code>%s</code> sur %d passage(s) "
                       "&middot; moyenne <b>%.1f</b>/100.%s %s",
         "judge.query": "Requête",
@@ -678,6 +684,8 @@ _HTML_I18N: Dict[str, Dict[str, str]] = {
         "judge.h": "LLM-Urteil zur Zitierbarkeit",
         "judge.compare": " Heuristischer Index: %.1f — Abstand "
                          "Richter-Heuristik: %+.1f.",
+        "judge.profile": " Profil %s: %.1f — Abstand "
+                         "Richter-Profil: %+.1f.",
         "judge.meta": "Modell <code>%s</code> auf %d Passage(n) "
                       "&middot; Durchschnitt <b>%.1f</b>/100.%s "
                       "%s",
@@ -884,6 +892,8 @@ _HTML_I18N: Dict[str, Dict[str, str]] = {
         "judge.h": "Juicio LLM sobre la citabilidad",
         "judge.compare": " Índice heurístico: %.1f — brecha "
                          "juez-heurística: %+.1f.",
+        "judge.profile": " Perfil %s: %.1f — brecha "
+                         "juez-perfil: %+.1f.",
         "judge.meta": "Modelo <code>%s</code> sobre %d "
                       "pasaje(s) &middot; media "
                       "<b>%.1f</b>/100.%s %s",
@@ -5232,6 +5242,8 @@ _FRAME_I18N: Dict[str, Dict[str, str]] = {
         "%+.1f":
             "  Indice heuristique : %.1f — écart "
             "juge-heuristique : %+.1f",
+        "  Profilo %s: %.1f — scarto giudice-profilo: %+.1f":
+            "  Profil %s : %.1f — écart juge-profil : %+.1f",
         "errore: %s": "erreur : %s",
         "    Trasversale: deprime %d profili di citabilita' "
         "(risolto vale +%.1f sull'indice)":
@@ -5379,6 +5391,8 @@ _FRAME_I18N: Dict[str, Dict[str, str]] = {
         "%+.1f":
             "  Heuristischer Index: %.1f — Abstand "
             "Richter-Heuristik: %+.1f",
+        "  Profilo %s: %.1f — scarto giudice-profilo: %+.1f":
+            "  Profil %s: %.1f — Abstand Richter-Profil: %+.1f",
         "errore: %s": "Fehler: %s",
         "    Trasversale: deprime %d profili di citabilita' "
         "(risolto vale +%.1f sull'indice)":
@@ -5529,6 +5543,8 @@ _FRAME_I18N: Dict[str, Dict[str, str]] = {
         "%+.1f":
             "  Índice heurístico: %.1f — brecha "
             "juez-heurística: %+.1f",
+        "  Profilo %s: %.1f — scarto giudice-profilo: %+.1f":
+            "  Perfil %s: %.1f — brecha juez-perfil: %+.1f",
         "errore: %s": "error: %s",
         "    Trasversale: deprime %d profili di citabilita' "
         "(risolto vale +%.1f sull'indice)":

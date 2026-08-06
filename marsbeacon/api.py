@@ -72,7 +72,7 @@ from marsbeacon.i18n import HTML_LANGS
 # 1.4.0 dichiara DEPRECATE le cinque rotte legacy del ciclo audit
 # (audit/status/cancel/events/report), sostituite dalle /api/v1 —
 # gli alias restano attivi, mai rimozione silenziosa.
-API_CONTRACT_VERSION = "1.4.0"
+API_CONTRACT_VERSION = "1.5.0"
 
 
 # Nome del cookie di sessione: fa parte del contratto (schema di
@@ -375,6 +375,17 @@ AUDIT_REQUEST_SCHEMA: Dict[str, object] = {
         "judge": {"type": "string",
                   "enum": list(JUDGE_MODES),
                   "default": "auto"},
+        "judge_models": {
+            "type": "string",
+            "default": "anthropic",
+            "description": "Modelli del giudizio LLM, separati "
+                           "da virgola: 'provider' o "
+                           "'provider:modello' fra anthropic, "
+                           "openai, qwen, kimi (parita' con "
+                           "--judge-models della CLI). Chiavi "
+                           "solo dall'ambiente del server; in "
+                           "'auto' partecipano i soli provider "
+                           "con la chiave presente."},
         "lighthouse": {"type": "string",
                        "enum": list(LIGHTHOUSE_MODES),
                        "default": "off"},
@@ -501,6 +512,13 @@ ROUTES: Tuple[Route, ...] = (
                     "render_available": {"type": "boolean"},
                     "judge_available": {"type": "boolean"},
                     "judge_reason": {"type": "string"},
+                    "judge_providers": {
+                        "type": "object",
+                        "description": "Disponibilita' per "
+                                       "provider del giudizio "
+                                       "LLM multi-modello: "
+                                       "label, available, "
+                                       "reason, model."},
                     "lighthouse_available": {"type": "boolean"},
                     "lighthouse_reason": {"type": "string"},
                     "lighthouse_version": {"type": "string"},
@@ -514,6 +532,7 @@ ROUTES: Tuple[Route, ...] = (
                     "suggested_max_body_mb",
                     "embeddings_available", "render_available",
                     "judge_available", "judge_reason",
+                    "judge_providers",
                     "lighthouse_available", "lighthouse_reason",
                     "lighthouse_version",
                     "search_check_available",
@@ -1890,6 +1909,7 @@ def _render_report(ctx: Dict[str, object], fmt: str,
     canonico in italiano.
     """
     comuni = dict(market=ctx["market"], judge=ctx["judge"],
+                  judges=ctx.get("judges"),
                   delta=ctx["delta"],
                   lighthouse=ctx["lighthouse"],
                   search_check=ctx["search"])
@@ -2024,8 +2044,13 @@ class Job:
                     delay=float(cfg["delay"]),
                     verbose=True,
                     stop_event=self.stop_event)
-                judge = sra.run_judge(results, pages, judge_mode,
-                                      verbose=True)
+                judges = sra.run_judges(
+                    results, pages, judge_mode,
+                    list(cfg.get("judge_models")
+                         or [(p, "")
+                             for p in sra.DEFAULT_JUDGE_MODELS]),
+                    verbose=True)
+                judge = judges[0] if judges else None
                 search = sra.run_search_check(
                     str(cfg["url"]), results,
                     str(cfg.get("search_check",
@@ -2075,7 +2100,7 @@ class Job:
             "base": base, "pages": pages, "findings": findings,
             "scores": scores, "results": results, "mode": mode,
             "k": k, "competitive": competitive, "market": market,
-            "judge": judge, "delta": delta,
+            "judge": judge, "judges": judges, "delta": delta,
             "lighthouse": lighthouse_block, "search": search,
             "lang": lang, "soglie": soglie,
             "rrf_params": {
@@ -2113,6 +2138,7 @@ class Job:
             "citability_actions": sra.citability_top_actions(
                 findings, pages, scores, market),
             "judge": judge,
+            "judges": judges,
             "lighthouse": lighthouse_block,
             "search_check": search,
             "delta": delta,
@@ -2335,12 +2361,20 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
     judge = str(raw.get("judge", sra.DEFAULT_JUDGE)).strip().lower()
     if judge not in sra.JUDGE_MODES:
         return None, "Valore non valido per 'judge'."
+    judge_models, jm_err = sra.parse_judge_models(
+        str(raw.get("judge_models",
+                    ",".join(sra.DEFAULT_JUDGE_MODELS))))
+    if jm_err:
+        return None, "Valore non valido per 'judge_models': %s." \
+            % jm_err
     if judge == sra.JUDGE_ON:
-        judge_reason = sra.judge_unavailable()
-        if judge_reason:
-            return None, ("Giudizio LLM obbligatorio ma non "
-                          "disponibile sul server: %s."
-                          % judge_reason)
+        motivi = [(prov, sra.judge_unavailable(prov))
+                  for prov, _ in judge_models]
+        if all(reason for _, reason in motivi):
+            return None, ("Giudizio LLM obbligatorio ma nessun "
+                          "provider disponibile sul server: %s."
+                          % "; ".join("%s: %s" % coppia
+                                      for coppia in motivi))
 
     lighthouse = str(raw.get("lighthouse",
                              sra.LIGHTHOUSE_OFF)).strip().lower()
@@ -2451,6 +2485,7 @@ def validate_config(raw: Dict[str, object]) -> Tuple[
         "robots": robots,
         "market": market,
         "judge": judge,
+        "judge_models": judge_models,
         "lighthouse": lighthouse,
         "lighthouse_pages": int(lighthouse_pages),
         "lighthouse_device": lighthouse_device,
@@ -2640,6 +2675,17 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "judge_available":
                     sra.judge_unavailable() is None,
                 "judge_reason": sra.judge_unavailable() or "",
+                "judge_providers": {
+                    prov: {
+                        "label": spec["label"],
+                        "model": spec["model"],
+                        "available":
+                            sra.judge_unavailable(prov) is None,
+                        "reason":
+                            sra.judge_unavailable(prov) or "",
+                    }
+                    for prov, spec
+                    in sorted(sra.JUDGE_PROVIDERS.items())},
                 "lighthouse_available": lighthouse_reason is None,
                 "lighthouse_reason": lighthouse_reason or "",
                 "lighthouse_version": sra.lighthouse_version() or "",

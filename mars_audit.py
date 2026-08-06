@@ -134,6 +134,7 @@ from marsbeacon.base import (  # noqa: F401
 from marsbeacon.base import (  # noqa: F401
     DEFAULT_EMBEDDINGS_MODEL,
     DEFAULT_JUDGE,
+    DEFAULT_JUDGE_MODELS,
     DEFAULT_LIGHTHOUSE_PAGES,
     DEFAULT_MARKET)
 from marsbeacon.base import (  # noqa: F401
@@ -187,6 +188,7 @@ from marsbeacon.base import (  # noqa: F401
     JUDGE_CHUNK_CHARS,
     JUDGE_MAX_CHUNKS)
 from marsbeacon.base import (  # noqa: F401
+    JUDGE_HTTP_TIMEOUT_S,
     JUDGE_MAX_TOKENS,
     JUDGE_MODEL,
     JUDGE_MODES,
@@ -194,6 +196,8 @@ from marsbeacon.base import (  # noqa: F401
 from marsbeacon.base import (  # noqa: F401
     JUDGE_OFF,
     JUDGE_ON,
+    JUDGE_PROVIDER_ANTHROPIC,
+    JUDGE_PROVIDERS,
     LIFECYCLE_HINTS,
     LIFECYCLE_SECTIONS)
 from marsbeacon.base import (  # noqa: F401
@@ -372,6 +376,8 @@ from marsbeacon.audits import (  # noqa: F401
     _citability_gains,
     _finding_key,
     _jsonld_nodes,
+    _judge_call_anthropic,
+    _judge_call_openai_compat,
     _judge_prompt)
 from marsbeacon.audits import (  # noqa: F401
     _judge_sample,
@@ -425,9 +431,11 @@ from marsbeacon.audits import (  # noqa: F401
     node_version,
     overall_score,
     parse_gsc_queries,
+    parse_judge_models,
     read_history_last)
 from marsbeacon.audits import (  # noqa: F401
     run_judge,
+    run_judges,
     run_lighthouse,
     run_search_check,
     search_check_unavailable)
@@ -830,8 +838,26 @@ def build_parser() -> argparse.ArgumentParser:
                              "(default) lo esegue se la chiave e' "
                              "presente, 'on' lo pretende (errore "
                              "senza chiave), 'off' lo disattiva. "
-                             "Una sola richiesta API per audit, "
-                             "con costi a carico della chiave")
+                             "Una richiesta API per modello "
+                             "richiesto (vedi --judge-models), "
+                             "con costi a carico delle chiavi")
+    parser.add_argument("--judge-models", default=None,
+                        dest="judge_models", metavar="LISTA",
+                        help="modelli del giudizio LLM, separati "
+                             "da virgola: 'provider' o "
+                             "'provider:modello' fra %s (default "
+                             "'%s'). Chiavi solo dall'ambiente "
+                             "(ANTHROPIC_API_KEY, OPENAI_API_KEY, "
+                             "DASHSCOPE_API_KEY, "
+                             "MOONSHOT_API_KEY); altri servizi "
+                             "OpenAI-compatibili sovrascrivendo "
+                             "l'endpoint con la variabile "
+                             "*_BASE_URL del provider. In 'auto' "
+                             "partecipano solo i provider con la "
+                             "chiave presente; 'on' pretende "
+                             "almeno un provider disponibile"
+                             % (", ".join(sorted(JUDGE_PROVIDERS)),
+                                ",".join(DEFAULT_JUDGE_MODELS)))
     parser.add_argument("--search-check",
                         choices=SEARCH_CHECK_MODES,
                         default=SEARCH_CHECK_AUTO,
@@ -999,11 +1025,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         robots_mode = ROBOTS_OWN
     else:
         robots_mode = ROBOTS_RESPECT
+    judge_models, jm_err = parse_judge_models(
+        args.judge_models if args.judge_models is not None
+        else ",".join(DEFAULT_JUDGE_MODELS))
+    if jm_err:
+        print("--judge-models: %s" % jm_err, file=sys.stderr)
+        return 2
     if args.judge == JUDGE_ON:
-        judge_reason = judge_unavailable()
-        if judge_reason:
-            print("--judge on richiede il giudizio LLM: %s"
-                  % judge_reason, file=sys.stderr)
+        motivi = [(prov, judge_unavailable(prov))
+                  for prov, _ in judge_models]
+        if all(reason for _, reason in motivi):
+            print("--judge on richiede almeno un provider del "
+                  "giudizio LLM disponibile: %s"
+                  % "; ".join("%s: %s" % coppia
+                              for coppia in motivi),
+                  file=sys.stderr)
             return 2
     if not (LIGHTHOUSE_PAGES_MIN <= args.lighthouse_pages
             <= LIGHTHOUSE_PAGES_MAX):
@@ -1119,8 +1155,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         scores[AREA_LIGHTHOUSE] = lighthouse_score
     lighthouse_block = lighthouse_report_data(lighthouse_data)
 
-    judge_data = run_judge(results, pages, args.judge,
-                           verbose=not args.quiet)
+    judges_data = run_judges(results, pages, args.judge,
+                             judge_models,
+                             verbose=not args.quiet)
+    judge_data = judges_data[0] if judges_data else None
     search_data = run_search_check(base, results,
                                    args.search_check,
                                    verbose=not args.quiet)
@@ -1154,7 +1192,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     report = renderers[args.format](
         base, pages, findings, scores, results, mode, args.rrf_k,
         competitive, market=args.market, judge=judge_data,
-        delta=delta, lighthouse=lighthouse_block,
+        judges=judges_data, delta=delta,
+        lighthouse=lighthouse_block,
         search_check=search_data, **extra)
 
     if args.output:

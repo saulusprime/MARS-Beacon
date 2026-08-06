@@ -24,6 +24,9 @@ VERDETTI_JSON = json.dumps([
 # Stato modificato dai test per simulare i vari esiti.
 RESPONSE_MODE = {"mode": "ok"}
 
+# Stato del server OpenAI-compatibile finto (multi-modello).
+OAI_MODE = {"mode": "ok"}
+
 
 def _fake_message():
     if RESPONSE_MODE["mode"] == "refusal":
@@ -58,6 +61,46 @@ class FakeAnthropicHandler(BaseHTTPRequestHandler):
 def fake_anthropic():
     server = ThreadingHTTPServer(("127.0.0.1", 0),
                                  FakeAnthropicHandler)
+    threading.Thread(target=server.serve_forever,
+                     daemon=True).start()
+    yield "http://127.0.0.1:%d" % server.server_address[1]
+    server.shutdown()
+
+
+class FakeOpenAiCompatHandler(BaseHTTPRequestHandler):
+    """Chat completions OpenAI-compatibile: ChatGPT, Qwen, Kimi."""
+
+    def do_POST(self):  # noqa: N802 - firma di BaseHTTPServer
+        length = int(self.headers.get("Content-Length", "0"))
+        self.rfile.read(length)
+        if OAI_MODE["mode"] == "http500":
+            self.send_response(500)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        testo = (VERDETTI_JSON if OAI_MODE["mode"] == "ok"
+                 else "non sono JSON")
+        body = json.dumps({
+            "id": "cmpl", "object": "chat.completion",
+            "model": "gpt-5.6",
+            "choices": [{"index": 0, "finish_reason": "stop",
+                         "message": {"role": "assistant",
+                                     "content": testo}}],
+        }).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):
+        pass
+
+
+@pytest.fixture(scope="module")
+def fake_openai():
+    server = ThreadingHTTPServer(("127.0.0.1", 0),
+                                 FakeOpenAiCompatHandler)
     threading.Thread(target=server.serve_forever,
                      daemon=True).start()
     yield "http://127.0.0.1:%d" % server.server_address[1]
@@ -165,6 +208,80 @@ def test_json_malformato_errore_gestito(monkeypatch,
     assert "non interpretabile" in esito["reason"]
 
 
+# ---------------- multi-modello (P4) ----------------
+
+def _attiva_openai(monkeypatch, fake_openai):
+    monkeypatch.setenv("OPENAI_API_KEY", "chiave-di-prova")
+    monkeypatch.setenv("OPENAI_BASE_URL", fake_openai)
+
+
+def test_parse_judge_models():
+    coppie, err = sra.parse_judge_models("anthropic,openai:gpt-x")
+    assert err is None
+    assert coppie == [("anthropic", ""), ("openai", "gpt-x")]
+    _, err = sra.parse_judge_models("gemini")
+    assert "sconosciuto" in err
+    _, err = sra.parse_judge_models("openai,openai")
+    assert "ripetuto" in err
+    _, err = sra.parse_judge_models("")
+    assert "nessun provider" in err
+
+
+def test_multi_modello_verdetti_da_due_provider(
+        monkeypatch, fake_anthropic, fake_openai):
+    _attiva(monkeypatch, fake_anthropic)
+    _attiva_openai(monkeypatch, fake_openai)
+    RESPONSE_MODE["mode"] = "ok"
+    OAI_MODE["mode"] = "ok"
+    pages = _pages_con_chunk()
+    esiti = sra.run_judges(_results(pages), pages,
+                           models=[("anthropic", ""),
+                                   ("openai", "")])
+    assert [e["status"] for e in esiti] == ["ok", "ok"]
+    assert esiti[0]["provider"] == "anthropic"
+    assert esiti[0]["profile"] == "claude"
+    assert esiti[1]["provider"] == "openai"
+    assert esiti[1]["profile"] == "chatgpt"
+    assert esiti[1]["model"] == "gpt-5.6"
+    # Stessa campionatura per tutti: verdetti confrontabili.
+    assert esiti[0]["average"] == esiti[1]["average"] == 61.0
+
+
+def test_multi_modello_errore_di_uno_non_ferma_gli_altri(
+        monkeypatch, fake_anthropic, fake_openai):
+    _attiva(monkeypatch, fake_anthropic)
+    _attiva_openai(monkeypatch, fake_openai)
+    RESPONSE_MODE["mode"] = "ok"
+    OAI_MODE["mode"] = "http500"
+    pages = _pages_con_chunk()
+    esiti = sra.run_judges(_results(pages), pages,
+                           models=[("openai", ""),
+                                   ("anthropic", "")])
+    OAI_MODE["mode"] = "ok"
+    assert esiti[0]["status"] == "error"
+    assert "HTTP 500" in esiti[0]["reason"]
+    assert esiti[1]["status"] == "ok"
+
+
+def test_multi_modello_salto_dichiarato_senza_chiave(
+        monkeypatch, fake_anthropic):
+    _attiva(monkeypatch, fake_anthropic)
+    RESPONSE_MODE["mode"] = "ok"
+    pages = _pages_con_chunk()
+    esiti = sra.run_judges(_results(pages), pages,
+                           models=[("anthropic", ""),
+                                   ("qwen", "")])
+    assert esiti[0]["status"] == "ok"
+    assert esiti[1]["status"] == "skipped"
+    assert "DASHSCOPE_API_KEY" in esiti[1]["reason"]
+    assert esiti[1]["label"] == "Qwen (Alibaba)"
+
+
+def test_cli_judge_models_sconosciuto_esce_con_2(site):
+    rc = sra.main([site, "--judge-models", "gemini", "--quiet"])
+    assert rc == 2
+
+
 # ---------------- referti ----------------
 
 def _giudizio_ok():
@@ -209,3 +326,48 @@ def test_referto_dichiara_il_giudizio_saltato():
         "https://sito.test", _pages_con_chunk(), [], _scores(),
         [], "char-tfidf", judge=None)
     assert "GIUDIZIO LLM" not in testo_off
+
+
+def test_referti_multi_modello_con_scarto_di_profilo():
+    pages = _pages_con_chunk()
+    g1 = dict(_giudizio_ok(), provider="anthropic",
+              profile="claude")
+    g2 = dict(_giudizio_ok(), provider="openai",
+              profile="chatgpt", model="gpt-5.6", average=70.0)
+    testo = sra.render_text("https://sito.test", pages, [],
+                            _scores(), [], "char-tfidf",
+                            judge=g1, judges=[g1, g2])
+    assert testo.count("Modello:") == 2
+    assert "gpt-5.6" in testo
+    assert "scarto giudice-profilo" in testo
+    # La nota di onesta' del giudice compare una sola volta.
+    assert testo.count(sra.JUDGE_NOTE[:40]) == 1
+    pagina = sra.render_html("https://sito.test", pages, [],
+                             _scores(), [], "char-tfidf",
+                             judge=g1, judges=[g1, g2])
+    assert "gpt-5.6" in pagina
+    assert "scarto giudice-profilo" in pagina
+    md = sra.render_markdown("https://sito.test", pages, [],
+                             _scores(), [], "char-tfidf",
+                             judge=g1, judges=[g1, g2])
+    assert md.count("Modello `") == 2
+    payload = json.loads(sra.render_json(
+        "https://sito.test", pages, [], _scores(), [],
+        "char-tfidf", judge=g1, judges=[g1, g2]))
+    assert payload["judge"]["model"] == "claude-opus-5"
+    assert payload["judges"][1]["model"] == "gpt-5.6"
+    assert payload["judges"][1]["provider"] == "openai"
+
+
+def test_referto_multi_modello_salto_di_un_solo_provider():
+    g1 = _giudizio_ok()
+    g2 = {"status": "skipped", "provider": "kimi",
+          "label": "Kimi (Moonshot AI)",
+          "reason": "variabile d'ambiente MOONSHOT_API_KEY "
+                    "assente"}
+    testo = sra.render_text(
+        "https://sito.test", _pages_con_chunk(), [], _scores(),
+        [], "char-tfidf", judges=[g1, g2])
+    assert "Modello: claude-opus-5" in testo
+    assert "Non eseguito: variabile d'ambiente " \
+           "MOONSHOT_API_KEY assente" in testo

@@ -55,6 +55,7 @@ from marsbeacon.base import (
     CROSS_GAIN_MIN,
     Chunk,
     DEFAULT_JUDGE,
+    DEFAULT_JUDGE_MODELS,
     DEFAULT_LIGHTHOUSE_PAGES,
     DEFAULT_MARKET,
     DEFAULT_TOP_N,
@@ -88,11 +89,14 @@ from marsbeacon.base import (
     JSONLD_URL_KEYS,
     JSON_SCHEMA_VERSION,
     JUDGE_CHUNK_CHARS,
+    JUDGE_HTTP_TIMEOUT_S,
     JUDGE_MAX_CHUNKS,
     JUDGE_MAX_TOKENS,
     JUDGE_MODEL,
     JUDGE_NOTE,
     JUDGE_OFF,
+    JUDGE_PROVIDER_ANTHROPIC,
+    JUDGE_PROVIDERS,
     LIFECYCLE_HINTS,
     LIFECYCLE_SECTIONS,
     LIGHTHOUSE_CLI,
@@ -3556,17 +3560,24 @@ def append_history(path: str, payload: Dict[str, object]) -> None:
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def judge_unavailable() -> Optional[str]:
+def judge_unavailable(
+        provider: str = JUDGE_PROVIDER_ANTHROPIC) -> Optional[str]:
     """None se il giudizio LLM puo' funzionare, altrimenti il motivo.
 
-    Stessa infrastruttura del monitor citazioni: SDK ufficiale
-    anthropic e chiave solo dalla variabile d'ambiente
-    ANTHROPIC_API_KEY (mai da riga di comando).
+    Stessa infrastruttura del monitor citazioni: chiavi solo dalle
+    variabili d'ambiente (mai da riga di comando). Il provider
+    'anthropic' usa l'SDK ufficiale; gli altri (registro
+    JUDGE_PROVIDERS) parlano HTTP con API OpenAI-compatibili e non
+    richiedono SDK.
     """
-    if importlib.util.find_spec("anthropic") is None:
+    spec = JUDGE_PROVIDERS.get(provider)
+    if spec is None:
+        return "provider '%s' sconosciuto" % provider
+    if provider == JUDGE_PROVIDER_ANTHROPIC \
+            and importlib.util.find_spec("anthropic") is None:
         return "SDK anthropic non installato (pip install anthropic)"
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return "variabile d'ambiente ANTHROPIC_API_KEY assente"
+    if not os.environ.get(str(spec["env"])):
+        return "variabile d'ambiente %s assente" % spec["env"]
     return None
 
 
@@ -3613,36 +3624,13 @@ def _judge_prompt(sample: Sequence[Tuple[str, "Chunk"]]) -> str:
     return "\n\n".join(parts)
 
 
-def run_judge(results: Sequence[QueryResult],
-              pages: Sequence[Page],
-              mode: str = DEFAULT_JUDGE,
-              verbose: bool = False,
-              model: str = JUDGE_MODEL) -> Optional[Dict[str, object]]:
-    """Giudizio LLM sulla citabilita' dei passaggi migliori.
+class _JudgeCallError(Exception):
+    """Errore gestito di una chiamata al provider del giudice."""
 
-    Passo separato dopo run_audit(): l'audit in se' non contatta
-    mai l'API. Restituisce None con mode=off; altrimenti un dict
-    con status "ok" (verdetti e media), "skipped" (motivo) o
-    "error" (motivo). Gli errori API non interrompono mai il
-    referto. Una sola richiesta per audit.
-    """
-    if mode == JUDGE_OFF:
-        return None
-    reason = judge_unavailable()
-    if reason:
-        if verbose:
-            print("Giudizio LLM saltato: %s" % reason,
-                  file=sys.stderr)
-        return {"status": "skipped", "reason": reason}
-    sample = _judge_sample(results, pages)
-    if not sample:
-        return {"status": "skipped",
-                "reason": "nessun passaggio recuperato dalla "
-                          "simulazione RRF da giudicare"}
-    if verbose:
-        print("Giudizio LLM su %d passaggi (%s)..."
-              % (len(sample), model), file=sys.stderr)
 
+def _judge_call_anthropic(prompt: str,
+                          model: str) -> Tuple[str, str]:
+    """(testo, modello effettivo) da Claude via SDK ufficiale."""
     import anthropic
     kwargs: Dict[str, object] = {}
     base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
@@ -3655,19 +3643,117 @@ def run_judge(results: Sequence[QueryResult],
             max_tokens=JUDGE_MAX_TOKENS,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
-            messages=[{"role": "user",
-                       "content": _judge_prompt(sample)}],
+            messages=[{"role": "user", "content": prompt}],
         )
     except anthropic.APIError as exc:
-        return {"status": "error",
-                "reason": "errore API Anthropic: %s" % exc}
+        raise _JudgeCallError("errore API Anthropic: %s" % exc)
     if getattr(resp, "stop_reason", "") == "refusal":
-        return {"status": "error",
-                "reason": "richiesta declinata dai classificatori "
-                          "di sicurezza"}
-
+        raise _JudgeCallError("richiesta declinata dai "
+                              "classificatori di sicurezza")
     text = "".join(getattr(b, "text", "") or ""
                    for b in getattr(resp, "content", []) or [])
+    return text, str(getattr(resp, "model", model) or model)
+
+
+def _judge_call_openai_compat(provider: str, prompt: str,
+                              model: str) -> Tuple[str, str]:
+    """(testo, modello effettivo) da un'API OpenAI-compatibile.
+
+    Copre ChatGPT, Qwen (DashScope in modalita' compatibile),
+    Kimi (Moonshot) e qualunque altro servizio compatibile:
+    l'endpoint del registro e' sovrascrivibile con la variabile
+    d'ambiente dedicata (server finti nei test). HTTP puro con
+    ``requests``, nessun SDK.
+    """
+    spec = JUDGE_PROVIDERS[provider]
+    endpoint = (os.environ.get(str(spec["endpoint_env"]), "")
+                or str(spec["endpoint"]))
+    try:
+        resp = requests.post(
+            endpoint,
+            headers={"Authorization": "Bearer %s"
+                     % os.environ.get(str(spec["env"]), "")},
+            json={"model": model,
+                  "max_tokens": JUDGE_MAX_TOKENS,
+                  "messages": [{"role": "user",
+                                "content": prompt}]},
+            timeout=JUDGE_HTTP_TIMEOUT_S)
+    except requests.RequestException as exc:
+        raise _JudgeCallError("errore di rete %s: %s"
+                              % (provider, exc))
+    if resp.status_code != 200:
+        raise _JudgeCallError("HTTP %d da %s"
+                              % (resp.status_code, provider))
+    try:
+        data = resp.json()
+        choice = (data.get("choices") or [])[0]
+        text = str((choice.get("message") or {}).get("content")
+                   or "")
+        if (choice.get("finish_reason") == "content_filter"
+                or not text):
+            raise _JudgeCallError("risposta vuota o filtrata "
+                                  "da %s" % provider)
+    except (ValueError, IndexError, AttributeError, TypeError):
+        raise _JudgeCallError("risposta di %s non riconosciuta"
+                              % provider)
+    return text, str(data.get("model") or model)
+
+
+def run_judge(results: Sequence[QueryResult],
+              pages: Sequence[Page],
+              mode: str = DEFAULT_JUDGE,
+              verbose: bool = False,
+              model: str = "",
+              provider: str = JUDGE_PROVIDER_ANTHROPIC
+              ) -> Optional[Dict[str, object]]:
+    """Giudizio LLM sulla citabilita' dei passaggi migliori.
+
+    Passo separato dopo run_audit(): l'audit in se' non contatta
+    mai l'API. Restituisce None con mode=off; altrimenti un dict
+    con status "ok" (verdetti e media), "skipped" (motivo) o
+    "error" (motivo). Gli errori API non interrompono mai il
+    referto. Una sola richiesta per provider; prompt, campione e
+    formato di risposta sono identici per tutti i provider, cosi'
+    i verdetti restano confrontabili.
+    """
+    if mode == JUDGE_OFF:
+        return None
+    spec = JUDGE_PROVIDERS.get(provider, {})
+    esito: Dict[str, object] = {
+        "provider": provider,
+        "label": spec.get("label", provider),
+        "profile": spec.get("profile"),
+    }
+    model = model or str(spec.get("model") or JUDGE_MODEL)
+    reason = judge_unavailable(provider)
+    if reason:
+        if verbose:
+            print("Giudizio LLM (%s) saltato: %s"
+                  % (provider, reason), file=sys.stderr)
+        esito.update({"status": "skipped", "reason": reason})
+        return esito
+    sample = _judge_sample(results, pages)
+    if not sample:
+        esito.update({
+            "status": "skipped",
+            "reason": "nessun passaggio recuperato dalla "
+                      "simulazione RRF da giudicare"})
+        return esito
+    if verbose:
+        print("Giudizio LLM su %d passaggi (%s)..."
+              % (len(sample), model), file=sys.stderr)
+
+    prompt = _judge_prompt(sample)
+    try:
+        if provider == JUDGE_PROVIDER_ANTHROPIC:
+            text, used = _judge_call_anthropic(prompt, model)
+        else:
+            text, used = _judge_call_openai_compat(provider,
+                                                   prompt, model)
+    except _JudgeCallError as exc:
+        esito.update({"status": "error", "reason": str(exc)})
+        return esito
+
     start, end = text.find("["), text.rfind("]")
     try:
         raw = json.loads(text[start:end + 1])
@@ -3690,19 +3776,79 @@ def run_judge(results: Sequence[QueryResult],
             raise ValueError("nessun verdetto riconosciuto")
     except (ValueError, KeyError, TypeError,
             json.JSONDecodeError) as exc:
-        return {"status": "error",
-                "reason": "risposta del modello non interpretabile "
-                          "(%s)" % exc}
+        esito.update({
+            "status": "error",
+            "reason": "risposta del modello non interpretabile "
+                      "(%s)" % exc})
+        return esito
     average = round(sum(float(v["score"]) for v in verdicts)
                     / len(verdicts), 1)
-    return {
+    esito.update({
         "status": "ok",
-        "model": getattr(resp, "model", model) or model,
+        "model": used,
         "sampled": len(verdicts),
         "average": average,
         "verdicts": verdicts,
         "note": JUDGE_NOTE,
-    }
+    })
+    return esito
+
+
+def parse_judge_models(raw: str) -> Tuple[List[Tuple[str, str]],
+                                          Optional[str]]:
+    """(lista di (provider, modello), errore) da '--judge-models'.
+
+    Sintassi: voci separate da virgola, ciascuna ``provider`` o
+    ``provider:modello`` (es. ``anthropic,openai:gpt-5.6-mini``).
+    Modello vuoto = predefinito del registro; provider duplicati
+    o sconosciuti sono un errore d'uso, mai un audit fallito.
+    """
+    coppie: List[Tuple[str, str]] = []
+    visti: Set[str] = set()
+    for voce in raw.split(","):
+        voce = voce.strip()
+        if not voce:
+            continue
+        provider, _, modello = voce.partition(":")
+        provider = provider.strip().lower()
+        if provider not in JUDGE_PROVIDERS:
+            return [], ("provider '%s' sconosciuto (validi: %s)"
+                        % (provider,
+                           ", ".join(sorted(JUDGE_PROVIDERS))))
+        if provider in visti:
+            return [], "provider '%s' ripetuto" % provider
+        visti.add(provider)
+        coppie.append((provider, modello.strip()))
+    if not coppie:
+        return [], "nessun provider indicato"
+    return coppie, None
+
+
+def run_judges(results: Sequence[QueryResult],
+               pages: Sequence[Page],
+               mode: str = DEFAULT_JUDGE,
+               models: Sequence[Tuple[str, str]] = tuple(
+                   (p, "") for p in DEFAULT_JUDGE_MODELS),
+               verbose: bool = False
+               ) -> Optional[List[Dict[str, object]]]:
+    """Giudizio LLM multi-modello: un esito per provider richiesto.
+
+    Stessa campionatura per tutti (verdetti confrontabili), una
+    richiesta API per modello; l'errore o il salto di un modello
+    non ferma mai gli altri ne' il referto. None con mode=off.
+    """
+    if mode == JUDGE_OFF:
+        return None
+    if verbose and len(models) > 1:
+        print("Giudizio LLM multi-modello: %d richieste API "
+              "(una per modello)" % len(models), file=sys.stderr)
+    esiti: List[Dict[str, object]] = []
+    for provider, modello in models:
+        esito = run_judge(results, pages, mode, verbose,
+                          modello, provider=provider)
+        if esito is not None:
+            esiti.append(esito)
+    return esiti
 
 
 # Risorse del brand incorporate nel referto HTML autonomo

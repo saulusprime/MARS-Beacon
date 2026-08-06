@@ -51,12 +51,17 @@ curl -s -b cookie.txt -X DELETE "$BASE/api/v1/tokens/1"
 ```bash
 # avvio: 202 con l'id del job. "soglie" e "lang" sono la parita'
 # con --config e --lang della CLI; fail_under echeggia il gate
-# nella sintesi (gate_passed).
+# nella sintesi (gate_passed); "judge_models" e' la parita' con
+# --judge-models (giudizio LLM multi-modello: anthropic, openai,
+# qwen, kimi — un verdetto per modello, chiavi solo dall'ambiente
+# del server; la disponibilita' per provider e' in GET /api/env,
+# campo judge_providers).
 curl -s "$BASE/api/v1/audits" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"url": "https://esempio.it", "max_pages": 25,
        "lang": "en",
+       "judge_models": "anthropic,openai",
        "soglie": {"title_min": 25, "title_max": 70},
        "fail_under": 60}'
 # -> {"ok": true, "id": "a1b2c3d4e5f6a7b8"}

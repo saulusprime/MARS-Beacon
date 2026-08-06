@@ -16,7 +16,60 @@ Fotografia di ciò che è **già realizzato e verificato** al 2026-08-06.
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `mars_audit.py` v1.62.0 (+ package `marsbeacon/`)
+## Strumento CLI — `mars_audit.py` v1.63.0 (+ package `marsbeacon/`)
+
+- **Giudizio LLM multi-modello** (v1.63.0, GUI v2.41.0, contratto
+  API 1.5.0, 2026-08-06 — chiude il programma P4 del TO-DO): la
+  chiamata Anthropic di `run_judge` vive dietro un'**interfaccia
+  provider** (registro `JUDGE_PROVIDERS` in `base.py`, pattern
+  `PROVIDERS` del monitor citazioni) e accanto ad `anthropic`
+  (SDK ufficiale, invariato, ancora il default: con la sola
+  chiave Anthropic nulla cambia) ci sono i provider
+  **OpenAI-compatibili** `openai` (ChatGPT, `OPENAI_API_KEY`),
+  `qwen` (Alibaba DashScope in modalità compatibile,
+  `DASHSCOPE_API_KEY`) e `kimi` (Moonshot AI,
+  `MOONSHOT_API_KEY`) — HTTP puro con `requests`, nessun SDK
+  nuovo, chiavi SOLO dall'ambiente, endpoint sovrascrivibili con
+  la variabile `*_BASE_URL` del provider (server finti nei test,
+  pattern `BRAVE_BASE_URL`; stessa strada per agganciare altri
+  servizi compatibili). **`--judge-models provider[:modello],…`**
+  sceglie i giudici (default `anthropic`; `parse_judge_models`
+  valida — sconosciuti, duplicati e lista vuota sono errore
+  d'uso, uscita 2); `run_judges()` esegue **un giudizio per
+  modello sullo stesso campione e con lo stesso prompt** (max 5
+  passaggi, verdetti confrontabili, una richiesta API per
+  modello, dichiarate nel log) e l'errore, il refusal o il salto
+  di un modello non ferma mai gli altri né il referto; `--judge
+  on` pretende **almeno un** provider disponibile (motivi per
+  provider nell'errore). Nei referti text/html/md un blocco per
+  modello con media e scarto giudice-euristica più lo **scarto
+  giudice-profilo** quando il giudice corrisponde a un profilo
+  di citabilità (chiave `profile` del registro → profilo Claude/
+  ChatGPT/Qwen/Kimi: la taratura delle stime diventa per
+  assistente; nuova voce di cornice in en/fr/de/es e chiave
+  `judge.profile` in `_HTML_I18N`, cinque lingue); la **nota di
+  onestà estesa** ("modelli diversi giudicano con scale diverse")
+  è resa una sola volta. JSON: blocco additivo **`judges`** (un
+  esito per modello con `provider`/`label`/`profile` anche su
+  salto ed errore), `judge` invariato per compatibilità (primo
+  esito), `schema_version` fermo. **API contratto 1.5.0**: campo
+  `judge_models` (stringa CSV, parità con la CLI) nel body degli
+  audit v1 e legacy, `judge_providers` in `GET /api/env`
+  (label, modello predefinito, disponibilità e motivo per
+  provider), golden `docs/openapi.json` rigenerato. **GUI
+  v2.41.0**: checkbox dei modelli nel form (nei preset salvati),
+  disponibilità per provider nell'hint da `/api/env`, payload
+  `judge_models`, un blocco di verdetti per modello nei
+  risultati (prima tabella statica riusata, le successive
+  clonate con `aria-label` per modello; salti dichiarati).
+  6 test in più (parse, due provider ok con medie identiche
+  sullo stesso campione, errore di uno che non ferma l'altro,
+  salto dichiarato senza chiave, CLI a uscita 2, renderer
+  multi-modello con scarto di profilo e nota unica) col **server
+  OpenAI-compatibile finto** accanto a quello Anthropic; fixture
+  di conftest estesa alle nuove chiavi (suite offline per
+  costruzione); golden JSON rigenerato (solo `judges: null`).
+  Suite 420 test, flake8 pulito, `node --check` su app.js.
 
 - **Soglie configurabili da file TOML** (v1.61.0, 2026-08-06,
   chiude la voce P3 "file di configurazione TOML"): `--config FILE`
@@ -1046,7 +1099,7 @@ Dettaglio nei bullet che seguono, dal più recente.
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.40.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.41.0 + `gui/`
 
 - **Modalità embed** (GUI v2.40.0 + mars_api v0.3.0, 2026-08-06 —
   chiude la strada A dell'analisi; la strada B, widget nativo, è

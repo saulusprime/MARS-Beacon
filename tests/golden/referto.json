@@ -232,6 +232,7 @@
       }
     ]
   },
+  "judges": null,
   "lighthouse": {
     "status": "ok",
     "mode": "auto",

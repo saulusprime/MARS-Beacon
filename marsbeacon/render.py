@@ -123,11 +123,16 @@ def render_text(base: str, pages: List[Page],
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
                 judge: Optional[Dict[str, object]] = None,
+                judges: Optional[List[Dict[str, object]]] = None,
                 delta: Optional[Dict[str, object]] = None,
                 lighthouse: Optional[Dict[str, object]] = None,
                 search_check: Optional[Dict[str, object]] = None,
                 lang: str = "it") -> str:
-    """Referto testuale per la console."""
+    """Referto testuale per la console.
+
+    ``judges`` (multi-modello, un esito per provider) ha la
+    precedenza su ``judge``, mantenuto per compatibilita'.
+    """
     def T(it_text: str, en_text: str) -> str:
         return frame_text(it_text, en_text, lang)
 
@@ -231,34 +236,57 @@ def render_text(base: str, pages: List[Page],
         lines.append(T("  Nota: %s", "  Note: %s") % cit["note"])
         lines.append("")
 
-    if judge:
+    judge_entries = [j for j in (judges if judges is not None
+                                 else [judge]) if j]
+    if judge_entries:
+        prof_by_key = {str(p["key"]): p
+                       for p in (cit or {}).get("profiles", [])}
         lines.append(T("GIUDIZIO LLM SULLA CITABILITA'",
                        "LLM JUDGEMENT ON CITABILITY"))
-        if judge.get("status") == "ok":
-            lines.append(T("  Modello: %s · passaggi valutati: %d "
-                           "· media: %.1f/100",
-                           "  Model: %s · passages judged: %d · "
-                           "average: %.1f/100")
-                         % (judge["model"], judge["sampled"],
-                            judge["average"]))
-            if cit and cit["index"] is not None:
-                lines.append(T("  Indice euristico: %.1f — scarto "
-                               "giudice-euristica: %+.1f",
-                               "  Heuristic index: %.1f — "
-                               "judge-heuristic gap: %+.1f")
-                             % (cit["index"],
-                                float(str(judge["average"]))
-                                - float(str(cit["index"]))))
-            for v in judge["verdicts"]:
-                lines.append("  %5.1f/100  %s"
-                             % (v["score"], v["query"]))
-                if v["reason"]:
-                    lines.append("             %s" % v["reason"])
+        judge_note = ""
+        for judge_e in judge_entries:
+            if judge_e.get("status") == "ok":
+                lines.append(T("  Modello: %s · passaggi "
+                               "valutati: %d · media: %.1f/100",
+                               "  Model: %s · passages judged: "
+                               "%d · average: %.1f/100")
+                             % (judge_e["model"],
+                                judge_e["sampled"],
+                                judge_e["average"]))
+                if cit and cit["index"] is not None:
+                    lines.append(T("  Indice euristico: %.1f — "
+                                   "scarto giudice-euristica: "
+                                   "%+.1f",
+                                   "  Heuristic index: %.1f — "
+                                   "judge-heuristic gap: %+.1f")
+                                 % (cit["index"],
+                                    float(str(judge_e["average"]))
+                                    - float(str(cit["index"]))))
+                prof = prof_by_key.get(
+                    str(judge_e.get("profile") or ""))
+                if prof and prof["score"] is not None:
+                    lines.append(T("  Profilo %s: %.1f — scarto "
+                                   "giudice-profilo: %+.1f",
+                                   "  Profile %s: %.1f — "
+                                   "judge-profile gap: %+.1f")
+                                 % (prof["label"], prof["score"],
+                                    float(str(judge_e["average"]))
+                                    - float(str(prof["score"]))))
+                for v in judge_e["verdicts"]:
+                    lines.append("  %5.1f/100  %s"
+                                 % (v["score"], v["query"]))
+                    if v["reason"]:
+                        lines.append("             %s"
+                                     % v["reason"])
+                judge_note = judge_note \
+                    or str(judge_e.get("note") or "")
+            else:
+                lines.append(T("  Non eseguito: %s",
+                               "  Not run: %s")
+                             % judge_e.get("reason", ""))
+        if judge_note:
             lines.append(T("  Nota: %s", "  Note: %s")
-                         % judge["note"])
-        else:
-            lines.append(T("  Non eseguito: %s", "  Not run: %s")
-                         % judge.get("reason", ""))
+                         % judge_note)
         lines.append("")
 
     if lighthouse:
@@ -609,6 +637,7 @@ def render_html(base: str, pages: List[Page],
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
                 judge: Optional[Dict[str, object]] = None,
+                judges: Optional[List[Dict[str, object]]] = None,
                 delta: Optional[Dict[str, object]] = None,
                 lighthouse: Optional[Dict[str, object]] = None,
                 search_check: Optional[Dict[str, object]] = None,
@@ -824,39 +853,59 @@ def render_html(base: str, pages: List[Page],
             parts.append("</ol>")
         parts.append("</section>")
 
-    if judge:
+    judge_entries = [j for j in (judges if judges is not None
+                                 else [judge]) if j]
+    if judge_entries:
+        prof_by_key = {str(p["key"]): p
+                       for p in (cit or {}).get("profiles", [])}
         parts.append("<section><h2>%s</h2>" % lab["judge.h"])
-        if judge.get("status") == "ok":
-            confronto = ""
-            if cit and cit["index"] is not None:
-                confronto = (lab["judge.compare"]
-                             % (cit["index"],
-                                float(str(judge["average"]))
-                                - float(str(cit["index"]))))
-            parts.append(
-                "<p class=\"meta\">%s</p>"
-                "<table><thead><tr><th>%s</th><th>%s"
-                "</th><th>%s</th></tr></thead><tbody>"
-                % (lab["judge.meta"]
-                   % (esc(str(judge["model"])), judge["sampled"],
-                      judge["average"], esc(confronto),
-                      esc(str(judge["note"]))),
-                   lab["judge.query"], lab["judge.score"],
-                   lab["judge.reason"]))
-            for v in judge["verdicts"]:
-                val = float(str(v["score"]))
-                hue = "var(--good)" if val >= 70 else (
-                    "var(--warn)" if val >= 40 else "var(--bad)")
+        nota_resa = False
+        for judge_e in judge_entries:
+            if judge_e.get("status") == "ok":
+                confronto = ""
+                if cit and cit["index"] is not None:
+                    confronto = (lab["judge.compare"]
+                                 % (cit["index"],
+                                    float(str(judge_e["average"]))
+                                    - float(str(cit["index"]))))
+                prof = prof_by_key.get(
+                    str(judge_e.get("profile") or ""))
+                if prof and prof["score"] is not None:
+                    confronto += (lab["judge.profile"]
+                                  % (prof["label"],
+                                     prof["score"],
+                                     float(str(judge_e["average"]))
+                                     - float(str(prof["score"]))))
+                nota = ("" if nota_resa
+                        else str(judge_e.get("note") or ""))
+                nota_resa = nota_resa or bool(nota)
                 parts.append(
-                    "<tr><td>%s</td><td style=\"color:%s\">"
-                    "<b>%.1f</b>/100</td><td>%s</td></tr>"
-                    % (esc(str(v["query"])), hue, val,
-                       esc(str(v["reason"]))))
-            parts.append("</tbody></table>")
-        else:
-            parts.append("<p class=\"meta\">%s</p>"
-                         % (lab["judge.skipped"]
-                            % esc(str(judge.get("reason", "")))))
+                    "<p class=\"meta\">%s</p>"
+                    "<table><thead><tr><th>%s</th><th>%s"
+                    "</th><th>%s</th></tr></thead><tbody>"
+                    % (lab["judge.meta"]
+                       % (esc(str(judge_e["model"])),
+                          judge_e["sampled"],
+                          judge_e["average"], esc(confronto),
+                          esc(nota)),
+                       lab["judge.query"], lab["judge.score"],
+                       lab["judge.reason"]))
+                for v in judge_e["verdicts"]:
+                    val = float(str(v["score"]))
+                    hue = "var(--good)" if val >= 70 else (
+                        "var(--warn)" if val >= 40
+                        else "var(--bad)")
+                    parts.append(
+                        "<tr><td>%s</td><td style=\"color:%s\">"
+                        "<b>%.1f</b>/100</td><td>%s</td></tr>"
+                        % (esc(str(v["query"])), hue, val,
+                           esc(str(v["reason"]))))
+                parts.append("</tbody></table>")
+            else:
+                parts.append(
+                    "<p class=\"meta\">%s</p>"
+                    % (lab["judge.skipped"]
+                       % esc(str(judge_e.get("reason", "")))))
         parts.append("</section>")
 
     if lighthouse:
@@ -1903,6 +1952,7 @@ def render_json(base: str, pages: List[Page],
                 competitive: Optional[Dict[str, object]] = None,
                 market: str = DEFAULT_MARKET,
                 judge: Optional[Dict[str, object]] = None,
+                judges: Optional[List[Dict[str, object]]] = None,
                 delta: Optional[Dict[str, object]] = None,
                 lighthouse: Optional[Dict[str, object]] = None,
                 search_check: Optional[Dict[str, object]] = None,
@@ -1934,6 +1984,7 @@ def render_json(base: str, pages: List[Page],
         "citability_actions": citability_top_actions(
             findings, pages, scores, market),
         "judge": judge,
+        "judges": judges,
         "lighthouse": lighthouse,
         "search_check": search_check,
         "delta": delta,
@@ -1978,6 +2029,8 @@ def render_markdown(base: str, pages: List[Page],
                     competitive: Optional[Dict[str, object]] = None,
                     market: str = DEFAULT_MARKET,
                     judge: Optional[Dict[str, object]] = None,
+                    judges: Optional[List[Dict[str, object]]]
+                    = None,
                     delta: Optional[Dict[str, object]] = None,
                     lighthouse: Optional[Dict[str, object]] = None,
                     search_check: Optional[Dict[str, object]]
@@ -2076,26 +2129,30 @@ def render_markdown(base: str, pages: List[Page],
                 out.append(T("- nessuno", "- none"))
             out.append("")
 
-    if judge and judge.get("status") == "ok":
+    judge_entries = [j for j in (judges if judges is not None
+                                 else [judge])
+                     if j and j.get("status") == "ok"]
+    if judge_entries:
         out.append(T("## Giudizio LLM sulla citabilita'",
                      "## LLM judgement on citability"))
         out.append("")
-        out.append(T("Modello `%s` su %d passaggio/i · media "
-                     "**%.1f/100**.",
-                     "Model `%s` on %d passage(s) · average "
-                     "**%.1f/100**.") % (judge["model"],
-                                         judge["sampled"],
-                                         judge["average"]))
-        out.append("")
-        out.append(T("| Query | Punteggio | Motivazione |",
-                     "| Query | Score | Rationale |"))
-        out.append("|---|---:|---|")
-        for v in judge["verdicts"]:
-            out.append("| %s | %.1f | %s |"
-                       % (_md_cell(v["query"]), v["score"],
-                          _md_cell(v["reason"])))
-        out.append("")
-        out.append("> %s" % judge["note"])
+        for judge_e in judge_entries:
+            out.append(T("Modello `%s` su %d passaggio/i · media "
+                         "**%.1f/100**.",
+                         "Model `%s` on %d passage(s) · average "
+                         "**%.1f/100**.") % (judge_e["model"],
+                                             judge_e["sampled"],
+                                             judge_e["average"]))
+            out.append("")
+            out.append(T("| Query | Punteggio | Motivazione |",
+                         "| Query | Score | Rationale |"))
+            out.append("|---|---:|---|")
+            for v in judge_e["verdicts"]:
+                out.append("| %s | %.1f | %s |"
+                           % (_md_cell(v["query"]), v["score"],
+                              _md_cell(v["reason"])))
+            out.append("")
+        out.append("> %s" % judge_entries[0]["note"])
         out.append("")
 
     if lighthouse:
@@ -2244,6 +2301,7 @@ def render_csv(base: str, pages: List[Page],
                competitive: Optional[Dict[str, object]] = None,
                market: str = DEFAULT_MARKET,
                judge: Optional[Dict[str, object]] = None,
+               judges: Optional[List[Dict[str, object]]] = None,
                delta: Optional[Dict[str, object]] = None,
                lighthouse: Optional[Dict[str, object]] = None,
                search_check: Optional[Dict[str, object]] = None,

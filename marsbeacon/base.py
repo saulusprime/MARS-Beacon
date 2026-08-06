@@ -35,7 +35,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.62.0"
+__version__ = "1.63.0"
 
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello
@@ -501,7 +501,68 @@ JUDGE_MAX_TOKENS = 1000
 JUDGE_NOTE = (
     "Parere di un modello su un campione dei passaggi migliori: "
     "utile per tarare le stime euristiche, ma non riproducibile "
-    "ne' garanzia di citazione.")
+    "ne' garanzia di citazione. Modelli diversi giudicano con "
+    "scale diverse: le medie si confrontano con cautela.")
+
+
+# Giudizio LLM multi-modello (P4): oltre a Claude via SDK
+# ufficiale, provider con API OpenAI-compatibile — ChatGPT
+# (OpenAI), Qwen (Alibaba DashScope in modalita' compatibile,
+# endpoint internazionale) e Kimi (Moonshot AI) — piu' qualunque
+# altro servizio compatibile sovrascrivendo l'endpoint. Chiavi
+# SOLO dall'ambiente; endpoint sovrascrivibili con la variabile
+# dedicata (server finti nei test, pattern BRAVE_BASE_URL).
+# Modelli predefiniti: OpenAI allineato al monitor citazioni
+# (mars_citations.OPENAI_MODEL); per Qwen e Kimi gli alias
+# stabili dei vendor (fonti: developers.openai.com,
+# help.aliyun.com — Model Studio/DashScope compatible-mode,
+# platform.moonshot.ai — verificate il 2026-08-06). "profile"
+# aggancia il verdetto al profilo di citabilita' corrispondente
+# (CITABILITY_PROFILES) per lo scarto giudice-profilo.
+JUDGE_PROVIDER_ANTHROPIC = "anthropic"
+
+
+JUDGE_PROVIDERS = {
+    JUDGE_PROVIDER_ANTHROPIC: {
+        "label": "Claude (Anthropic)",
+        "model": JUDGE_MODEL,
+        "env": "ANTHROPIC_API_KEY",
+        "endpoint": None,  # SDK ufficiale (ANTHROPIC_BASE_URL)
+        "endpoint_env": "ANTHROPIC_BASE_URL",
+        "profile": "claude",
+    },
+    "openai": {
+        "label": "ChatGPT (OpenAI)",
+        "model": "gpt-5.6",
+        "env": "OPENAI_API_KEY",
+        "endpoint": "https://api.openai.com/v1/chat/completions",
+        "endpoint_env": "OPENAI_BASE_URL",
+        "profile": "chatgpt",
+    },
+    "qwen": {
+        "label": "Qwen (Alibaba)",
+        "model": "qwen-max",
+        "env": "DASHSCOPE_API_KEY",
+        "endpoint": "https://dashscope-intl.aliyuncs.com"
+                    "/compatible-mode/v1/chat/completions",
+        "endpoint_env": "DASHSCOPE_BASE_URL",
+        "profile": "qwen",
+    },
+    "kimi": {
+        "label": "Kimi (Moonshot AI)",
+        "model": "kimi-latest",
+        "env": "MOONSHOT_API_KEY",
+        "endpoint": "https://api.moonshot.ai/v1/chat/completions",
+        "endpoint_env": "MOONSHOT_BASE_URL",
+        "profile": "kimi",
+    },
+}
+
+
+DEFAULT_JUDGE_MODELS = (JUDGE_PROVIDER_ANTHROPIC,)
+
+
+JUDGE_HTTP_TIMEOUT_S = 90  # provider OpenAI-compatibili
 
 
 # Ancora di realta' (P2): posizionamento reale sulle query

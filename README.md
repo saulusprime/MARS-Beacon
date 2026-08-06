@@ -59,8 +59,12 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 ```bash
 pip install -r requirements.txt                 # requests, bs4, lxml
 pip install sentence-transformers numpy         # opzionali: embedding reali
+
+python -m pip install --upgrade torch torchvision torchaudio sentence-transformers
+
 pip install playwright                          # opzionale: rendering JS
 playwright install chromium                     # (o usa Chrome di sistema)
+npm install -g corepack                         # opzionale ma necessario per Lighthouse
 tools/update-lighthouse.sh                      # opzionale: audit Lighthouse
 ```
 
@@ -125,7 +129,8 @@ python3 mars_audit.py https://esempio.it \
 | `--config FILE` | — | **soglie di prassi personalizzate** da file TOML (tabella `[soglie]`: `title_min`/`title_max`, `description_min`/`description_max`, `parole_scarse`/`parole_obiettivo`, `estraibilita_minima`, `varieta_anchor_minima` — esempio commentato coi default in [docs/soglie.esempio.toml](docs/soglie.esempio.toml)). Chiavi, tipi, intervalli e coppie min/max sono validati (errore d'uso con motivo); i valori sostituiscono i default in tutto l'audit, **i rilievi dichiarano sempre la soglia usata** (anche nei referti tradotti) e il JSON le echeggia nel blocco `thresholds` — due referti con soglie diverse non sono confrontabili alla pari. Richiede Python ≥ 3.11 (`tomllib` in libreria standard) oppure il pacchetto `tomli` |
 | `--history FILE` | — | **storico JSONL delle esecuzioni**: legge l'ultima riga dello stesso sito e riporta nei referti la sezione "Rispetto all'esecuzione precedente" (variazioni dei punteggi per area, rilievi nuovi/risolti), poi accoda una riga compatta per l'esecuzione corrente. Con un audit schedulato (cron/systemd) trasforma l'audit in monitoraggio anche senza GUI |
 | `--fail-under PUNTI` | — | **gate di regressione**: esce con codice `1` anche quando il punteggio complessivo (0–100) è sotto la soglia, dichiarandolo su stderr. Pensato per gli audit schedulati con `--history` (cron/systemd): il fallimento del servizio diventa la notifica — vedi le unit in `deploy/` |
-| `--judge auto\|on\|off` | auto | **giudizio LLM sulla citabilità**: un modello (Claude, SDK ufficiale Anthropic) valuta i passaggi migliori della simulazione RRF — max 5, una sola richiesta API per audit — con punteggio e motivazione per ciascuno e **scarto rispetto all'indice euristico**. `auto` (default) parte solo se `ANTHROPIC_API_KEY` è nell'ambiente, altrimenti viene saltato con motivo dichiarato nel referto: senza chiave l'audit resta interamente offline. `on` pretende la chiave (errore d'uso senza); `off` disattiva. I costi API sono a carico della chiave configurata |
+| `--judge auto\|on\|off` | auto | **giudizio LLM sulla citabilità**: i modelli scelti con `--judge-models` (default: Claude via SDK ufficiale Anthropic) valutano i passaggi migliori della simulazione RRF — max 5, **una richiesta API per modello**, stesso campione e stesso prompt per tutti così i verdetti sono confrontabili — con punteggio e motivazione per ciascuno, **scarto rispetto all'indice euristico** e, quando il modello corrisponde a un profilo di citabilità, **scarto rispetto a quel profilo**. `auto` (default): partecipano solo i provider con la chiave nell'ambiente, gli altri vengono saltati con motivo dichiarato nel referto — senza chiavi l'audit resta interamente offline. `on` pretende almeno un provider disponibile (errore d'uso senza); `off` disattiva. I costi API sono a carico delle chiavi configurate. Nota di onestà sempre inclusa: modelli diversi giudicano con scale diverse |
+| `--judge-models LISTA` | anthropic | **giudici multi-modello**: voci separate da virgola, ciascuna `provider` o `provider:modello` — `anthropic` (Claude, `ANTHROPIC_API_KEY`), `openai` (ChatGPT, `OPENAI_API_KEY`), `qwen` (Alibaba DashScope in modalità compatibile, `DASHSCOPE_API_KEY`), `kimi` (Moonshot AI, `MOONSHOT_API_KEY`). I provider non-Anthropic parlano l'API chat completions **OpenAI-compatibile** senza SDK aggiuntivi; qualunque altro servizio compatibile si aggancia sovrascrivendo l'endpoint con la variabile `*_BASE_URL` del provider (es. `OPENAI_BASE_URL`). Esempio: `--judge-models anthropic,openai,qwen:qwen-plus`. Un verdetto per modello nei referti; l'errore di un modello non ferma né gli altri né il referto |
 | `--search-check auto\|on\|off` | auto | **ancora di realtà**: cerca il sito sulle query dell'audit con la [Brave Search API](https://brave.com/search/api/) (chiave **solo** da `BRAVE_API_KEY`) e affianca al consenso RRF simulato la posizione reale nei primi 20 risultati — o l'assenza. `auto` parte solo con la chiave presente (senza: salto dichiarato, audit offline), `on` la pretende, `off` disattiva. Max 10 query, una richiesta al secondo, costi a carico della chiave. Complementare a `--queries-gsc`: quello porta le domande vere, questo il ranking vero. Nota di onestà sempre inclusa: il ranking dipende anche da personalizzazione, località e freschezza — confronto direzionale, non una validazione |
 | `--lighthouse off\|auto\|always` | off | **audit Lighthouse** col fork installato da `tools/update-lighthouse.sh` (Performance, Accessibilità, SEO, Best Practices, Agentic Browsing): `auto` lo esegue se Node ≥ 22.19 e Chrome ci sono, altrimenti **salto dichiarato** nel referto; `always` li pretende (errore d'uso senza). Gli audit sotto soglia diventano rilievi MARS (gravità dai bucket ufficiali 0,5/0,9, testi in italiano dal LHR, pilastri dalla mappatura di progetto), i punteggi di categoria formano la **sesta area** (peso 1.0; senza Lighthouse i pesi si rinormalizzano e gli storici restano confrontabili), gli audit che duplicano controlli MARS si fondono come evidenza ("Conferma Lighthouse") |
 | `--lighthouse-pages N` | 3 | pagine rappresentative sottoposte a Lighthouse oltre alla home (0–9), scelte per link interni in ingresso e vicinanza alla home; ~10–30 s a pagina |
@@ -484,7 +489,13 @@ A tarare le stime ci pensa, dalla v1.18.0, il **giudizio LLM**
 campione dei passaggi vincitori della fusione e il referto riporta i
 verdetti e lo scarto fra la media del giudice e l'indice euristico —
 un parere di modello, dichiarato come tale, non una misura
-riproducibile.
+riproducibile. Dalla v1.63.0 il giudizio è **multi-modello**
+(`--judge-models`): agli stessi passaggi, con lo stesso prompt,
+possono rispondere anche ChatGPT, Qwen e Kimi (o altri servizi
+OpenAI-compatibili) — un verdetto per modello e, dove il giudice
+corrisponde a un profilo di citabilità, lo **scarto
+giudice-profilo** che rende la taratura confrontabile per
+assistente.
 
 1. **Tecnica** — HTTPS, `robots.txt` e permessi per i 14 crawler IA
    documentati dai vendor (GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot,
@@ -624,9 +635,10 @@ flowchart TD
 ```
 
 L'audit Lighthouse (`run_lighthouse()`) e il giudizio LLM
-(`run_judge()`) sono **passi separati dopo `run_audit()`**: l'audit
-in sé non avvia mai processi Node né contatta API, e i loro esiti
-(rilievi, sesta area, verdetti) vengono fusi a valle.
+(`run_judges()`, un esito per modello richiesto) sono **passi
+separati dopo `run_audit()`**: l'audit in sé non avvia mai processi
+Node né contatta API, e i loro esiti (rilievi, sesta area,
+verdetti) vengono fusi a valle.
 
 L'interfaccia grafica si appoggia allo stesso nucleo: il server importa
 lo script ed esegue `run_audit()` in un thread, catturandone il log.
@@ -705,10 +717,12 @@ Lighthouse offline per costruzione** (LHR finti e `subprocess.Popen`
 finto: rilevamento runtime, runner con timeout e annullamento,
 parser con le soglie esatte dei bucket, deduplica, sesta area,
 metriche CWV, i18n dai locale del fork, coerenza dei cinque
-renderer), giudizio LLM contro un
-server API finto (verdetti, refusal, JSON malformato, salto senza
-chiave — una fixture autouse rimuove le chiavi dall'ambiente, quindi
-la suite è offline per costruzione) e monitoraggio citazioni
+renderer), giudizio LLM contro
+server API finti — Anthropic e OpenAI-compatibile per il
+multi-modello — (verdetti, refusal, JSON malformato, salto senza
+chiave, errore di un modello che non ferma gli altri — una fixture
+autouse rimuove le chiavi dall'ambiente, quindi la suite è offline
+per costruzione) e monitoraggio citazioni
 con server API finti (Anthropic e Perplexity). In CI (GitHub
 Actions): flake8 + pytest su più versioni di Python e audit di
 accessibilità Pa11y.

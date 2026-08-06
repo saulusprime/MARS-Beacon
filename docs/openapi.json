@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "MARS Beacon API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "Contratto dell'API locale di MARS Beacon, generato dal registro dichiarativo delle rotte (marsbeacon/api.py): spec e codice non possono divergere per costruzione. Gli errori sono {\"error\": messaggio in italiano} (piu' \"code\" macchina dove indicato). Un audit alla volta; slot orario per utente; download dei referti riservato alla registrazione completa.",
     "license": {
       "name": "Apache 2.0",
@@ -135,6 +135,10 @@
                     "judge_reason": {
                       "type": "string"
                     },
+                    "judge_providers": {
+                      "type": "object",
+                      "description": "Disponibilita' per provider del giudizio LLM multi-modello: label, available, reason, model."
+                    },
                     "lighthouse_available": {
                       "type": "boolean"
                     },
@@ -164,6 +168,7 @@
                     "render_available",
                     "judge_available",
                     "judge_reason",
+                    "judge_providers",
                     "lighthouse_available",
                     "lighthouse_reason",
                     "lighthouse_version",
@@ -1054,6 +1059,11 @@
                       "off"
                     ],
                     "default": "auto"
+                  },
+                  "judge_models": {
+                    "type": "string",
+                    "default": "anthropic",
+                    "description": "Modelli del giudizio LLM, separati da virgola: 'provider' o 'provider:modello' fra anthropic, openai, qwen, kimi (parita' con --judge-models della CLI). Chiavi solo dall'ambiente del server; in 'auto' partecipano i soli provider con la chiave presente."
                   },
                   "lighthouse": {
                     "type": "string",
@@ -2155,6 +2165,11 @@
                       "off"
                     ],
                     "default": "auto"
+                  },
+                  "judge_models": {
+                    "type": "string",
+                    "default": "anthropic",
+                    "description": "Modelli del giudizio LLM, separati da virgola: 'provider' o 'provider:modello' fra anthropic, openai, qwen, kimi (parita' con --judge-models della CLI). Chiavi solo dall'ambiente del server; in 'auto' partecipano i soli provider con la chiave presente."
                   },
                   "lighthouse": {
                     "type": "string",

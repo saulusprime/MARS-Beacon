@@ -708,6 +708,38 @@ il file e delega) e `check_thresholds` (la validazione delle soglie
 senza passare da un file TOML; `load_thresholds` la riusa).
 Comportamento della CLI invariato.
 
+Novità 1.63.0 (2026-08-06): **giudizio LLM multi-modello** (P4).
+La chiamata Anthropic di `run_judge()` è estratta dietro
+un'interfaccia provider (registro `JUDGE_PROVIDERS` in `base.py`,
+pattern `PROVIDERS` del monitor citazioni): oltre a `anthropic`
+(SDK ufficiale, invariato e ancora default), i provider
+OpenAI-compatibili `openai` (ChatGPT, `OPENAI_API_KEY`), `qwen`
+(Alibaba DashScope in modalità compatibile, `DASHSCOPE_API_KEY`)
+e `kimi` (Moonshot AI, `MOONSHOT_API_KEY`) — HTTP puro con
+`requests`, nessun SDK nuovo, endpoint sovrascrivibili con la
+variabile `*_BASE_URL` (server finti nei test, e aggancio di
+qualunque altro servizio compatibile). `--judge-models
+provider[:modello],…` sceglie i giudici (`parse_judge_models`
+valida: sconosciuti e duplicati sono errore d'uso);
+`run_judges()` esegue un giudizio per modello **sullo stesso
+campione e con lo stesso prompt** (verdetti confrontabili, una
+richiesta API per modello) e l'errore o il salto di un modello
+non ferma mai gli altri né il referto. `--judge on` ora pretende
+**almeno un** provider disponibile. Nei referti: un blocco per
+modello con media e scarto giudice-euristica, più lo **scarto
+giudice-profilo** quando il giudice corrisponde a un profilo di
+citabilità (Claude, ChatGPT, Qwen, Kimi — la taratura diventa
+per assistente); nota di onestà estesa (modelli diversi, scale
+diverse) resa una sola volta. JSON: blocco additivo `judges`
+(un esito per modello, con `provider`/`label`/`profile`),
+`judge` invariato per compatibilità, `schema_version` fermo.
+API contratto 1.5.0: campo `judge_models` nel body degli audit e
+`judge_providers` in `/api/env` (disponibilità per provider con
+motivo). GUI 2.41.0: checkbox dei modelli nel form (nei preset),
+disponibilità per provider nell'hint, un blocco di verdetti per
+modello nei risultati. 6 test in più con server
+OpenAI-compatibile finto; golden JSON e OpenAPI rigenerati.
+
 ## Uso
 
 ```
@@ -733,8 +765,12 @@ JavaScript con Playwright/Chrome), `--own-site` / `--ignore-robots accetto`
 `--competitor URL` (ripetibile, max 3; confronto competitivo con share of
 voice), `--market occidentale|globale|orientale` (pesi dell'indice di
 citabilità composito), `--judge auto|on|off` (giudizio LLM sui passaggi
-migliori via API Anthropic; `auto`, il default, parte solo con
-ANTHROPIC_API_KEY presente), `--search-check auto|on|off` (ancora di
+migliori; `auto`, il default, esegue i soli provider con la chiave
+presente, `on` pretende almeno un provider disponibile) con
+`--judge-models provider[:modello],…` (giudici multi-modello:
+`anthropic` — default —, `openai`, `qwen`, `kimi`; chiavi solo
+dall'ambiente, endpoint OpenAI-compatibili sovrascrivibili con
+`*_BASE_URL`), `--search-check auto|on|off` (ancora di
 realtà: posizione reale del sito sulle query dell'audit via Brave
 Search API, chiave solo da BRAVE_API_KEY; confronto direzionale col
 consenso RRF, nota di onestà inclusa), `--lighthouse off|auto|always` con

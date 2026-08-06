@@ -1,7 +1,7 @@
 # TO-DO — sviluppi e idee di miglioramento
 
-Elenco di ciò che **resta da fare** (codice alla v1.62.0 / GUI
-v2.40.0 / API mars_api v0.3.0, contratto 1.4.0 / citations v1.2.0;
+Elenco di ciò che **resta da fare** (codice alla v1.63.0 / GUI
+v2.41.0 / API mars_api v0.3.0, contratto 1.5.0 / citations v1.2.0;
 tutto su `main`, dove il programma P1 API-first è stato fuso il
 2026-08-06). Quanto già realizzato — e quanto scartato
 consapevolmente, per non rivalutarlo — è documentato in
