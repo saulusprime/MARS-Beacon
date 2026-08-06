@@ -1,0 +1,4 @@
+@scalar/api-reference 1.64.0
+Licenza dichiarata nel package.json: MIT - Scalar (https://github.com/scalar)
+Bundle standalone vendorizzato da npm; attribuzione nel
+NOTICE del repository. https://github.com/scalar/scalar

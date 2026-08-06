@@ -693,6 +693,39 @@ sono nel [README.md](README.md).
 
 ## API — contratto e registro (programma P1, branch `devapi`)
 
+- **Documentazione Scalar su /api/docs: contratto 1.2.0 — FASE 1
+  CONCLUSA** (GUI v2.33.0, 2026-08-06). **Scalar API Reference
+  1.64.0 vendorizzato** in `gui/vendor/scalar/` (3,6 MB, licenza
+  MIT verificata dal package.json e attribuita nel NOTICE) dal
+  nuovo **`tools/update-scalar.sh`** sul modello di update-vendor:
+  scarica da npm, pota al solo bundle standalone (**verificato
+  autonomo**: niente chunk dinamici, lo script rifiuta
+  l'aggiornamento se il bundle smette di esserlo), **denylist
+  telemetria** che ferma l'aggiornamento (sentry/analytics/
+  posthog/segment/hotjar/plausible — pattern anti-telemetria del
+  fork Lighthouse; oggi: zero occorrenze), file `VERSIONE` e
+  **`ORIGINI.txt`** con l'elenco dichiarato degli host esterni
+  presenti nel bundle come stringhe inerti (esempi, documentazione
+  e i font predefiniti di fonts.scalar.com). Pagina
+  **`gui/api-docs.html`** servita da `GET /api/docs` in
+  **modalità markup** (`data-url` verso la spec, zero JavaScript
+  inline: la CSP stretta della GUI resta intatta e blocca comunque
+  ogni caricamento fuori da 'self'), con
+  **`withDefaultFonts: false`** e `--scalar-font` sul **Titillium
+  Web del brand** già vendorizzato (@font-face 400/600/700):
+  nessuna origine esterna nella pagina, documentazione con il look
+  Lympha. Rotta censita nel registro (tag "contratto", 18 rotte
+  totali), `API_CONTRACT_VERSION` 1.2.0, golden rigenerato,
+  docstring di mars_gui aggiornata. 2 test in più (pagina servita
+  con content-type e CSP giusti, spec puntata, withDefaultFonts
+  spento, Titillium presente, **nessun http(s):// nella pagina**;
+  bundle presente con VERSIONE/ORIGINI, denylist telemetria,
+  autonomia senza chunk); verifica dal vivo: /api/docs 200,
+  bundle servito, spec 1.2.0 con 18 rotte. Suite 387 test, flake8
+  pulito. **Con questo la Fase 1 del programma API-first è
+  completa**: contratto auto-generato, censimento totale, parità
+  CLI↔API e documentazione navigabile — restano le Fasi 2-4.
+
 - **Parità CLI↔API su POST /api/audit: contratto 1.1.0** (core
   v1.62.0, GUI v2.32.0, 2026-08-06 — chiude il "gap di parità"
   della Fase 1). Quattro campi nuovi, validati in
@@ -819,7 +852,12 @@ sono nel [README.md](README.md).
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.32.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.33.0 + `gui/`
+
+- **Documentazione del contratto su /api/docs** (v2.33.0,
+  2026-08-06, branch `devapi`): Scalar vendorizzato, pagina
+  `gui/api-docs.html` — dettaglio nella sezione "API — contratto
+  e registro" più sopra.
 
 - **Parità CLI↔API nel POST /api/audit** (v2.32.0, 2026-08-06,
   branch `devapi`): lang, soglie, queries_gsc e fail_under —
@@ -1352,7 +1390,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 385 test in ~30 secondi** (inclusa
+- **Suite pytest: 387 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

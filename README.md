@@ -40,6 +40,7 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies |
 | [deploy/](deploy/) | Unit systemd per l'esecuzione come servizio automatico sulle macchine dei clienti |
 | [tools/update-lighthouse.sh](tools/update-lighthouse.sh) | Installa il fork di Google Lighthouse in `lighthouse/` (tag pinnato, build inclusa, mai nel repo) |
+| [tools/update-scalar.sh](tools/update-scalar.sh) | Vendorizza il lettore Scalar della spec OpenAPI in `gui/vendor/scalar/` (denylist telemetria, origini dichiarate) |
 | [docs/LIGHTHOUSE-FORK.md](docs/LIGHTHOUSE-FORK.md) | Strategia di manutenzione del fork: pin alla release, patch-set versionato, procedura di sync |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | CI GitHub Actions: flake8 + pytest multi-Python, job d'integrazione Lighthouse (Node + Chrome) e audit accessibilità Pa11y |
 | [tests/](tests/) | Suite pytest: unit test del nucleo numerico, fixture site locale, end-to-end CLI e GUI |
@@ -362,10 +363,17 @@ protezione dal path traversal ed esegue un audit alla volta.
 
 API esposte (usate dal frontend, utilizzabili anche da script):
 `GET /api/env` (versioni, RAM disponibile, valori suggeriti),
-`POST /api/audit` (avvio; `409` se un audit è già in corso),
+`POST /api/audit` (avvio; `409` se un audit è già in corso; dal
+branch `devapi` anche `lang`, `soglie`, `queries_gsc` e
+`fail_under` per la parità con la CLI),
 `GET /api/status` (stato, log, sintesi, rilievi, esiti RRF),
-`GET /api/report/{html,json,text}` (referti, `?download=1` per lo
-scarico).
+`GET /api/report/{html,json,text,md,csv}` (referti, `?download=1`
+per lo scarico). Il **contratto OpenAPI 3.1** è generato dal
+registro dichiarativo delle rotte (`marsbeacon/api.py`) e servito
+da `GET /api/v1/openapi.json` (snapshot golden in
+[docs/openapi.json](docs/openapi.json)); la **documentazione
+navigabile** è su `GET /api/docs` (Scalar vendorizzato, nessuna
+origine esterna).
 
 ## Le aree misurate
 
@@ -590,7 +598,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 385 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 387 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

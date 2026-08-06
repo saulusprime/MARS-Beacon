@@ -46,24 +46,13 @@ scelta — non rivalutare).
 
 ### Fase 1 — Il contratto (lo "swagger")
 
-Registro, generatore, spec servita, golden, validazione runtime,
-contract test e **parità CLI↔API** (lang, soglie, queries_gsc,
-fail_under nel POST /api/audit) sono **fatti** — censimento
-completo delle 17 rotte, `API_CONTRACT_VERSION` 1.1.0, vedi AS-IS
-"API — contratto e registro". Resta:
-
-- [ ] **Scalar vendorizzato** (decisione di Fase 0): script
-      `tools/update-scalar.sh` sul modello di update-vendor che
-      scarica `@scalar/api-reference` (MIT) da npm, pota ai soli
-      file necessari, scrive il file `VERSIONE` e **verifica
-      l'assenza di origini esterne** nel bundle; attribuzione nel
-      NOTICE.
-- [ ] Rotta `/api/docs`: Scalar in modalità markup (`data-url`
-      verso la spec, niente JS inline: CSP stretta), con
-      `withDefaultFonts: false` e `--scalar-font` sul Titillium
-      Web del brand già vendorizzato; test che la pagina serve,
-      punta alla spec e non contiene origini esterne (grep
-      automatico, pattern anti-telemetria del fork Lighthouse).
+**COMPLETATA il 2026-08-06 su `devapi`** (vedi AS-IS "API —
+contratto e registro"): registro dichiarativo e generatore
+OpenAPI 3.1, censimento totale (18 rotte), golden
+`docs/openapi.json`, validazione runtime dagli stessi schemi,
+contract test, parità CLI↔API (lang, soglie, queries_gsc,
+fail_under) e documentazione Scalar vendorizzata su `/api/docs`.
+`API_CONTRACT_VERSION` 1.2.0.
 
 ### Fase 2 — Backend puro
 

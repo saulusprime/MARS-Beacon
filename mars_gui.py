@@ -7,6 +7,10 @@ che serve una interfaccia grafica in Bootstrap Italia (cartella
 ``gui/``) e alcune API JSON per pilotare l'audit e fruire dei referti:
 
     GET  /                  interfaccia grafica
+    GET  /api/v1/openapi.json  contratto OpenAPI 3.1 generato dal
+                            registro delle rotte (marsbeacon/api.py)
+    GET  /api/docs          documentazione navigabile del contratto
+                            (Scalar vendorizzato)
     GET  /api/env           versione, RAM disponibile, valori suggeriti
     POST /api/register      registrazione (nome, email, password, ToS)
     POST /api/login         accesso con email e password
@@ -71,7 +75,7 @@ import mars_audit as sra
 
 from marsbeacon import api as mars_api
 
-__version__ = "2.32.0"
+__version__ = "2.33.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -1002,6 +1006,10 @@ class Handler(BaseHTTPRequestHandler):
             # Contratto API generato al volo dal registro delle
             # rotte (marsbeacon/api.py): mai letto da file.
             self._send_json(200, mars_api.openapi_spec())
+        elif path == "/api/docs":
+            # Documentazione navigabile del contratto: Scalar
+            # vendorizzato in modalita' markup, CSP stretta.
+            self._serve_static("/api-docs.html")
         elif path == "/api/env":
             ram = sra.available_ram_mb()
             suggested = (max(1, round(ram * 0.1))

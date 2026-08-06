@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "MARS Beacon API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Contratto dell'API locale di MARS Beacon, generato dal registro dichiarativo delle rotte (marsbeacon/api.py): spec e codice non possono divergere per costruzione. Gli errori sono {\"error\": messaggio in italiano} (piu' \"code\" macchina dove indicato). Un audit alla volta; slot orario per utente; download dei referti riservato alla registrazione completa.",
     "license": {
       "name": "Apache 2.0",
@@ -57,6 +57,28 @@
               "application/json": {
                 "schema": {
                   "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/docs": {
+      "get": {
+        "operationId": "get-api-docs",
+        "summary": "Documentazione navigabile del contratto (Scalar)",
+        "tags": [
+          "contratto"
+        ],
+        "description": "Lettore Scalar vendorizzato in modalita' markup: nessuna origine esterna (font predefiniti disattivati in favore del Titillium Web del brand; la CSP della GUI blocca comunque ogni caricamento fuori da 'self'). La spec grezza resta su /api/v1/openapi.json, importabile in qualunque strumento.",
+        "responses": {
+          "200": {
+            "description": "Pagina HTML della documentazione.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }

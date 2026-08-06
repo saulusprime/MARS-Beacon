@@ -503,3 +503,40 @@ def _api_grezza(base_url, path, cookie=""):
     except urllib.error.HTTPError as exc:
         return (exc.code, exc.read().decode("utf-8"),
                 dict(exc.headers))
+
+
+# ------------------- documentazione Scalar (/api/docs) ------------
+
+def test_contract_docs_scalar(base):
+    stato, corpo, headers = _api_grezza(base, "/api/docs")
+    assert stato == 200
+    assert headers.get("Content-Type", "").startswith("text/html")
+    # punta alla spec generata e al bundle vendorizzato
+    assert 'data-url="/api/v1/openapi.json"' in corpo
+    assert "/vendor/scalar/standalone.js" in corpo
+    # font predefiniti (fonts.scalar.com) spenti, brand al loro posto
+    assert '"withDefaultFonts": false' in corpo
+    assert "Titillium Web" in corpo
+    # nessuna origine esterna nella pagina; CSP stretta della GUI
+    assert "http://" not in corpo and "https://" not in corpo
+    assert headers.get("Content-Security-Policy") == gui.CSP
+
+
+def test_bundle_scalar_vendorizzato_e_pulito():
+    vendor = os.path.join(os.path.dirname(__file__), os.pardir,
+                          "gui", "vendor", "scalar")
+    bundle = os.path.join(vendor, "standalone.js")
+    assert os.path.isfile(bundle), \
+        "bundle assente: tools/update-scalar.sh"
+    assert os.path.isfile(os.path.join(vendor, "VERSIONE"))
+    assert os.path.isfile(os.path.join(vendor, "ORIGINI.txt"))
+    testo = open(bundle, encoding="utf-8",
+                 errors="replace").read()
+    # denylist telemetria (pattern anti-telemetria del fork
+    # Lighthouse): il bundle non deve contenere questi host
+    for host in ("sentry.io", "google-analytics",
+                 "googletagmanager", "posthog", "hotjar",
+                 "plausible.io"):
+        assert host not in testo, host
+    # il bundle resta autonomo: niente chunk dinamici
+    assert "dist/browser/chunks" not in testo

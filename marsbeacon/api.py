@@ -50,10 +50,11 @@ from marsbeacon.i18n import HTML_LANGS
 # Versione del contratto API, indipendente dalla versione dello
 # strumento: si muove solo quando cambia il contratto. La 1.0.0
 # ha segnato il censimento completo della superficie (17 rotte);
-# la 1.1.0 aggiunge la parita' CLI-API su POST /api/audit (lang,
-# soglie, queries_gsc, fail_under). E' il numero che compare in
-# info.version della spec.
-API_CONTRACT_VERSION = "1.1.0"
+# la 1.1.0 la parita' CLI-API su POST /api/audit (lang, soglie,
+# queries_gsc, fail_under); la 1.2.0 aggiunge GET /api/docs (la
+# documentazione Scalar del contratto). E' il numero che compare
+# in info.version della spec.
+API_CONTRACT_VERSION = "1.2.0"
 
 
 # Nome del cookie di sessione: fa parte del contratto (schema di
@@ -260,6 +261,23 @@ ROUTES: Tuple[Route, ...] = (
         tags=("contratto",),
         responses={200: {"description": "La spec OpenAPI.",
                          "schema": {"type": "object"}}},
+    ),
+    Route(
+        "GET", "/api/docs",
+        summary="Documentazione navigabile del contratto (Scalar)",
+        description="Lettore Scalar vendorizzato in modalita' "
+                    "markup: nessuna origine esterna (font "
+                    "predefiniti disattivati in favore del "
+                    "Titillium Web del brand; la CSP della GUI "
+                    "blocca comunque ogni caricamento fuori da "
+                    "'self'). La spec grezza resta su "
+                    "/api/v1/openapi.json, importabile in "
+                    "qualunque strumento.",
+        tags=("contratto",),
+        responses={200: {"description": "Pagina HTML della "
+                                        "documentazione.",
+                         "schema": {"type": "string"},
+                         "content_type": "text/html"}},
     ),
     Route(
         "GET", "/api/env",
