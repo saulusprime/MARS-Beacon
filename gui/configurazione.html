@@ -139,10 +139,13 @@
 
           <div class="form-group">
             <label for="f-url" class="active">URL del sito da auditare *</label>
+            <button type="button" class="lt-help"
+                    aria-controls="h-url" aria-expanded="false"
+                    aria-label="Aiuto: URL del sito da auditare">?</button>
             <input type="text" class="form-control" id="f-url" name="url"
                    required autocomplete="url" spellcheck="false"
                    aria-describedby="h-url" placeholder=" ">
-            <small id="h-url" class="form-text">
+            <small id="h-url" class="form-text" hidden>
               Esempio: https://esempio.it — se ometti lo schema viene
               usato https://
             </small>
@@ -153,11 +156,14 @@
             <div class="col-12 col-md-3">
               <div class="form-group">
                 <label for="f-max-pages" class="active">Pagine massime</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-max-pages" aria-expanded="false"
+                        aria-label="Aiuto: Pagine massime">?</button>
                 <input type="number" class="form-control" id="f-max-pages"
                        name="max_pages" value="25" min="1" max="500"
                        step="1" inputmode="numeric"
                        aria-describedby="h-max-pages">
-                <small id="h-max-pages" class="form-text">
+                <small id="h-max-pages" class="form-text" hidden>
                   Da 1 a 500 (predefinito 25)
                 </small>
                 <div class="invalid-feedback" id="e-max-pages"></div>
@@ -167,10 +173,13 @@
               <div class="form-group">
                 <label for="f-delay" class="active">Pausa fra richieste
                   (secondi)</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-delay" aria-expanded="false"
+                        aria-label="Aiuto: Pausa fra richieste (secondi)">?</button>
                 <input type="number" class="form-control" id="f-delay"
                        name="delay" value="0.5" min="0" max="10" step="0.1"
                        inputmode="decimal" aria-describedby="h-delay">
-                <small id="h-delay" class="form-text">
+                <small id="h-delay" class="form-text" hidden>
                   Da 0 a 10 (predefinito 0,5)
                 </small>
                 <div class="invalid-feedback" id="e-delay"></div>
@@ -180,11 +189,14 @@
               <div class="form-group">
                 <label for="f-max-body" class="active">Dimensione massima
                   risposta (MB)</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-max-body" aria-expanded="false"
+                        aria-label="Aiuto: Dimensione massima risposta (MB)">?</button>
                 <input type="number" class="form-control" id="f-max-body"
                        name="max_body" value="10" min="1" max="10240"
                        step="1" inputmode="numeric"
                        aria-describedby="h-max-body">
-                <small id="h-max-body" class="form-text">
+                <small id="h-max-body" class="form-text" hidden>
                   Tetto per ogni pagina scaricata (predefinito 10)
                 </small>
                 <div class="invalid-feedback" id="e-max-body"></div>
@@ -194,11 +206,14 @@
               <div class="form-group">
                 <label for="f-retries" class="active">Ritentativi su
                   errori transitori</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-retries" aria-expanded="false"
+                        aria-label="Aiuto: Ritentativi su errori transitori">?</button>
                 <input type="number" class="form-control" id="f-retries"
                        name="retries" value="2" min="0" max="10"
                        step="1" inputmode="numeric"
                        aria-describedby="h-retries">
-                <small id="h-retries" class="form-text">
+                <small id="h-retries" class="form-text" hidden>
                   Con attesa crescente, su errori di rete e HTTP
                   429/5xx (predefinito 2, 0 disattiva)
                 </small>
@@ -212,6 +227,9 @@
               <div class="form-group">
                 <label for="f-render" class="active">Rendering
                   JavaScript</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-render" aria-expanded="false"
+                        aria-label="Aiuto: Rendering JavaScript">?</button>
                 <select class="form-select" id="f-render"
                         name="render" aria-describedby="h-render">
                   <option value="off" selected>Spento</option>
@@ -219,7 +237,7 @@
                     client-side)</option>
                   <option value="always">Tutte le pagine</option>
                 </select>
-                <small id="h-render" class="form-text">
+                <small id="h-render" class="form-text" hidden>
                   Analizza il DOM renderizzato in un browser
                   headless. Richiede Playwright sul server.
                 </small>
@@ -229,11 +247,14 @@
               <div class="form-group">
                 <label for="f-workers" class="active">Richieste in
                   parallelo</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-workers" aria-expanded="false"
+                        aria-label="Aiuto: Richieste in parallelo">?</button>
                 <input type="number" class="form-control" id="f-workers"
                        name="workers" value="4" min="1" max="16"
                        step="1" inputmode="numeric"
                        aria-describedby="h-workers">
-                <small id="h-workers" class="form-text">
+                <small id="h-workers" class="form-text" hidden>
                   Da 1 a 16 (predefinito 4). Il ritmo verso il sito
                   non cambia: resta governato dalla pausa fra
                   richieste.
@@ -245,6 +266,9 @@
               <div class="form-group">
                 <label for="f-market" class="active">Mercato di
                   riferimento</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-market" aria-expanded="false"
+                        aria-label="Aiuto: Mercato di riferimento">?</button>
                 <select class="form-select" id="f-market"
                         name="market" aria-describedby="h-market">
                   <option value="occidentale" selected>Occidentale
@@ -252,7 +276,7 @@
                   <option value="globale">Globale</option>
                   <option value="orientale">Orientale</option>
                 </select>
-                <small id="h-market" class="form-text">
+                <small id="h-market" class="form-text" hidden>
                   Pesa l'indice composito dei profili di
                   citabilità: occidentale privilegia
                   ChatGPT/Perplexity e Claude, orientale Qwen e
@@ -264,6 +288,9 @@
               <div class="form-group">
                 <label for="f-judge" class="active">Giudizio LLM
                   sulla citabilità</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-judge" aria-expanded="false"
+                        aria-label="Aiuto: Giudizio LLM sulla citabilità">?</button>
                 <select class="form-select" id="f-judge"
                         name="judge" aria-describedby="h-judge">
                   <option value="auto" selected>Auto: se la chiave
@@ -271,7 +298,7 @@
                   <option value="on">Obbligatorio</option>
                   <option value="off">Spento</option>
                 </select>
-                <small id="h-judge" class="form-text">
+                <small id="h-judge" class="form-text" hidden>
                   I modelli scelti valutano i passaggi migliori,
                   una richiesta API per modello. Chiavi solo
                   dall'ambiente del server.
@@ -283,6 +310,11 @@
                         aria-describedby="h-judge-models">
                 <legend class="active h6 mb-1">Modelli del
                   giudizio</legend>
+                <button type="button" class="lt-help"
+                        aria-controls="h-judge-models"
+                        aria-expanded="false"
+                        aria-label="Aiuto: Modelli del giudizio">
+                  ?</button>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="checkbox"
                          id="f-jm-anthropic" checked>
@@ -307,7 +339,7 @@
                   <label class="form-check-label"
                          for="f-jm-kimi">Kimi</label>
                 </div>
-                <small id="h-judge-models" class="form-text">
+                <small id="h-judge-models" class="form-text" hidden>
                   Un verdetto per modello sugli stessi passaggi;
                   senza scelta vale Claude. In auto partecipano
                   solo i provider con la chiave sul server.
@@ -321,6 +353,9 @@
               <div class="form-group">
                 <label for="f-lighthouse" class="active">Audit
                   Lighthouse</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-lighthouse" aria-expanded="false"
+                        aria-label="Aiuto: Audit Lighthouse">?</button>
                 <select class="form-select" id="f-lighthouse"
                         name="lighthouse"
                         aria-describedby="h-lighthouse">
@@ -329,7 +364,7 @@
                     sono</option>
                   <option value="always">Obbligatorio</option>
                 </select>
-                <small id="h-lighthouse" class="form-text">
+                <small id="h-lighthouse" class="form-text" hidden>
                   Performance, accessibilità, SEO e best practice
                   col fork di Lighthouse. Richiede Node e
                   Chrome/Chromium sul server.
@@ -340,13 +375,16 @@
               <div class="form-group">
                 <label for="f-lighthouse-device"
                        class="active">Dispositivo Lighthouse</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-lighthouse-device" aria-expanded="false"
+                        aria-label="Aiuto: Dispositivo Lighthouse">?</button>
                 <select class="form-select" id="f-lighthouse-device"
                         name="lighthouse_device"
                         aria-describedby="h-lighthouse-device">
                   <option value="mobile" selected>Mobile</option>
                   <option value="desktop">Desktop</option>
                 </select>
-                <small id="h-lighthouse-device" class="form-text">
+                <small id="h-lighthouse-device" class="form-text" hidden>
                   Emulazione e throttling: mobile è il
                   predefinito, come PageSpeed.
                 </small>
@@ -356,12 +394,15 @@
               <div class="form-group">
                 <label for="f-lighthouse-pages" class="active">Pagine
                   Lighthouse oltre la home</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-lighthouse-pages" aria-expanded="false"
+                        aria-label="Aiuto: Pagine Lighthouse oltre la home">?</button>
                 <input type="number" class="form-control"
                        id="f-lighthouse-pages"
                        name="lighthouse_pages" value="3" min="0"
                        max="9" step="1" inputmode="numeric"
                        aria-describedby="h-lighthouse-pages">
-                <small id="h-lighthouse-pages" class="form-text">
+                <small id="h-lighthouse-pages" class="form-text" hidden>
                   Da 0 a 9 (predefinito 3): pagine
                   rappresentative, ~10–30 s ciascuna.
                 </small>
@@ -373,6 +414,9 @@
               <div class="form-group">
                 <label for="f-search-check" class="active">Ancora di
                   realtà (Brave)</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-search-check" aria-expanded="false"
+                        aria-label="Aiuto: Ancora di realtà (Brave)">?</button>
                 <select class="form-select" id="f-search-check"
                         name="search_check"
                         aria-describedby="h-search-check">
@@ -381,7 +425,7 @@
                   <option value="on">Obbligatoria</option>
                   <option value="off">Spenta</option>
                 </select>
-                <small id="h-search-check" class="form-text">
+                <small id="h-search-check" class="form-text" hidden>
                   Posizione reale del sito sulle query dell'audit
                   (Brave Search). Richiede BRAVE_API_KEY sul
                   server.
@@ -393,10 +437,13 @@
           <div class="form-group">
             <label for="f-competitors" class="active">Siti concorrenti
               (facoltativi)</label>
+            <button type="button" class="lt-help"
+                    aria-controls="h-competitors" aria-expanded="false"
+                    aria-label="Aiuto: Siti concorrenti (facoltativi)">?</button>
             <textarea class="form-control" id="f-competitors"
                       name="competitors" rows="2"
                       aria-describedby="h-competitors"></textarea>
-            <small id="h-competitors" class="form-text">
+            <small id="h-competitors" class="form-text" hidden>
               Da 1 a 3 URL, uno per riga. Ogni concorrente viene
               scansionato con gli stessi limiti e confrontato sulle
               stesse query: il referto mostra la share of voice nei
@@ -408,6 +455,9 @@
           <div class="form-group">
             <label for="f-robots" class="active">Robots.txt del sito
               auditato</label>
+            <button type="button" class="lt-help"
+                    aria-controls="h-robots" aria-expanded="false"
+                    aria-label="Aiuto: Robots.txt del sito auditato">?</button>
             <select class="form-select" id="f-robots" name="robots"
                     aria-describedby="h-robots">
               <option value="own" selected>Sito di mia titolarità:
@@ -416,7 +466,7 @@
               <option value="force">Ignora i Disallow (me ne assumo
                 la responsabilità)</option>
             </select>
-            <small id="h-robots" class="form-text">
+            <small id="h-robots" class="form-text" hidden>
               La titolarità dei siti auditati è dichiarata nelle
               condizioni di servizio accettate alla registrazione.
               Con "Rispetta" gli URL vietati all'agente SeoRrfAudit
@@ -447,9 +497,12 @@
           <div class="form-group">
             <label for="f-queries" class="active">Query di prova
               (facoltative)</label>
+            <button type="button" class="lt-help"
+                    aria-controls="h-queries" aria-expanded="false"
+                    aria-label="Aiuto: Query di prova (facoltative)">?</button>
             <textarea class="form-control" id="f-queries" name="queries"
                       rows="4" aria-describedby="h-queries"></textarea>
-            <small id="h-queries" class="form-text">
+            <small id="h-queries" class="form-text" hidden>
               Una per riga. Se vuoto, le query vengono generate
               automaticamente dai temi del sito.
             </small>
@@ -460,6 +513,9 @@
               <div class="form-group">
                 <label for="f-embeddings" class="active">Modello di
                   embedding (facoltativo)</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-embeddings" aria-expanded="false"
+                        aria-label="Aiuto: Modello di embedding (facoltativo)">?</button>
                 <input type="text" class="form-control" id="f-embeddings"
                        name="embeddings" spellcheck="false"
                        aria-describedby="h-embeddings"
@@ -468,7 +524,7 @@
                   <option value="paraphrase-multilingual-MiniLM-L12-v2"></option>
                   <option value="sentence-transformers/all-MiniLM-L6-v2"></option>
                 </datalist>
-                <small id="h-embeddings" class="form-text">
+                <small id="h-embeddings" class="form-text" hidden>
                   Nome di un modello sentence-transformers per il recupero
                   vettoriale reale.
                 </small>
@@ -478,10 +534,13 @@
               <div class="form-group">
                 <label for="f-rrf-k" class="active">Costante k della
                   formula RRF</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-rrf-k" aria-expanded="false"
+                        aria-label="Aiuto: Costante k della formula RRF">?</button>
                 <input type="number" class="form-control" id="f-rrf-k"
                        name="rrf_k" value="60" min="1" max="1000" step="1"
                        inputmode="numeric" aria-describedby="h-rrf-k">
-                <small id="h-rrf-k" class="form-text">
+                <small id="h-rrf-k" class="form-text" hidden>
                   Da 1 a 1000 (predefinito 60)
                 </small>
                 <div class="invalid-feedback" id="e-rrf-k"></div>
@@ -494,11 +553,14 @@
               <div class="form-group">
                 <label for="f-top-n" class="active">Posti fusi per
                   query</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-top-n" aria-expanded="false"
+                        aria-label="Aiuto: Posti fusi per query">?</button>
                 <input type="number" class="form-control"
                        id="f-top-n" name="top_n" value="5" min="1"
                        max="20" step="1" inputmode="numeric"
                        aria-describedby="h-top-n">
-                <small id="h-top-n" class="form-text">
+                <small id="h-top-n" class="form-text" hidden>
                   Da 1 a 20 (predefinito 5): governa consenso e
                   share of voice.
                 </small>
@@ -509,12 +571,15 @@
               <div class="form-group">
                 <label for="f-chunk-words" class="active">Parole
                   per chunk</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-chunk-words" aria-expanded="false"
+                        aria-label="Aiuto: Parole per chunk">?</button>
                 <input type="number" class="form-control"
                        id="f-chunk-words" name="chunk_words"
                        value="220" min="80" max="600" step="10"
                        inputmode="numeric"
                        aria-describedby="h-chunk-words">
-                <small id="h-chunk-words" class="form-text">
+                <small id="h-chunk-words" class="form-text" hidden>
                   Da 80 a 600 (predefinito 220); il taglio segue
                   comunque gli heading.
                 </small>
@@ -526,12 +591,15 @@
               <div class="form-group">
                 <label for="f-w-lex" class="active">Peso lista
                   lessicale</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-w-lex" aria-expanded="false"
+                        aria-label="Aiuto: Peso lista lessicale">?</button>
                 <input type="number" class="form-control"
                        id="f-w-lex" name="w_lex" value="1"
                        min="0.1" max="10" step="0.1"
                        inputmode="decimal"
                        aria-describedby="h-w-lex">
-                <small id="h-w-lex" class="form-text">
+                <small id="h-w-lex" class="form-text" hidden>
                   Variante RRF pesata: 1 e 1 è l'RRF classico.
                 </small>
                 <div class="invalid-feedback" id="e-w-lex"></div>
@@ -541,12 +609,15 @@
               <div class="form-group">
                 <label for="f-w-vec" class="active">Peso lista
                   vettoriale</label>
+                <button type="button" class="lt-help"
+                        aria-controls="h-w-vec" aria-expanded="false"
+                        aria-label="Aiuto: Peso lista vettoriale">?</button>
                 <input type="number" class="form-control"
                        id="f-w-vec" name="w_vec" value="1"
                        min="0.1" max="10" step="0.1"
                        inputmode="decimal"
                        aria-describedby="h-w-vec">
-                <small id="h-w-vec" class="form-text">
+                <small id="h-w-vec" class="form-text" hidden>
                   Da 0,1 a 10 (predefinito 1).
                 </small>
                 <div class="invalid-feedback" id="e-w-vec"></div>

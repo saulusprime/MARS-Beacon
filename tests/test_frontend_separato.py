@@ -72,6 +72,32 @@ def test_accesso_token_presente_e_accessibile():
     assert "if (REMOTE_API) {" in app
 
 
+def test_aiuti_contestuali_del_form():
+    """Gli hint del form di configurazione sono nascosti e si
+    aprono dall'icona "?" accanto all'etichetta (disclosure:
+    aria-expanded/aria-controls; aria-describedby resta sul
+    campo, quindi la descrizione arriva comunque alle AT)."""
+    pagina = _leggi("configurazione.html")
+    bottoni = re.findall(
+        r'class="lt-help"\s+aria-controls="(h-[\w-]+)"', pagina)
+    nascosti = re.findall(
+        r'<small id="(h-[\w-]+)" class="form-text[^"]*" hidden>',
+        pagina)
+    assert sorted(bottoni) == sorted(nascosti)
+    assert len(bottoni) >= 20
+    # ogni bottone dichiara stato e nome proprio
+    assert pagina.count('aria-expanded="false"') >= len(bottoni)
+    assert pagina.count('aria-label="Aiuto: ') == len(bottoni)
+    # la dichiarazione di responsabilita' robots resta in chiaro
+    assert "h-robots-ack" not in bottoni
+    assert ('id="h-robots-ack" class="form-text d-block mb-2">'
+            in pagina)
+    app = _leggi("app.js")
+    assert "bindHelpButtons" in app
+    css = _leggi("theme.css")
+    assert "button.lt-help" in css
+
+
 def test_javascript_sintatticamente_valido():
     for nome in ("app.js", "config.js", "smista.js"):
         esito = subprocess.run(

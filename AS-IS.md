@@ -1099,7 +1099,49 @@ Dettaglio nei bullet che seguono, dal più recente.
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.42.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.43.1 + `gui/`
+
+- **Fix: "Avvia audit" non partiva** (v2.43.1, 2026-08-06):
+  regressione della GUI a pagine — `clearErrors`, eseguita al
+  submit del form, azzerava anche `#audit-error`, che dalla P5
+  vive solo su scansione.html: sulla configurazione l'accesso a
+  un nodo assente uccideva il gestore prima di `startAudit`,
+  senza sintomi visibili (niente POST, niente redirect). Ora
+  l'azzeramento e' guardato (l'elemento e' dichiarato della sola
+  scansione). Verifica sistematica della classe di bug: censiti
+  tutti gli id `el("…")` di app.js contro le tre pagine —
+  l'unico flusso cross-pagina non guardato era questo
+  (`footer-info` assente e' gia' tollerato per progetto dalla
+  v2.39.0). **Nuovo `tests/test_gui_browser.py`**: il flusso
+  completo eseguito in Chromium reale via Playwright
+  (registrazione → redirect → "?" degli aiuti → avvio →
+  redirect con job nell'URL → risultati sul sito fixture →
+  ricaricamento dal deep-link, con `pageerror` raccolti e
+  asseriti vuoti) — e' la rete di regressione che i test
+  strutturali non possono dare, perche' questa classe di bug
+  emerge solo eseguendo il JavaScript; salta dichiaratamente
+  senza Playwright/Chromium, come il test del rendering.
+
+- **Aiuti contestuali a icona nel form** (v2.43.0, 2026-08-06):
+  i 23 hint sotto i campi della configurazione non sono più in
+  chiaro — ogni campo ha un'icona **"?"** accanto all'etichetta
+  (o alla legenda, per i modelli del giudizio) che apre e chiude
+  l'hint. Pattern **disclosure accessibile**, non tooltip al
+  passaggio del mouse (funziona da tastiera e touch): bottone con
+  `aria-expanded`/`aria-controls` e nome proprio ("Aiuto: nome
+  del campo"), hint `hidden` di default ma **`aria-describedby`
+  invariato sul campo** — le tecnologie assistive leggono la
+  descrizione anche a hint chiuso, perché i riferimenti
+  aria-describedby includono i nodi nascosti. I testi dinamici di
+  `loadEnv` (RAM suggerita, disponibilità di giudice, Lighthouse,
+  Brave) continuano ad aggiornare gli stessi nodi. **Eccezione
+  dichiarata**: l'hint della responsabilità robots
+  (`h-robots-ack`) resta in chiaro — testo di responsabilità, non
+  aiuto. Stile `.lt-help` in theme.css sul colore di brand
+  (`--lt-teal`, stato aperto evidenziato), toggle
+  `bindHelpButtons` in app.js (solo pagina configurazione). Test
+  strutturale dedicato (parità bottoni↔hint nascosti, nomi
+  propri, eccezione robots); suite verde, `node --check` ok.
 
 - **GUI a momenti UX distinti** (v2.42.0, 2026-08-06 — chiude il
   programma P5 del TO-DO, solo-frontend: nessun cambio d'API, il

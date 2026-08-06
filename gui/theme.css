@@ -305,3 +305,38 @@ body.mars-embed #main {
   height: 64px;
   width: auto;
 }
+
+/* ------------------------- Aiuti contestuali -------------------------
+   Icona "?" accanto alle etichette del form di configurazione:
+   apre e chiude l'hint del campo (bindHelpButtons in app.js).
+   Colore dal brand (link), focus visibile di Bootstrap Italia. */
+button.lt-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  margin-left: 0.3rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: none;
+  color: var(--lt-teal, #17324d);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: text-bottom;
+  cursor: pointer;
+}
+
+button.lt-help:hover {
+  color: #fff;
+  background: var(--lt-teal, #17324d);
+  border-color: var(--lt-teal, #17324d);
+}
+
+button.lt-help[aria-expanded="true"] {
+  color: #fff;
+  background: var(--lt-teal, #17324d);
+  border-color: var(--lt-teal, #17324d);
+}

@@ -346,6 +346,24 @@
   if (PAGE === "configurazione") {
     refreshPresetSelect();
     loadEnv();
+    bindHelpButtons();
+  }
+
+  /* Aiuti contestuali del form: gli hint sotto i campi sono
+     nascosti e si aprono dall'icona "?" accanto all'etichetta
+     (pattern disclosure: aria-expanded + aria-controls; il campo
+     mantiene aria-describedby, quindi le tecnologie assistive
+     leggono la descrizione anche a hint chiuso). */
+  function bindHelpButtons() {
+    document.querySelectorAll("button.lt-help").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const hint = el(btn.getAttribute("aria-controls"));
+        if (!hint) { return; }
+        const aperto = btn.getAttribute("aria-expanded") === "true";
+        btn.setAttribute("aria-expanded", String(!aperto));
+        hint.hidden = aperto;
+      });
+    });
   }
   if (PAGE === "accesso") {
     bindTokenLogin();
@@ -1338,7 +1356,8 @@
     const summary = el("form-error");
     summary.hidden = true;
     summary.textContent = "";
-    el("audit-error").hidden = true;
+    const auditError = el("audit-error");  // solo su scansione
+    if (auditError) { auditError.hidden = true; }
     document.querySelectorAll(".is-invalid").forEach((input) => {
       input.classList.remove("is-invalid");
       input.removeAttribute("aria-invalid");
