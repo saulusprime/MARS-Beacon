@@ -1180,6 +1180,32 @@ sono nel [README.md](README.md).
 
 ## File di servizio e documentazione
 
+- **Presentazione GitHub e file di comunità** (2026-08-06): badge
+  in testa al README (CI GitHub Actions, licenza, Python 3.10+,
+  versione, stato, referti in 5 lingue, obiettivo WCAG 2.2 AA,
+  brand Lympha nei colori di `lympha-brand.css`), sezione
+  "Contribuire" e paragrafo "Paternità e marchio" nella sezione
+  Licenza. La Apache 2.0 resta intatta (uso, modifica e
+  ridistribuzione liberi); la paternità di **Paolo Pierno / Lympha
+  Technologies S.r.l.** passa dagli strumenti che la licenza stessa
+  prevede — attribuzione nel NOTICE da conservare (art. 4), nessun
+  diritto sui marchi (art. 6: fork e derivati con nome e identità
+  propri, re-brand previsto in `gui/brand/`), contributi in
+  ingresso sotto la stessa licenza (art. 5) — più la governance
+  dichiarata: le decisioni di progetto restano al maintainer.
+  Nuovi file: **`CONTRIBUTING.md`** (issue prima di PR sostanziose,
+  rimando a "Scartato consapevolmente" per non rivalutare le
+  strade escluse, ambiente di sviluppo, requisiti di qualità che
+  la CI verifica — flake8, suite offline per costruzione, cataloghi
+  i18n in parità su tutte le lingue, accessibilità con
+  `verifica_at.py` e Pa11y, note di onestà, documentazione
+  allineata con bump di versione e del badge — licenza dei
+  contributi ex art. 5) e **`CODE_OF_CONDUCT.md`** (Contributor
+  Covenant 2.1 in italiano, contatto di applicazione
+  lymphalab@outlook.it). Entrambi riconosciuti da GitHub nel
+  community profile; righe dedicate nella tabella del repository
+  nel README.
+
 - `requirements.txt` (esecuzione) e `requirements-dev.txt`
   (pytest + flake8 + SDK anthropic per i test), `pytest.ini`.
 - File `LICENSE` (**Apache License 2.0** dal 2026-08-05, prima MIT)

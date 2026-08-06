@@ -3,6 +3,15 @@
 **MARS Beacon** (*Meta-fusion, Accessibility, Ranking & Security
 Audit*)
 
+[![CI](https://github.com/saulusprime/MARS-Beacon/actions/workflows/ci.yml/badge.svg)](https://github.com/saulusprime/MARS-Beacon/actions/workflows/ci.yml)
+[![Licenza: Apache 2.0](https://img.shields.io/badge/licenza-Apache_2.0-blue)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#installazione)
+[![Versione 1.60.0](https://img.shields.io/badge/versione-1.60.0-186078)](AS-IS.md)
+[![Stato: attivo](https://img.shields.io/badge/stato-attivo-success)](AS-IS.md)
+[![Referti in 5 lingue](https://img.shields.io/badge/referti-it_%C2%B7_en_%C2%B7_fr_%C2%B7_de_%C2%B7_es-186078)](#opzioni)
+[![Accessibilità WCAG 2.2 AA](https://img.shields.io/badge/accessibilit%C3%A0-WCAG_2.2_AA-6f42c1)](docs/ACCESSIBILITA.md)
+[![Un progetto Lympha Technologies](https://img.shields.io/badge/un_progetto-Lympha_Technologies-17324d)](https://lymphatech.it)
+
 Strumento scritto in Python 3, licenza Apache 2.0, che misura quanto un sito è
 **recuperabile e citabile dai motori di ricerca ibridi e dagli assistenti IA** 
 (ChatGPT, Claude, Perplexity, Google AI Overviews). Oltre ai controlli SEO classici, 
@@ -36,6 +45,8 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | [tests/](tests/) | Suite pytest: unit test del nucleo numerico, fixture site locale, end-to-end CLI e GUI |
 | [AS-IS.md](AS-IS.md) | Stato di fatto: tutto ciò che è già realizzato e verificato |
 | [TO-DO.md](TO-DO.md) | Ciò che resta da fare: bug noti, sviluppi e idee di miglioramento |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Regole di contribuzione: governance, requisiti di qualità, licenza dei contributi |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Codice di condotta (Contributor Covenant 2.1 in italiano) |
 | [mars_audit.md](mars_audit.md) | Nota tecnica di consegna: uso, verifiche eseguite, difetti corretti, fonti |
 
 ## Installazione
@@ -641,6 +652,18 @@ Dettaglio completo in [mars_audit.md](mars_audit.md).
 - [OpenSearch — Introducing RRF for hybrid search](https://opensearch.org/blog/introducing-reciprocal-rank-fusion-hybrid-search/)
 - [Schema.org](https://schema.org/)
 
+## Contribuire
+
+MARS Beacon è open source con una direzione ben precisa: ideazione,
+visione e roadmap sono di **Paolo Pierno** per **Lympha Technologies
+S.r.l.**, e le decisioni di progetto restano in capo al maintainer.
+Dentro questa cornice i contributi sono benvenuti: correzioni,
+segnalazioni circostanziate e proposte discusse prima in una issue.
+Le regole — ambiente di sviluppo, requisiti di qualità che la CI
+verifica, licenza dei contributi — sono in
+[CONTRIBUTING.md](CONTRIBUTING.md); in ogni spazio del progetto vale
+il [Codice di condotta](CODE_OF_CONDUCT.md).
+
 ## Licenza
 
 Apache License 2.0 — vedi [LICENSE](LICENSE) e [NOTICE](NOTICE)
@@ -650,3 +673,17 @@ fork di Lighthouse in corso di integrazione ed è adatta all'uso B2B
 enterprise: rispetto alla MIT aggiunge la concessione esplicita dei
 diritti di brevetto (art. 3) e la clausola di difesa che revoca la
 licenza a chi avvia contenziosi brevettuali sul software.
+
+**Paternità e marchio.** MARS Beacon è ideato, progettato e diretto
+da **Paolo Pierno**; il titolare del copyright è **Lympha
+Technologies S.r.l.** La Apache 2.0 garantisce a chiunque uso,
+modifica e ridistribuzione, anche commerciali, e con gli stessi
+articoli tutela la paternità del progetto: l'attribuzione nel file
+[NOTICE](NOTICE) va conservata in ogni ridistribuzione (art. 4), la
+licenza **non concede alcun diritto sui marchi** (art. 6) — i nomi
+«MARS Beacon» e «Lympha Technologies», il logo e l'identità visiva
+identificano il progetto originale, quindi fork e lavori derivati si
+presentano con un nome e un'identità propri (il re-brand è previsto:
+basta ridefinire i token in `gui/brand/`) — e ogni contributo
+inviato al progetto è concesso alle condizioni della stessa licenza
+(art. 5).
