@@ -35,7 +35,7 @@ except ImportError:  # pragma: no cover
              "beautifulsoup4 lxml")
 
 
-__version__ = "1.59.0"
+__version__ = "1.60.0"
 
 
 # Versione dello SCHEMA del referto JSON (e delle righe dello

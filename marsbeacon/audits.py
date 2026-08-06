@@ -374,32 +374,56 @@ _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _LH_EN_CATALOG: Optional[Dict[str, str]] = None
 
 
-def _lh_en_catalog() -> Dict[str, str]:
-    """Messaggi inglesi del fork (en-US.json), una volta sola.
+def _lh_read_locale(filename: str) -> Dict[str, str]:
+    """Messaggi id -> testo da un file di locale del fork.
 
     Vuoto se il file manca o non si legge: i testi dei rilievi
-    Lighthouse restano in italiano nei referti EN — stesso
-    fallback dichiarato, campo per campo, del catalogo
-    _FINDINGS_EN.
+    Lighthouse restano in italiano nei referti tradotti — stesso
+    fallback dichiarato, campo per campo, dei cataloghi dei
+    rilievi.
     """
+    catalog: Dict[str, str] = {}
+    path = os.path.join(LIGHTHOUSE_DIR, "shared",
+                        "localization", "locales", filename)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except (OSError, ValueError):
+        return catalog
+    for msg_id, entry in raw.items():
+        message = entry.get("message") \
+            if isinstance(entry, dict) else None
+        if isinstance(message, str):
+            catalog[msg_id] = message
+    return catalog
+
+
+def _lh_en_catalog() -> Dict[str, str]:
+    """Messaggi inglesi del fork (en-US.json), una volta sola."""
     global _LH_EN_CATALOG
     if _LH_EN_CATALOG is None:
-        catalog: Dict[str, str] = {}
-        path = os.path.join(LIGHTHOUSE_DIR, "shared",
-                            "localization", "locales",
-                            "en-US.json")
-        try:
-            with open(path, encoding="utf-8") as fh:
-                raw = json.load(fh)
-            for msg_id, entry in raw.items():
-                message = entry.get("message") \
-                    if isinstance(entry, dict) else None
-                if isinstance(message, str):
-                    catalog[msg_id] = message
-        except (OSError, ValueError):
-            catalog = {}
-        _LH_EN_CATALOG = catalog
+        _LH_EN_CATALOG = _lh_read_locale("en-US.json")
     return _LH_EN_CATALOG
+
+
+# Cache dei locale non inglesi del fork (fr.json, de.json, ...),
+# caricati pigramente alla prima richiesta della lingua.
+_LH_CATALOGS: Dict[str, Dict[str, str]] = {}
+
+
+def lh_locale_catalog(lang: str) -> Dict[str, str]:
+    """Messaggi del fork nella lingua del referto, una volta sola.
+
+    Per l'inglese vale ``_lh_en_catalog()`` (risolto dal parser al
+    parse-time: i referti gia' salvati nello storico restano
+    leggibili); per le altre lingue il file e' ``<lang>.json`` e
+    la risoluzione avviene al rendering dagli id dei messaggi.
+    """
+    if lang == "en":
+        return _lh_en_catalog()
+    if lang not in _LH_CATALOGS:
+        _LH_CATALOGS[lang] = _lh_read_locale("%s.json" % lang)
+    return _LH_CATALOGS[lang]
 
 
 def _lh_message_ids(lhr: Dict[str, object]) -> Dict[str, str]:
@@ -505,6 +529,7 @@ def lighthouse_findings(data: Optional[Dict[str, object]]
     cat_scores: Dict[str, List[float]] = {}
     cat_titles: Dict[str, str] = {}
     cat_titles_en: Dict[str, str] = {}
+    cat_titles_msg: Dict[str, str] = {}
     cat_failed: Set[str] = set()
     for res in data.get("results") or []:
         page_url = str(res.get("url") or "")
@@ -527,6 +552,9 @@ def lighthouse_findings(data: Optional[Dict[str, object]]
                                  "categories.%s.title" % cat_id)
             if cat_en:
                 cat_titles_en.setdefault(cat_id, cat_en)
+            cat_msg = reverse.get("categories.%s.title" % cat_id)
+            if cat_msg:
+                cat_titles_msg.setdefault(cat_id, cat_msg)
             cat_score = cat.get("score")
             if isinstance(cat_score, (int, float)):
                 cat_scores.setdefault(cat_id, []).append(
@@ -563,6 +591,11 @@ def lighthouse_findings(data: Optional[Dict[str, object]]
                             "audits[%s].title" % audit_id) or "",
                         "fix_en": _lh_en_text(
                             reverse,
+                            "audits[%s].description"
+                            % audit_id) or "",
+                        "title_msg": reverse.get(
+                            "audits[%s].title" % audit_id) or "",
+                        "fix_msg": reverse.get(
                             "audits[%s].description"
                             % audit_id) or "",
                         "urls": [],
@@ -615,7 +648,9 @@ def lighthouse_findings(data: Optional[Dict[str, object]]
                     "display": e["display"],
                     "evidence": list(e["evidence"]),
                     "title_en": e["title_en"],
-                    "fix_en": e["fix_en"]}))
+                    "fix_en": e["fix_en"],
+                    "title_msg": e["title_msg"],
+                    "fix_msg": e["fix_msg"]}))
 
     for cat_id in sorted(cat_scores):
         if cat_id in cat_failed:
@@ -632,8 +667,9 @@ def lighthouse_findings(data: Optional[Dict[str, object]]
             key="lh.%s.ok" % cat_id,
             params={"category": cat_id, "score": media,
                     "pages": len(scores),
-                    "cat_title_en": cat_titles_en.get(cat_id,
-                                                      "")}))
+                    "cat_title_en": cat_titles_en.get(cat_id, ""),
+                    "cat_title_msg": cat_titles_msg.get(cat_id,
+                                                        "")}))
 
     errors = data.get("errors") or []
     if errors:

@@ -12,11 +12,12 @@ def _patch(monkeypatch, name, value):
     import marsbeacon.audits
     import marsbeacon.base
     import marsbeacon.crawler
+    import marsbeacon.i18n
     import marsbeacon.indexes
     import marsbeacon.render
     for modulo in (mars_audit, marsbeacon.base, marsbeacon.crawler,
                    marsbeacon.indexes, marsbeacon.audits,
-                   marsbeacon.render):
+                   marsbeacon.render, marsbeacon.i18n):
         if name in vars(modulo):
             monkeypatch.setattr(modulo, name, value)
 
@@ -90,16 +91,29 @@ def test_lingua_en_cornice_e_nota_dichiarata():
     assert "Report in English" in out
 
 
-def test_cataloghi_it_en_stesse_chiavi():
+def test_lingua_fr_cornice_e_nota_dichiarata():
+    out = _render(lang="fr")
+    assert "<html lang=\"fr\">" in out
+    assert "Plan de remédiation" in out
+    assert "Principaux constats" in out
+    assert "Technique" in out and "Lexicale (BM25)" in out
+    assert "Rapport en français" in out
+
+
+def test_cataloghi_html_stesse_chiavi_tutte_le_lingue():
     it = set(sra._HTML_I18N["it"])
-    en = set(sra._HTML_I18N["en"])
-    assert it == en
+    assert set(sra._HTML_I18N) == set(sra.HTML_LANGS)
+    for lingua in sra.HTML_LANGS:
+        assert set(sra._HTML_I18N[lingua]) == it, lingua
 
 
 def test_cli_lang_scelte():
     parser = sra.build_parser()
     assert parser.parse_args(["x.it"]).lang == "it"
     assert parser.parse_args(["x.it", "--lang", "en"]).lang == "en"
+    for lingua in ("fr", "de", "es"):
+        assert parser.parse_args(
+            ["x.it", "--lang", lingua]).lang == lingua
 
 
 # ------------- treemap e interattivita' (v1.53.0) -----------------

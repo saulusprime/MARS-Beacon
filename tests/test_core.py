@@ -12,11 +12,12 @@ def _patch(monkeypatch, name, value):
     import marsbeacon.audits
     import marsbeacon.base
     import marsbeacon.crawler
+    import marsbeacon.i18n
     import marsbeacon.indexes
     import marsbeacon.render
     for modulo in (mars_audit, marsbeacon.base, marsbeacon.crawler,
                    marsbeacon.indexes, marsbeacon.audits,
-                   marsbeacon.render):
+                   marsbeacon.render, marsbeacon.i18n):
         if name in vars(modulo):
             monkeypatch.setattr(modulo, name, value)
 

@@ -338,6 +338,7 @@ from marsbeacon.audits import (  # noqa: F401
     QUERY_TEMPLATES,
     QueryResult,
     ShareResult,
+    _LH_CATALOGS,
     _LH_EN_CATALOG)
 from marsbeacon.audits import (  # noqa: F401
     _MD_LINK_RE,
@@ -368,7 +369,8 @@ from marsbeacon.audits import (  # noqa: F401
     _judge_sample,
     _kill_lighthouse,
     _lh_en_catalog,
-    _lh_en_text)
+    _lh_en_text,
+    _lh_read_locale)
 from marsbeacon.audits import (  # noqa: F401
     _lh_message_ids,
     _lhr_evidence,
@@ -402,9 +404,10 @@ from marsbeacon.audits import (  # noqa: F401
 from marsbeacon.audits import (  # noqa: F401
     is_question,
     judge_unavailable,
-    lighthouse_area_score,
-    lighthouse_findings)
+    lh_locale_catalog,
+    lighthouse_area_score)
 from marsbeacon.audits import (  # noqa: F401
+    lighthouse_findings,
     lighthouse_report_data,
     lighthouse_unavailable,
     lighthouse_version,
@@ -424,25 +427,38 @@ from marsbeacon.audits import (  # noqa: F401
     simulate_rrf,
     simulate_share_of_voice,
     validate_jsonld)
+from marsbeacon.i18n import (  # noqa: F401
+    HTML_LANGS,
+    _AREA_I18N,
+    _FINDINGS_BY_LANG,
+    _FINDINGS_DE,
+    _FINDINGS_EN)
+from marsbeacon.i18n import (  # noqa: F401
+    _FINDINGS_ES,
+    _FINDINGS_FR,
+    _FRAME_I18N,
+    _HTML_I18N,
+    _LH_FRAME)
+from marsbeacon.i18n import (  # noqa: F401
+    _lighthouse_texts,
+    csv_header,
+    csv_yes,
+    evidence_note,
+    finding_texts,
+    frame_text)
 from marsbeacon.render import (  # noqa: F401
     FONTS_DIR,
-    HTML_LANGS,
     _CSS,
-    _FINDINGS_EN)
-from marsbeacon.render import (  # noqa: F401
     _FONT_FILES,
-    _HTML_I18N,
-    _REPORT_JS,
-    _brand_font_css)
+    _REPORT_JS)
 from marsbeacon.render import (  # noqa: F401
+    _brand_font_css,
     _brand_logo_svg,
     _donut_svg,
-    _finding_anchor,
-    _lighthouse_texts_en)
+    _finding_anchor)
 from marsbeacon.render import (  # noqa: F401
     _md_cell,
     _render_hero,
-    finding_texts,
     page_status_counts)
 from marsbeacon.render import (  # noqa: F401
     render_csv,
@@ -738,11 +754,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="lingua del referto per i formati "
                              "html, text, md e csv: cornice E "
                              "rilievi (titoli, dettagli, fix, "
-                             "esempi via catalogo). Le evidenze "
-                             "citate dal sito (URL, estratti) "
-                             "restano nella lingua del sito, "
-                             "dichiarato nel referto. Il JSON "
-                             "resta canonico in italiano con "
+                             "esempi via catalogo — una tabella "
+                             "per lingua: en, fr, de, es). Le "
+                             "evidenze citate dal sito (URL, "
+                             "estratti) restano nella lingua del "
+                             "sito, dichiarato nel referto. Il "
+                             "JSON resta canonico in italiano con "
                              "chiave e parametri di traduzione "
                              "per rilievo (default it)")
     parser.add_argument("--output", metavar="FILE",

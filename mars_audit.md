@@ -676,6 +676,19 @@ Novità 1.45.0 (2026-08-05): file rinominati `mars_*` (questo script
 progetto da MIT ad **Apache License 2.0** con file `NOTICE`
 (allineamento al fork Lighthouse e uso B2B enterprise).
 
+Novità 1.60.0 (2026-08-06): referti anche in **francese, tedesco e
+spagnolo** (`--lang it|en|fr|de|es`), le tre lingue che completano il
+pentaglotta già coperto dall'analisi linguistica (v1.20.0). Una
+tabella per lingua col meccanismo chiave+parametri della 1.43.0
+(cataloghi `_FINDINGS_FR/DE/ES`, ~140 voci ciascuno) e stesso
+fallback dichiarato campo per campo; cornici HTML (`_HTML_I18N`) e
+text/md (`_FRAME_I18N`, chiave = testo italiano canonico) nelle tre
+lingue; i rilievi Lighthouse si traducono coi **file di locale del
+fork** (fr/de/es.json, risolti al rendering dagli id dei messaggi
+salvati nei params). Cataloghi e resolver vivono nel nuovo modulo
+`marsbeacon/i18n.py`. Il JSON resta canonico in italiano; l'output
+italiano è identico per costruzione.
+
 ## Uso
 
 ```
@@ -711,8 +724,8 @@ Lighthouse col fork installato da `tools/update-lighthouse.sh`;
 richiede Node ≥ 22.19 e Chrome — `auto` salta con motivo dichiarato
 se mancano, `always` li pretende), `--history FILE` (storico JSONL:
 delta nei referti e riga compatta accodata a ogni esecuzione),
-`--format text|json|html|md|csv`, `--lang it|en`, `--output`,
-`--quiet`, `--version`.
+`--format text|json|html|md|csv`, `--lang it|en|fr|de|es`,
+`--output`, `--quiet`, `--version`.
 
 Codici di uscita: `0` nessuna criticità, `1` almeno una criticità, `2` errore
 d'uso, `130` interruzione.

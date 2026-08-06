@@ -25,7 +25,7 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | File | Descrizione |
 |---|---|
 | [mars_audit.py](mars_audit.py) | Lo strumento: facciata con la CLI (`python3 mars_audit.py URL`), PEP8, `flake8` pulito |
-| [marsbeacon/](marsbeacon/) | Il codice dello strumento, scomposto in moduli: `base`, `crawler`, `indexes`, `audits`, `render` |
+| [marsbeacon/](marsbeacon/) | Il codice dello strumento, scomposto in moduli: `base`, `crawler`, `indexes`, `audits`, `render`, `i18n` |
 | [mars_gui.py](mars_gui.py) | Interfaccia web locale: server stdlib che pilota lo script ed espone i referti |
 | [mars_citations.py](mars_citations.py) | Monitoraggio periodico delle citazioni IA effettive (Claude, Perplexity) con storico e soglie |
 | [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies |
@@ -120,7 +120,7 @@ python3 mars_audit.py https://esempio.it \
 | *(robots.txt)* | rispetta | **dalla v1.13.0 i `Disallow` per l'agente `SeoRrfAudit` sono rispettati di default**: gli URL vietati non vengono scaricati e sono elencati nel referto. `--own-site` dichiara il sito di tua titolarità e li analizza comunque (i concorrenti restano protetti); `--ignore-robots accetto` li ignora ovunque, con accettazione **esplicita** di responsabilità (il valore letterale "accetto" è obbligatorio). `--respect-robots` resta accettato ma è deprecato (ora è il default) e non si combina con gli altri due |
 | `--max-body MB` | 10 | tetto al corpo di ogni risposta: lo scarico avviene a blocchi e si interrompe al superamento (o subito, se il `Content-Length` dichiarato eccede). Il corpo resta in RAM durante l'analisi: dimensiona il valore sulla memoria della tua macchina, di norma non oltre un decimo della RAM disponibile — lo script stesso avvisa all'avvio se il valore scelto è alto per la macchina in uso |
 | `--format text\|json\|html\|md\|csv` | text | formato del referto. Il JSON dichiara `schema_version` (oggi `1`): si incrementa solo per cambi incompatibili della struttura — è il numero su cui fare il gate nelle integrazioni. `md` è Markdown per issue/PR (il piano di remediation è una task list spuntabile); `csv` esporta i rilievi una riga ciascuno per Excel/Sheets (`;` e BOM). L'HTML ha un **CSS di stampa** (la stampa del browser produce un PDF pulito, con colori di verdetto e URL delle fonti) e **ancore stabili per rilievo** (`#r-…`, i conteggi nei titoli non le cambiano): Top rilievi e piano di remediation linkano il rilievo esteso, e ogni rilievo ha il suo permalink `#` |
-| `--lang it\|en` | it | lingua del referto per i formati `html`, `text`, `md` e `csv`: **cornice e rilievi** (titoli, dettagli, correzioni ed esempi tradotti via catalogo interno, ~125 rilievi). Le **evidenze citate dal sito** (URL, estratti di pagina, titoli del confronto storico) restano nella lingua del sito, dichiarato in testa al referto. Il JSON resta canonico in italiano e porta per ogni rilievo `key` e `params`, con cui le integrazioni possono tradurre da sole |
+| `--lang it\|en\|fr\|de\|es` | it | lingua del referto per i formati `html`, `text`, `md` e `csv`: **cornice e rilievi** (titoli, dettagli, correzioni ed esempi tradotti via cataloghi interni — una tabella per lingua, ~140 voci ciascuna; dalla v1.60.0 anche **francese, tedesco e spagnolo**, le lingue già coperte dall'analisi linguistica). I rilievi Lighthouse si traducono coi **file di locale del fork**. Le **evidenze citate dal sito** (URL, estratti di pagina, titoli del confronto storico) restano nella lingua del sito, dichiarato in testa al referto. Il JSON resta canonico in italiano e porta per ogni rilievo `key` e `params`, con cui le integrazioni possono tradurre da sole |
 | `--output FILE` | stdout | scrive il referto su file |
 | `--quiet` | — | sopprime l'avanzamento su stderr |
 | `--version` | — | stampa la versione |
@@ -578,7 +578,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 342 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 349 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
@@ -597,6 +597,9 @@ assente), le tre modalità robots, piano di remediation con sforzo e
 quick win, "matematica del problema", profili di citabilità per
 assistente IA (pesi e ancoraggi calcolati a mano, rinormalizzazione
 con aree mancanti, mercati), coerenza dei tre renderer,
+**i18n dei referti in en/fr/de/es** (parità di chiavi e campi fra i
+cataloghi, copertura della cornice verificata sull'AST dei renderer,
+audit reale con traduzione effettiva di ogni rilievo),
 codici di uscita CLI, API della GUI (account, limite orario, SSE,
 storico, CSP, path traversal, annullamento), **integrazione
 Lighthouse offline per costruzione** (LHR finti e `subprocess.Popen`

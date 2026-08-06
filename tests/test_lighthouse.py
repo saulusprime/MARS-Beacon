@@ -22,11 +22,12 @@ def _patch(monkeypatch, name, value):
     import marsbeacon.audits
     import marsbeacon.base
     import marsbeacon.crawler
+    import marsbeacon.i18n
     import marsbeacon.indexes
     import marsbeacon.render
     for modulo in (mars_audit, marsbeacon.base, marsbeacon.crawler,
                    marsbeacon.indexes, marsbeacon.audits,
-                   marsbeacon.render):
+                   marsbeacon.render, marsbeacon.i18n):
         if name in vars(modulo):
             monkeypatch.setattr(modulo, name, value)
 
@@ -769,6 +770,68 @@ def test_i18n_en_ok_e_errori(monkeypatch):
     errori = sra.finding_texts(per_chiave["lh.run.errors"], "en")
     assert errori["title"] \
         == "Lighthouse did not complete on 1 page"
+
+
+def _locale_fr(tmp_path, failure_title="Le document n'a pas de "
+                                       "méta description"):
+    """Finto fork installato col solo locale fr.json."""
+    cartella = tmp_path / "shared" / "localization" / "locales"
+    cartella.mkdir(parents=True)
+    (cartella / "fr.json").write_text(json.dumps({
+        "audit.js | failureTitle": {"message": failure_title},
+        "audit.js | description":
+            {"message": "Rédigez la [méta](https://web.dev/meta)."},
+        "config.js | seoCategoryTitle": {"message": "SEO (fr)"},
+    }), encoding="utf-8")
+    return str(tmp_path)
+
+
+def test_i18n_fr_risolto_al_rendering(monkeypatch, tmp_path):
+    """Le lingue oltre l'inglese risolvono gli id dei messaggi
+    (``*_msg`` nei params) sui locale del fork al rendering."""
+    _patch(monkeypatch, "LIGHTHOUSE_DIR", _locale_fr(tmp_path))
+    _patch(monkeypatch, "_LH_CATALOGS", {})
+    data = _dati_lhr([{"url": "https://x.it/", "lhr": _lhr_i18n()}])
+    rilievo = sra.lighthouse_findings(data)[0]
+    assert rilievo.params["title_msg"] == "audit.js | failureTitle"
+    assert rilievo.params["fix_msg"] == "audit.js | description"
+    testi = sra.finding_texts(rilievo, "fr")
+    assert testi["title"] == ("Lighthouse : Le document n'a pas "
+                              "de méta description")
+    assert testi["fix"] == "Rédigez la méta."
+    assert "Pages : https://x.it/" in testi["detail"]
+    # lingua senza locale installato: fallback italiano dichiarato
+    assert "meta descrizione" \
+        in sra.finding_texts(rilievo, "de")["title"]
+
+
+def test_i18n_fr_ok_errori_e_icu(monkeypatch, tmp_path):
+    _patch(monkeypatch, "LIGHTHOUSE_DIR", _locale_fr(tmp_path))
+    _patch(monkeypatch, "_LH_CATALOGS", {})
+    data = _dati_lhr([{"url": "https://x.it/",
+                       "lhr": _lhr_i18n(score=1.0)}],
+                     errors=[{"url": "https://x.it/a",
+                              "error": "tempo scaduto"}])
+    per_chiave = {f.key: f for f in sra.lighthouse_findings(data)}
+    assert per_chiave["lh.seo.ok"].params["cat_title_msg"] \
+        == "config.js | seoCategoryTitle"
+    ok = sra.finding_texts(per_chiave["lh.seo.ok"], "fr")
+    assert ok["title"] == "Lighthouse SEO (fr) : aucun constat"
+    assert ok["detail"] == "Score 50/100 sur 1 page examinée."
+    errori = sra.finding_texts(per_chiave["lh.run.errors"], "fr")
+    assert errori["title"] \
+        == "Lighthouse n'a pas abouti sur 1 page"
+
+
+def test_i18n_fr_placeholder_icu_scartati(monkeypatch, tmp_path):
+    _patch(monkeypatch, "LIGHTHOUSE_DIR",
+           _locale_fr(tmp_path, failure_title="Perdu {timeInMs} ms"))
+    _patch(monkeypatch, "_LH_CATALOGS", {})
+    data = _dati_lhr([{"url": "https://x.it/", "lhr": _lhr_i18n()}])
+    rilievo = sra.lighthouse_findings(data)[0]
+    # messaggio con placeholder ICU residui: resta l'italiano
+    assert "meta descrizione" \
+        in sra.finding_texts(rilievo, "fr")["title"]
 
 
 def test_parser_soglie_esatte_dei_bucket():

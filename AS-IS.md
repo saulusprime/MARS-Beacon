@@ -11,12 +11,55 @@ rinominati: `seo_rrf_audit.py` → `mars_audit.py`, `seo_rrf_gui.py` →
 `seo_rrf_audit.md` → `mars_audit.md`, unit systemd `seo-rrf-*` →
 `mars-*`.
 
-Fotografia di ciò che è **già realizzato e verificato** al 2026-08-05.
+Fotografia di ciò che è **già realizzato e verificato** al 2026-08-06.
 È il complemento di [TO-DO.md](TO-DO.md), che da qui in avanti elenca
 solo ciò che resta da fare. Il quadro d'insieme e le istruzioni d'uso
 sono nel [README.md](README.md).
 
-## Strumento CLI — `mars_audit.py` v1.59.0 (+ package `marsbeacon/`)
+## Strumento CLI — `mars_audit.py` v1.60.0 (+ package `marsbeacon/`)
+
+- **Referti in cinque lingue** (v1.60.0, 2026-08-06, chiude la voce
+  P3 "altre lingue del referto"): `--lang it|en|fr|de|es` —
+  **francese, tedesco e spagnolo** completano il pentaglotta già
+  coperto dall'analisi linguistica (v1.20.0). Architettura "una
+  tabella per lingua" col meccanismo chiave+parametri della v1.43.0:
+  cataloghi dei rilievi `_FINDINGS_FR/DE/ES` (140 voci ciascuno,
+  stessi campi e segnaposto di `_FINDINGS_EN`), cornice HTML
+  `_HTML_I18N` estesa a cinque lingue (128 chiavi ciascuna) e
+  cornice text/md nel nuovo `_FRAME_I18N` (83 voci per lingua,
+  **chiave = testo italiano canonico** delle coppie inline
+  `T(it, en)`, che restano il meccanismo per l'inglese — zero
+  modifiche ai punti di chiamata); etichette d'area in
+  `_AREA_I18N`, intestazioni CSV e nota sulle evidenze per lingua.
+  Stesso **fallback dichiarato campo per campo** ovunque; le nuove
+  lingue usano i diacritici veri (é, ü, ó — l'output italiano resta
+  identico per costruzione, storico e ancore intatti). I **rilievi
+  Lighthouse** si traducono coi file di locale del fork
+  (fr/de/es.json): il parser salva anche gli **id dei messaggi**
+  (`title_msg`/`fix_msg`/`cat_title_msg`, additivi nei params,
+  accanto ai testi `*_en` risolti al parse-time che restano per la
+  compatibilità con i referti già salvati) e
+  `lh_locale_catalog(lang)` li risolve pigramente al rendering,
+  con cornice per lingua (`_LH_FRAME`, singolare/plurale
+  espliciti) e scarto dei messaggi con placeholder ICU residui.
+  Cataloghi e resolver vivono nel nuovo modulo
+  **`marsbeacon/i18n.py`** (~5.800 righe, quasi tutte tabelle),
+  estratto da `render` con spostamento meccanico; facciata e
+  `_patch` dei test estesi al modulo. La GUI non cambia (referti
+  in italiano canonico). 7 test in più (parità di chiavi e campi
+  fra i cataloghi, template formattabili in ogni lingua,
+  **copertura della cornice verificata sull'AST** dei renderer con
+  controllo dei segnaposto posizionali, audit reale sul sito
+  fixture con traduzione effettiva — template applicato, nessun
+  fallback — in tutte e quattro le lingue, marcatori di cornice
+  mai nella lingua sbagliata su text/md/html, intestazioni CSV,
+  Lighthouse fr risolto al rendering con ok/errori/ICU e fallback
+  della lingua senza locale); suite 349 test, flake8 pulito.
+  Verificato anche dal vivo: audit reale con referti fr (text) e
+  de (md) corretti; i valori dinamici non catalogati (sforzo,
+  motivi di salto, note di onestà, focus dei profili) restano in
+  italiano come già nei referti EN dalla v1.43.0 —
+  comportamento dichiarato, non regressione.
 
 - **Grafo dei link, motore evoluto** (v1.59.0, GUI v2.30.0,
   2026-08-05) — in vanilla JavaScript su entrambe le superfici
@@ -1110,7 +1153,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 342 test in ~30 secondi** (inclusa
+- **Suite pytest: 349 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con
