@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- brand:testa inizio -->
+  <title>Configurazione della scansione · MARS Beacon — Lympha Technologies</title>
+  <link rel="icon" type="image/png" href="brand/favicon.png">
+  <!-- brand:testa fine -->
+  <link rel="stylesheet" href="vendor/bootstrap-italia/css/bootstrap-italia.min.css">
+  <link rel="stylesheet" href="brand/brand.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="custom.css">
+</head>
+<body data-page="configurazione">
+
+  <a class="visually-hidden-focusable skip-link" href="#main">Vai al contenuto principale</a>
+
+  <header class="lt-header py-3">
+    <div class="container d-flex flex-wrap align-items-center
+                column-gap-4 row-gap-2">
+      <!-- brand:testata inizio -->
+      <div class="lt-brand">
+        <img class="lt-logo" src="brand/lympha-mark.svg" alt=""
+             aria-hidden="true">
+        <span>
+          <span class="lt-name d-block">Lympha</span>
+          <span class="lt-tag d-block">technologies</span>
+        </span>
+      </div>
+      <!-- brand:testata fine -->
+      <span class="lt-divider d-none d-sm-block mx-sm-4" aria-hidden="true"></span>
+      <h1 class="h5 mb-0 lt-app-title">MARS Beacon
+        <span class="d-block small fw-normal">Meta-fusion,
+          Accessibility, Ranking &amp; Security Audit</span></h1>
+      <img class="lt-mars-logo ms-auto" src="brand/mars-logo.png"
+           alt="" aria-hidden="true">
+    </div>
+  </header>
+
+  <main id="main" class="container my-4">
+
+    <div id="user-bar" class="d-flex flex-wrap align-items-center
+                column-gap-3 row-gap-2 mb-3 small" hidden>
+      <span class="me-auto">Connesso come
+        <strong id="auth-name"></strong>
+        (<span id="auth-email"></span>)</span>
+      <a class="btn btn-outline-primary btn-sm" id="nav-other"
+         href="scansione.html">Scansione e report</a>
+      <button type="button" id="logout-btn"
+              class="btn btn-outline-secondary btn-sm">
+        Esci</button>
+    </div>
+
+    <p id="announcer" role="status" class="visually-hidden"></p>
+
+    <div id="auth-error" class="alert alert-danger" role="alert"
+         tabindex="-1" hidden></div>
+
+    <div id="profile-wrap" hidden>
+    <div id="profile-block" hidden>
+      <div class="alert alert-info py-2 mb-3">
+        Registrazione parziale: puoi avviare il check e leggere i
+        risultati nella pagina. Per <strong>scaricare i
+        referti</strong> completa il profilo qui sotto.
+      </div>
+      <form id="profile-form" class="row" novalidate>
+        <div class="col-12 col-md-5">
+          <div class="form-group">
+            <label for="p-azienda" class="active">Azienda</label>
+            <input type="text" class="form-control" id="p-azienda"
+                   autocomplete="organization">
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="form-group">
+            <label for="p-telefono" class="active">Telefono</label>
+            <input type="text" class="form-control" id="p-telefono"
+                   inputmode="tel" autocomplete="tel">
+          </div>
+        </div>
+        <div class="col-12 col-md-3 align-self-center">
+          <button type="submit" class="btn btn-primary">
+            Completa la registrazione</button>
+        </div>
+      </form>
+    </div>
+    <p id="profile-ok" class="text-success fw-semibold" hidden>
+      Registrazione completa: puoi scaricare i referti.
+    </p>
+    </div>
+
+    <div class="accordion lt-sections" id="sections-acc">
+    <div class="accordion-item" id="config-section" hidden>
+      <h2 class="accordion-header" id="config-heading">
+        <button type="button" class="accordion-button"
+                id="config-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-config" aria-expanded="true"
+                aria-controls="sec-config">
+          Configurazione dell'audit
+        </button>
+      </h2>
+      <div id="sec-config" class="accordion-collapse collapse show"
+           aria-labelledby="config-heading">
+      <div class="accordion-body">
+
+      <div id="form-error" class="alert alert-danger" role="alert"
+           tabindex="-1" hidden></div>
+
+      <div class="row align-items-center mb-4" id="preset-row">
+        <div class="col-12 col-md-4">
+          <label for="preset-select" class="form-label small mb-1">
+            Preimpostazioni salvate</label>
+          <select id="preset-select" class="form-select form-select-sm">
+            <option value="">— nessuna —</option>
+          </select>
+        </div>
+        <div class="col-auto pt-3">
+          <button type="button" class="btn btn-outline-primary btn-sm"
+                  id="preset-load">Carica</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm"
+                  id="preset-delete">Elimina</button>
+        </div>
+        <div class="col-12 col-md-3 ms-md-auto pt-3 pt-md-0">
+          <label for="preset-name" class="form-label small mb-1">
+            Salva la configurazione attuale come</label>
+          <input type="text" class="form-control form-control-sm"
+                 id="preset-name" placeholder="es. cliente-rossi">
+        </div>
+        <div class="col-auto pt-3">
+          <button type="button" class="btn btn-outline-primary btn-sm"
+                  id="preset-save">Salva</button>
+        </div>
+      </div>
+
+      <form id="audit-form" novalidate>
+        <fieldset class="mb-4">
+          <legend class="h5">Sito e scansione</legend>
+
+          <div class="form-group">
+            <label for="f-url" class="active">URL del sito da auditare *</label>
+            <input type="text" class="form-control" id="f-url" name="url"
+                   required autocomplete="url" spellcheck="false"
+                   aria-describedby="h-url" placeholder=" ">
+            <small id="h-url" class="form-text">
+              Esempio: https://esempio.it — se ometti lo schema viene
+              usato https://
+            </small>
+            <div class="invalid-feedback" id="e-url"></div>
+          </div>
+
+          <div class="row">
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-max-pages" class="active">Pagine massime</label>
+                <input type="number" class="form-control" id="f-max-pages"
+                       name="max_pages" value="25" min="1" max="500"
+                       step="1" inputmode="numeric"
+                       aria-describedby="h-max-pages">
+                <small id="h-max-pages" class="form-text">
+                  Da 1 a 500 (predefinito 25)
+                </small>
+                <div class="invalid-feedback" id="e-max-pages"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-delay" class="active">Pausa fra richieste
+                  (secondi)</label>
+                <input type="number" class="form-control" id="f-delay"
+                       name="delay" value="0.5" min="0" max="10" step="0.1"
+                       inputmode="decimal" aria-describedby="h-delay">
+                <small id="h-delay" class="form-text">
+                  Da 0 a 10 (predefinito 0,5)
+                </small>
+                <div class="invalid-feedback" id="e-delay"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-max-body" class="active">Dimensione massima
+                  risposta (MB)</label>
+                <input type="number" class="form-control" id="f-max-body"
+                       name="max_body" value="10" min="1" max="10240"
+                       step="1" inputmode="numeric"
+                       aria-describedby="h-max-body">
+                <small id="h-max-body" class="form-text">
+                  Tetto per ogni pagina scaricata (predefinito 10)
+                </small>
+                <div class="invalid-feedback" id="e-max-body"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-retries" class="active">Ritentativi su
+                  errori transitori</label>
+                <input type="number" class="form-control" id="f-retries"
+                       name="retries" value="2" min="0" max="10"
+                       step="1" inputmode="numeric"
+                       aria-describedby="h-retries">
+                <small id="h-retries" class="form-text">
+                  Con attesa crescente, su errori di rete e HTTP
+                  429/5xx (predefinito 2, 0 disattiva)
+                </small>
+                <div class="invalid-feedback" id="e-retries"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-render" class="active">Rendering
+                  JavaScript</label>
+                <select class="form-select" id="f-render"
+                        name="render" aria-describedby="h-render">
+                  <option value="off" selected>Spento</option>
+                  <option value="auto">Auto (solo pagine
+                    client-side)</option>
+                  <option value="always">Tutte le pagine</option>
+                </select>
+                <small id="h-render" class="form-text">
+                  Analizza il DOM renderizzato in un browser
+                  headless. Richiede Playwright sul server.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-workers" class="active">Richieste in
+                  parallelo</label>
+                <input type="number" class="form-control" id="f-workers"
+                       name="workers" value="4" min="1" max="16"
+                       step="1" inputmode="numeric"
+                       aria-describedby="h-workers">
+                <small id="h-workers" class="form-text">
+                  Da 1 a 16 (predefinito 4). Il ritmo verso il sito
+                  non cambia: resta governato dalla pausa fra
+                  richieste.
+                </small>
+                <div class="invalid-feedback" id="e-workers"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-market" class="active">Mercato di
+                  riferimento</label>
+                <select class="form-select" id="f-market"
+                        name="market" aria-describedby="h-market">
+                  <option value="occidentale" selected>Occidentale
+                  </option>
+                  <option value="globale">Globale</option>
+                  <option value="orientale">Orientale</option>
+                </select>
+                <small id="h-market" class="form-text">
+                  Pesa l'indice composito dei profili di
+                  citabilità: occidentale privilegia
+                  ChatGPT/Perplexity e Claude, orientale Qwen e
+                  Kimi.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-judge" class="active">Giudizio LLM
+                  sulla citabilità</label>
+                <select class="form-select" id="f-judge"
+                        name="judge" aria-describedby="h-judge">
+                  <option value="auto" selected>Auto: se la chiave
+                    è presente</option>
+                  <option value="on">Obbligatorio</option>
+                  <option value="off">Spento</option>
+                </select>
+                <small id="h-judge" class="form-text">
+                  I modelli scelti valutano i passaggi migliori,
+                  una richiesta API per modello. Chiavi solo
+                  dall'ambiente del server.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <fieldset class="form-group"
+                        aria-describedby="h-judge-models">
+                <legend class="active h6 mb-1">Modelli del
+                  giudizio</legend>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox"
+                         id="f-jm-anthropic" checked>
+                  <label class="form-check-label"
+                         for="f-jm-anthropic">Claude</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox"
+                         id="f-jm-openai">
+                  <label class="form-check-label"
+                         for="f-jm-openai">ChatGPT</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox"
+                         id="f-jm-qwen">
+                  <label class="form-check-label"
+                         for="f-jm-qwen">Qwen</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox"
+                         id="f-jm-kimi">
+                  <label class="form-check-label"
+                         for="f-jm-kimi">Kimi</label>
+                </div>
+                <small id="h-judge-models" class="form-text">
+                  Un verdetto per modello sugli stessi passaggi;
+                  senza scelta vale Claude. In auto partecipano
+                  solo i provider con la chiave sul server.
+                </small>
+              </fieldset>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-lighthouse" class="active">Audit
+                  Lighthouse</label>
+                <select class="form-select" id="f-lighthouse"
+                        name="lighthouse"
+                        aria-describedby="h-lighthouse">
+                  <option value="off" selected>Spento</option>
+                  <option value="auto">Auto: se Node e Chrome ci
+                    sono</option>
+                  <option value="always">Obbligatorio</option>
+                </select>
+                <small id="h-lighthouse" class="form-text">
+                  Performance, accessibilità, SEO e best practice
+                  col fork di Lighthouse. Richiede Node e
+                  Chrome/Chromium sul server.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-lighthouse-device"
+                       class="active">Dispositivo Lighthouse</label>
+                <select class="form-select" id="f-lighthouse-device"
+                        name="lighthouse_device"
+                        aria-describedby="h-lighthouse-device">
+                  <option value="mobile" selected>Mobile</option>
+                  <option value="desktop">Desktop</option>
+                </select>
+                <small id="h-lighthouse-device" class="form-text">
+                  Emulazione e throttling: mobile è il
+                  predefinito, come PageSpeed.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-lighthouse-pages" class="active">Pagine
+                  Lighthouse oltre la home</label>
+                <input type="number" class="form-control"
+                       id="f-lighthouse-pages"
+                       name="lighthouse_pages" value="3" min="0"
+                       max="9" step="1" inputmode="numeric"
+                       aria-describedby="h-lighthouse-pages">
+                <small id="h-lighthouse-pages" class="form-text">
+                  Da 0 a 9 (predefinito 3): pagine
+                  rappresentative, ~10–30 s ciascuna.
+                </small>
+                <div class="invalid-feedback"
+                     id="e-lighthouse-pages"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-search-check" class="active">Ancora di
+                  realtà (Brave)</label>
+                <select class="form-select" id="f-search-check"
+                        name="search_check"
+                        aria-describedby="h-search-check">
+                  <option value="auto" selected>Auto: se la chiave
+                    è presente</option>
+                  <option value="on">Obbligatoria</option>
+                  <option value="off">Spenta</option>
+                </select>
+                <small id="h-search-check" class="form-text">
+                  Posizione reale del sito sulle query dell'audit
+                  (Brave Search). Richiede BRAVE_API_KEY sul
+                  server.
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="f-competitors" class="active">Siti concorrenti
+              (facoltativi)</label>
+            <textarea class="form-control" id="f-competitors"
+                      name="competitors" rows="2"
+                      aria-describedby="h-competitors"></textarea>
+            <small id="h-competitors" class="form-text">
+              Da 1 a 3 URL, uno per riga. Ogni concorrente viene
+              scansionato con gli stessi limiti e confrontato sulle
+              stesse query: il referto mostra la share of voice nei
+              primi posti delle liste fuse.
+            </small>
+            <div class="invalid-feedback" id="e-competitors"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="f-robots" class="active">Robots.txt del sito
+              auditato</label>
+            <select class="form-select" id="f-robots" name="robots"
+                    aria-describedby="h-robots">
+              <option value="own" selected>Sito di mia titolarità:
+                analizza tutto</option>
+              <option value="respect">Rispetta i Disallow</option>
+              <option value="force">Ignora i Disallow (me ne assumo
+                la responsabilità)</option>
+            </select>
+            <small id="h-robots" class="form-text">
+              La titolarità dei siti auditati è dichiarata nelle
+              condizioni di servizio accettate alla registrazione.
+              Con "Rispetta" gli URL vietati all'agente SeoRrfAudit
+              non vengono scaricati e sono elencati nel referto. I
+              concorrenti sono sempre protetti, salvo "Ignora".
+            </small>
+          </div>
+
+          <div id="robots-ack-box" hidden>
+            <div class="form-check">
+              <input type="checkbox" id="f-robots-ack"
+                     aria-describedby="h-robots-ack">
+              <label for="f-robots-ack">Dichiaro di assumermi la
+                responsabilità della scansione oltre i Disallow del
+                robots.txt</label>
+            </div>
+            <small id="h-robots-ack" class="form-text d-block mb-2">
+              Richiesto per procedere quando si ignorano i Disallow
+              su siti non propri.
+            </small>
+            <div class="invalid-feedback" id="e-robots-ack"></div>
+          </div>
+        </fieldset>
+
+        <fieldset class="mb-4">
+          <legend class="h5">Recupero e fusione</legend>
+
+          <div class="form-group">
+            <label for="f-queries" class="active">Query di prova
+              (facoltative)</label>
+            <textarea class="form-control" id="f-queries" name="queries"
+                      rows="4" aria-describedby="h-queries"></textarea>
+            <small id="h-queries" class="form-text">
+              Una per riga. Se vuoto, le query vengono generate
+              automaticamente dai temi del sito.
+            </small>
+          </div>
+
+          <div class="row">
+            <div class="col-12 col-md-8">
+              <div class="form-group">
+                <label for="f-embeddings" class="active">Modello di
+                  embedding (facoltativo)</label>
+                <input type="text" class="form-control" id="f-embeddings"
+                       name="embeddings" spellcheck="false"
+                       aria-describedby="h-embeddings"
+                       list="embeddings-suggestions">
+                <datalist id="embeddings-suggestions">
+                  <option value="paraphrase-multilingual-MiniLM-L12-v2"></option>
+                  <option value="sentence-transformers/all-MiniLM-L6-v2"></option>
+                </datalist>
+                <small id="h-embeddings" class="form-text">
+                  Nome di un modello sentence-transformers per il recupero
+                  vettoriale reale.
+                </small>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div class="form-group">
+                <label for="f-rrf-k" class="active">Costante k della
+                  formula RRF</label>
+                <input type="number" class="form-control" id="f-rrf-k"
+                       name="rrf_k" value="60" min="1" max="1000" step="1"
+                       inputmode="numeric" aria-describedby="h-rrf-k">
+                <small id="h-rrf-k" class="form-text">
+                  Da 1 a 1000 (predefinito 60)
+                </small>
+                <div class="invalid-feedback" id="e-rrf-k"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-top-n" class="active">Posti fusi per
+                  query</label>
+                <input type="number" class="form-control"
+                       id="f-top-n" name="top_n" value="5" min="1"
+                       max="20" step="1" inputmode="numeric"
+                       aria-describedby="h-top-n">
+                <small id="h-top-n" class="form-text">
+                  Da 1 a 20 (predefinito 5): governa consenso e
+                  share of voice.
+                </small>
+                <div class="invalid-feedback" id="e-top-n"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-chunk-words" class="active">Parole
+                  per chunk</label>
+                <input type="number" class="form-control"
+                       id="f-chunk-words" name="chunk_words"
+                       value="220" min="80" max="600" step="10"
+                       inputmode="numeric"
+                       aria-describedby="h-chunk-words">
+                <small id="h-chunk-words" class="form-text">
+                  Da 80 a 600 (predefinito 220); il taglio segue
+                  comunque gli heading.
+                </small>
+                <div class="invalid-feedback"
+                     id="e-chunk-words"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-w-lex" class="active">Peso lista
+                  lessicale</label>
+                <input type="number" class="form-control"
+                       id="f-w-lex" name="w_lex" value="1"
+                       min="0.1" max="10" step="0.1"
+                       inputmode="decimal"
+                       aria-describedby="h-w-lex">
+                <small id="h-w-lex" class="form-text">
+                  Variante RRF pesata: 1 e 1 è l'RRF classico.
+                </small>
+                <div class="invalid-feedback" id="e-w-lex"></div>
+              </div>
+            </div>
+            <div class="col-12 col-md-3">
+              <div class="form-group">
+                <label for="f-w-vec" class="active">Peso lista
+                  vettoriale</label>
+                <input type="number" class="form-control"
+                       id="f-w-vec" name="w_vec" value="1"
+                       min="0.1" max="10" step="0.1"
+                       inputmode="decimal"
+                       aria-describedby="h-w-vec">
+                <small id="h-w-vec" class="form-text">
+                  Da 0,1 a 10 (predefinito 1).
+                </small>
+                <div class="invalid-feedback" id="e-w-vec"></div>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+          Avvia audit
+        </button>
+      </form>
+
+      </div>
+      </div>
+    </div>
+
+    </div><!-- /sections-acc -->
+  </main>
+
+  <!-- brand:footer inizio -->
+  <!-- Footer istituzionale: replica quello di lymphatech.it
+       (stessa struttura, voci e link; markup rifatto pulito e
+       badge vendorizzati in brand/ — vedi brand/ORIGINI.txt). -->
+  <footer class="lt-footer">
+    <div class="container lt-footer__main">
+      <div class="row g-4">
+
+        <div class="col-lg-4">
+          <p class="lt-footer__brand mb-3">
+            <span class="lt-name">Lympha <span>Technologies</span> S.r.l.</span>
+          </p>
+          <address class="lt-footer__address mb-3">
+            <strong class="d-block mt-2">Sede legale</strong>
+            Via Guglielmo Marconi, 32 - 40122 Bologna (BO)
+            <strong class="d-block mt-2">Sede operativa</strong>
+            Via Antonio Meucci, 24/c – 40024 Castel San Pietro Terme (BO)
+            <strong class="d-block mt-2">Green Data Center 00GATE</strong>
+            Via Antonio Meucci, 24/i/2 – 40024 Castel San Pietro Terme (BO)
+            <span class="d-block mt-2">Partita IVA e Codice Fiscale 03099141206<br>
+              Numero REA BO – 491736<br>
+              SDI M5UXCR1<br>
+              Capitale Sociale 25.000 euro, i.v.</span>
+            <span class="d-block mt-2">Tel: <a href="tel:+390510981815">+39 051 0981815</a><br>
+              Email: <a href="mailto:info@lymphatech.it">info@lymphatech.it</a></span>
+            <span class="d-block mt-2">Codice LEI <a href="https://lymphatech.it/it/codice-lei">8945007RB5QFYZ1XFW64</a><br>
+              D-U-N-S ® Number 430735178<br>
+              Rating di legalità RT18284<img
+                src="brand/badge-stella-due-plus-oro.svg"
+                alt="Rating di legalità: una stella e due plus"
+                class="lt-rating-badge"></span>
+          </address>
+          <p class="lt-footer__tagline mb-0">Lympha Technologies è
+            Service Provider &amp; Systems Integrator, fornitore di
+            tecnologie, know-how e creatore d'innovazione.</p>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <h2>Servizi</h2>
+          <ul class="list-unstyled d-grid gap-2 mt-3">
+            <li><a href="https://lymphatech.it/it/data-protection">Data Protection</a></li>
+            <li><a href="https://lymphatech.it/it/cybersecurity">Cybersecurity</a></li>
+            <li><a href="https://lymphatech.it/it/private-cloud">Private Cloud &amp; VDC</a></li>
+            <li><a href="https://lymphatech.it/it/bcdr">Business Continuity</a></li>
+            <li><a href="https://lymphatech.it/it/noc">NOC &amp; Monitoraggio</a></li>
+          </ul>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <h2>Azienda</h2>
+          <ul class="list-unstyled d-grid gap-2 mt-3">
+            <li><a href="https://lymphatech.it/it/chi-siamo">Chi siamo</a></li>
+            <li><a href="https://lymphatech.it/it/sviluppo">Sviluppo</a></li>
+            <li><a href="https://lymphatech.it/it/settori">Settori</a></li>
+            <li><a href="https://lymphatech.it/it/metodo">Metodo</a></li>
+            <li><a href="https://lymphatech.it/it/blog">Blog</a></li>
+            <li><a href="https://lymphatech.it/it/contatti">Contatti</a></li>
+          </ul>
+        </div>
+
+        <div class="col-lg-4">
+          <h2>Documenti e policy</h2>
+          <ul class="list-unstyled d-grid gap-2 mt-3">
+            <li><a href="https://lymphatech.it/it/privacy-cookie">Privacy e Cookie Policy</a></li>
+            <li><a href="https://lymphatech.it/it/politica-qualita">Politica per la qualità</a></li>
+            <li><a href="https://lymphatech.it/it/certificato-qualita">Certificato qualità (ISO 9001)</a></li>
+            <li><a href="https://lymphatech.it/it/codice-etico">Codice etico</a></li>
+            <li><a href="https://lymphatech.it/it/sostenibilita">Sostenibilità</a></li>
+            <li><a href="https://lymphatech.it/it/dichiarazione-accessibilita">Dichiarazione di accessibilità</a></li>
+            <li><a href="https://lymphatechnologies.com/it/trasparenza-sull-intelligenza-artificiale">Trasparenza sulla IA</a></li>
+            <li><a href="mailto:abusi@lymphatechnologies.com">Segnala abusi o malfunzionamento IA</a></li>
+          </ul>
+          <div class="mt-3">
+            <span class="lt-cert-plate"><img
+              src="brand/accredia-kiwa.png"
+              alt="Accredia · Kiwa — Sistema di gestione certificato"></span>
+            <p class="lt-cert-cap mt-2 mb-0">ISO 9001:2015 — Reg. Num. 19349-A
+              <br>Erogazione di servizi di consulenza nel settore
+              information technology</p>
+          </div>
+          <div class="mt-3 d-flex flex-column align-items-start gap-3">
+            <img src="brand/esg-ecomate.svg" width="171" height="60"
+              alt="Rating ESG BBB (SME Rating) rilasciato da Ecomate S.R.L.">
+            <a href="https://www.green-cloud.it/api/green-certificates/v1/certificatesUuid/f0bfb489-140f-4940-a1e2-a6c24012fe79/fdf102fd-eca1-4b4c-bcba-30632e4b4404"
+              target="_blank" rel="noopener"><span class="lt-green-plate"><img
+              src="brand/green-cloud-badge.png"
+              alt="Badge Green Cloud" class="img-fluid"></span></a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="lt-footer__bar">
+      <div class="container py-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <p class="mb-0">Copyright © 2011–<span data-year>2026</span> Lympha Technologies S.r.l.</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <a href="https://www.linkedin.com/company/lympha-technologies-s-r-l-/"
+            target="_blank" rel="noopener" class="lt-footer__linkedin"
+            aria-label="LinkedIn di Lympha Technologies"><svg
+            viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
+            focusable="false"><path d="M4.98 3.5C4.98 4.88 3.87 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.25 8.25h4.5V23h-4.5V8.25zM8.25 8.25h4.31v2.01h.06c.6-1.14 2.07-2.34 4.26-2.34 4.56 0 5.4 3 5.4 6.9V23h-4.5v-6.54c0-1.56-.03-3.57-2.18-3.57-2.18 0-2.51 1.7-2.51 3.46V23h-4.5V8.25z"/></svg></a>
+          <img src="brand/wcag21-aa.png" class="lt-footer__wcag"
+            alt="Conformità WCAG 2.1 livello AA">
+        </div>
+      </div>
+    </div>
+  </footer>
+  <!-- brand:footer fine -->
+
+  <script src="config.js"></script>
+  <script src="vendor/bootstrap-italia/js/bootstrap-italia.bundle.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

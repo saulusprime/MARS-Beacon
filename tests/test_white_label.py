@@ -20,16 +20,18 @@ BRAND_LYMPHA = os.path.join(RADICE, "branding",
                             "lympha-technologies.toml")
 BRAND_MARS = os.path.join(RADICE, "branding", "mars-beacon.toml")
 
-# I file che il tool riscrive (confronti byte per byte).
-RISCRITTI = ("index.html", "tos.html",
-             os.path.join("brand", "brand.css"))
+# Le pagine del bundle (GUI a momenti distinti, P5) e i file che
+# il tool riscrive (confronti byte per byte).
+PAGINE = ("index.html", "accesso.html", "configurazione.html",
+          "scansione.html", "tos.html")
+RISCRITTI = PAGINE + (os.path.join("brand", "brand.css"),)
 
 
 def _bundle(tmp_path):
     """Copia ridotta del bundle: le pagine e gli asset di brand."""
     destinazione = os.path.join(str(tmp_path), "gui")
     os.makedirs(destinazione)
-    for nome in ("index.html", "tos.html"):
+    for nome in PAGINE:
         shutil.copy(os.path.join(GUI, nome), destinazione)
     shutil.copytree(os.path.join(GUI, "brand"),
                     os.path.join(destinazione, "brand"))
@@ -61,7 +63,7 @@ def test_brand_generico_senza_tracce_lympha(tmp_path):
     bundle = _bundle(tmp_path)
     esito = _applica(BRAND_MARS, bundle)
     assert esito.returncode == 0, esito.stderr
-    for nome in ("index.html", "tos.html"):
+    for nome in PAGINE:
         pagina = _leggi(bundle, nome)
         assert "Lympha" not in pagina, nome
         assert "lymphatech" not in pagina, nome

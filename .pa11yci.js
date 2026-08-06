@@ -22,17 +22,34 @@ module.exports = {
   },
   urls: [
     base + "/tos.html",
-    base + "/",
-    base + "/?embed=1",
+    base + "/accesso.html",
+    base + "/accesso.html?embed=1",
     {
-      url: base + "/?vista=autenticata",
+      /* Configurazione da autenticati: registrazione
+         sull'accesso e redirect alla pagina dedicata (P5). */
+      url: base + "/accesso.html?vista=autenticata",
       actions: [
         "set field #r-nome to Utente Test",
         "set field #r-email to a11y@esempio.it",
         "set field #r-password to passwordtest",
         "check field #r-tos",
         "click element #register-form button[type=submit]",
-        "wait for element #config-section to be visible",
+        "wait for element #audit-form to be visible",
+      ],
+    },
+    {
+      /* Scansione senza job: ogni URL Pa11y ha la sua sessione,
+         quindi si registra un account dedicato e si naviga. */
+      url: base + "/accesso.html?vista=scansione",
+      actions: [
+        "set field #r-nome to Utente Test",
+        "set field #r-email to a11y-scan@esempio.it",
+        "set field #r-password to passwordtest",
+        "check field #r-tos",
+        "click element #register-form button[type=submit]",
+        "wait for element #audit-form to be visible",
+        "navigate to " + base + "/scansione.html",
+        "wait for element #no-job to be visible",
       ],
     },
   ],

@@ -115,7 +115,12 @@ def test_frame_ancestors_configurabile(gui_base):
 def test_statici_con_csp_e_traversal_negato(gui_base):
     for path, atteso in (("/", b"MARS Beacon"),
                          ("/", b"Lympha"),
+                         ("/", b"smista.js"),
+                         ("/accesso.html", b"login-form"),
+                         ("/configurazione.html", b"audit-form"),
+                         ("/scansione.html", b"progress-section"),
                          ("/app.js", b"use strict"),
+                         ("/smista.js", b"use strict"),
                          ("/config.js", b"__PUBLIC_PATH__"),
                          ("/theme.css", b"--lt-teal"),
                          ("/tos.html", b"Condizioni di servizio"),

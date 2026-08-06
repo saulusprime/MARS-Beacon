@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- brand:testa inizio -->
+  <title>Scansione e report · MARS Beacon — Lympha Technologies</title>
+  <link rel="icon" type="image/png" href="brand/favicon.png">
+  <!-- brand:testa fine -->
+  <link rel="stylesheet" href="vendor/bootstrap-italia/css/bootstrap-italia.min.css">
+  <link rel="stylesheet" href="brand/brand.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="custom.css">
+</head>
+<body data-page="scansione">
+
+  <a class="visually-hidden-focusable skip-link" href="#main">Vai al contenuto principale</a>
+
+  <header class="lt-header py-3">
+    <div class="container d-flex flex-wrap align-items-center
+                column-gap-4 row-gap-2">
+      <!-- brand:testata inizio -->
+      <div class="lt-brand">
+        <img class="lt-logo" src="brand/lympha-mark.svg" alt=""
+             aria-hidden="true">
+        <span>
+          <span class="lt-name d-block">Lympha</span>
+          <span class="lt-tag d-block">technologies</span>
+        </span>
+      </div>
+      <!-- brand:testata fine -->
+      <span class="lt-divider d-none d-sm-block mx-sm-4" aria-hidden="true"></span>
+      <h1 class="h5 mb-0 lt-app-title">MARS Beacon
+        <span class="d-block small fw-normal">Meta-fusion,
+          Accessibility, Ranking &amp; Security Audit</span></h1>
+      <img class="lt-mars-logo ms-auto" src="brand/mars-logo.png"
+           alt="" aria-hidden="true">
+    </div>
+  </header>
+
+  <main id="main" class="container my-4">
+
+    <div id="user-bar" class="d-flex flex-wrap align-items-center
+                column-gap-3 row-gap-2 mb-3 small" hidden>
+      <span class="me-auto">Connesso come
+        <strong id="auth-name"></strong>
+        (<span id="auth-email"></span>)</span>
+      <a class="btn btn-outline-primary btn-sm" id="nav-other"
+         href="configurazione.html">Nuova scansione</a>
+      <button type="button" id="logout-btn"
+              class="btn btn-outline-secondary btn-sm">
+        Esci</button>
+    </div>
+
+    <!-- ================= Errore audit ================= -->
+    <div id="audit-error" class="alert alert-danger" role="alert"
+         tabindex="-1" hidden></div>
+
+    <div id="no-job" class="alert alert-info" role="alert"
+         hidden>
+      Nessuna scansione da mostrare: configura e avvia un audit
+      dalla <a href="configurazione.html">pagina di
+      configurazione</a>.
+    </div>
+
+    <div class="accordion lt-sections" id="sections-acc">
+    <div class="accordion-item" id="progress-section" hidden>
+      <h2 class="accordion-header" id="progress-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="progress-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-progress" aria-expanded="false"
+                aria-controls="sec-progress">
+          Avanzamento
+        </button>
+      </h2>
+      <div id="sec-progress" class="accordion-collapse collapse"
+           aria-labelledby="progress-heading">
+      <div class="accordion-body">
+
+      <p id="announcer" role="status" class="fw-semibold mb-2"></p>
+
+      <div class="progress progress-indeterminate mb-3" aria-hidden="true"
+           id="progress-anim">
+        <div class="progress-bar" role="progressbar"></div>
+      </div>
+
+      <button type="button" class="btn btn-outline-danger btn-sm mb-3"
+              id="cancel-btn" hidden>Annulla audit</button>
+
+      <h3 class="h6">Log di scansione</h3>
+      <div class="audit-log border rounded" tabindex="0" role="group"
+           aria-label="Log di scansione, area scorrevole">
+        <pre id="log" class="mb-0 p-3"></pre>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ============ Risultati e referto (unificati) ============ -->
+    <div class="accordion-item" id="results-section" hidden>
+      <h2 class="accordion-header" id="results-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="results-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-results" aria-expanded="false"
+                aria-controls="sec-results">
+          Risultati dell'audit: sintesi e referto
+        </button>
+      </h2>
+      <div id="sec-results" class="accordion-collapse collapse"
+           aria-labelledby="results-heading">
+      <div class="accordion-body">
+
+      <p id="results-meta" class="text-muted"></p>
+
+      <div class="mb-4 d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-primary" id="dl-html"
+           href="#">
+          <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
+          Scarica HTML
+        </a>
+        <a class="btn btn-outline-primary" id="dl-json"
+           href="#">
+          <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
+          Scarica JSON
+        </a>
+        <a class="btn btn-outline-primary" id="dl-text"
+           href="#">
+          <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
+          Scarica testo
+        </a>
+        <a class="btn btn-outline-primary" id="dl-md"
+           href="#">
+          <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
+          Scarica Markdown
+        </a>
+        <a class="btn btn-outline-primary" id="dl-csv"
+           href="#">
+          <svg class="icon icon-sm icon-primary me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-download"></use></svg>
+          Scarica CSV rilievi
+        </a>
+        <a class="btn btn-outline-secondary" id="open-report"
+           href="#" target="_blank" rel="noopener">
+          <svg class="icon icon-sm me-1" aria-hidden="true"
+               focusable="false"><use href="vendor/bootstrap-italia/svg/sprites.svg#it-external-link"></use></svg>
+          Apri il referto HTML
+          <span class="visually-hidden">(si apre in una nuova scheda)</span>
+        </a>
+      </div>
+      <p id="download-note" class="small text-muted" hidden>
+        Il download dei referti è riservato alla registrazione
+        completa: aggiungi azienda e telefono nella
+        <a href="configurazione.html">pagina di configurazione</a>.
+      </p>
+
+      <div id="hero" class="audit-hero border rounded mb-4"></div>
+
+      <div id="toplist-block" hidden>
+        <h3 class="h5">Top rilievi</h3>
+        <p class="small text-muted mb-2">
+          La testa del piano di remediation, trasversale alle aree:
+          gravità come pallino ed etichetta, guadagno stimato
+          sull'indice di citabilità dove disponibile.
+        </p>
+        <ol id="toplist" class="mb-4"></ol>
+      </div>
+
+      <div id="delta-block" hidden>
+        <h3 class="h5">Rispetto all'esecuzione precedente</h3>
+        <p class="small text-muted mb-2" id="delta-intro"></p>
+        <p class="mb-2" id="delta-scores"></p>
+        <div class="row">
+          <div class="col-12 col-md-6">
+            <h4 class="h6" id="delta-resolved-title">Rilievi
+              risolti</h4>
+            <ul class="list-unstyled mb-3" id="delta-resolved"></ul>
+          </div>
+          <div class="col-12 col-md-6">
+            <h4 class="h6" id="delta-new-title">Rilievi
+              nuovi</h4>
+            <ul class="list-unstyled mb-3" id="delta-new"></ul>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="h5">Punteggi per area</h3>
+      <p class="small text-muted mb-2">
+        Soglie del giudizio: buono da 70, da migliorare da 40, critico
+        sotto 40. Seleziona un'area per aprire i suoi rilievi.
+      </p>
+      <div id="scores" class="mb-4"></div>
+      <div id="lighthouse-summary" class="mb-4"></div>
+
+      <div id="remediation-block" hidden>
+        <h3 class="h5">Piano di remediation</h3>
+        <p class="small text-muted mb-2" id="remediation-intro"></p>
+        <div id="remediation-list" class="mb-4"></div>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ========= Risultati: Meta-fusion ========= -->
+    <div class="accordion-item" id="pillar-meta-section" hidden>
+      <h2 class="accordion-header" id="pillar-meta-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="pillar-meta-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-pillar-meta"
+                aria-expanded="false"
+                aria-controls="sec-pillar-meta">
+          Risultati dell'audit: Meta-fusion
+        </button>
+      </h2>
+      <div id="sec-pillar-meta" class="accordion-collapse collapse"
+           aria-labelledby="pillar-meta-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted">
+        Il cuore della simulazione: come i tuoi contenuti si
+        comportano nella fusione RRF delle liste lessicale e
+        vettoriale, quanto sono citabili per ciascun assistente IA
+        e come ti confronti con i concorrenti.
+      </p>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc-meta"></div>
+
+      <div id="citability-block" hidden>
+        <h3 class="h5">Profili di citabilità per assistente IA</h3>
+        <p class="small text-muted mb-2" id="citability-intro"></p>
+        <div id="citability-bars" class="mb-3"></div>
+        <div id="citability-actions-box" hidden>
+          <h4 class="h6">Top azioni prioritarie</h4>
+          <p class="small text-muted mb-2">
+            Le prime voci del piano di remediation con il profilo
+            che ne guadagna di più (stima in punti profilo, stessa
+            natura euristica).
+          </p>
+          <ol id="citability-actions" class="mb-4"></ol>
+        </div>
+      </div>
+
+      <div id="judge-block" hidden>
+        <h3 class="h5">Giudizio LLM sulla citabilità</h3>
+        <p class="small text-muted mb-2" id="judge-intro"></p>
+        <div class="table-responsive mb-4" tabindex="0" role="group"
+             aria-label="Tabella del giudizio LLM, area scorrevole"
+             id="judge-table-box">
+          <table class="table table-striped align-middle"
+                 id="judge-table">
+            <caption class="small" id="judge-note"></caption>
+            <thead>
+              <tr>
+                <th scope="col">Query</th>
+                <th scope="col">Punteggio</th>
+                <th scope="col">Motivazione</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="judge-extra"></div>
+      </div>
+
+      <div id="surface-math-block" hidden>
+        <h3 class="h5">La matematica del problema</h3>
+        <p class="small text-muted mb-2">
+          L'RRF premia chi compare in più liste con più passaggi
+          pertinenti: il numero di chunk indicizzabili è il vero
+          moltiplicatore.
+        </p>
+        <dl class="surface-math mb-4" id="surface-math-list"></dl>
+      </div>
+
+      <h3 class="h5">Simulazione RRF per query</h3>
+      <div class="table-responsive mb-4" tabindex="0" role="group"
+           aria-label="Tabella della simulazione RRF, area scorrevole">
+        <table class="table table-striped align-middle" id="rrf-table">
+          <caption class="small">
+            Consenso: passaggi presenti sia nei primi 5 lessicali sia nei
+            primi 5 vettoriali. «Coperta» indica che la query trova
+            almeno un passaggio in ciascuna lista. Le tacche sulla barra
+            sono le soglie del giudizio (20% e 45%).
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Query</th>
+              <th scope="col">Consenso</th>
+              <th scope="col">Coperta</th>
+              <th scope="col">Primo passaggio dopo la fusione</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div id="search-check-block" hidden>
+        <h3 class="h5">Ancora di realtà (Brave Search)</h3>
+        <p class="small text-muted mb-2" id="search-check-intro"></p>
+        <div class="table-responsive mb-4" tabindex="0" role="group"
+             aria-label="Tabella dell'ancora di realtà, area
+                         scorrevole">
+          <table class="table table-striped align-middle"
+                 id="search-check-table">
+            <caption class="small" id="search-check-note"></caption>
+            <thead>
+              <tr>
+                <th scope="col">Query</th>
+                <th scope="col">Posizione reale</th>
+                <th scope="col">Consenso RRF</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="competitive-block" hidden>
+        <h3 class="h5">Confronto competitivo</h3>
+        <p class="small text-muted mb-2" id="competitive-intro"></p>
+        <div id="share-bars" class="mb-3"></div>
+        <div id="sov-bubble" class="mb-3"></div>
+        <div class="table-responsive mb-4" tabindex="0" role="group"
+             aria-label="Tabella del confronto competitivo, area
+                         scorrevole">
+          <table class="table table-striped align-middle"
+                 id="sov-table">
+            <caption class="small">
+              Per ogni query: quanti dei primi posti fusi sono
+              occupati da tuoi passaggi e la migliore posizione
+              raggiunta dal tuo sito.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Query</th>
+                <th scope="col">Tuoi passaggi</th>
+                <th scope="col">Migliore posizione</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ========= Risultati: Accessibility ========= -->
+    <div class="accordion-item" id="pillar-access-section" hidden>
+      <h2 class="accordion-header" id="pillar-access-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="pillar-access-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-pillar-access"
+                aria-expanded="false"
+                aria-controls="sec-pillar-access">
+          Risultati dell'audit: Accessibility
+        </button>
+      </h2>
+      <div id="sec-pillar-access"
+           class="accordion-collapse collapse"
+           aria-labelledby="pillar-access-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted">
+        Quanto i tuoi contenuti sono raggiungibili da crawler e
+        assistenti IA: permessi, sitemap, architettura dei link e
+        profondità di navigazione.
+      </p>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc-access"></div>
+
+      <div id="depth-block" hidden>
+        <h3 class="h5">Profondità di crawl</h3>
+        <p class="small text-muted mb-2">
+          Quanti click servono dalla home per raggiungere ogni
+          pagina lungo i link interni: oltre 3 click scansione e
+          peso calano; "solo da sitemap" indica pagine senza
+          percorso di link.
+        </p>
+        <div id="depth-bars" class="mb-4"></div>
+      </div>
+
+      <div id="graph-block" hidden>
+        <h3 class="h5">Architettura dei link interni</h3>
+        <p class="small text-muted mb-2" id="graph-intro"></p>
+        <div class="mb-2" role="group"
+             aria-label="Controlli del grafo">
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-2"
+                  id="graph-vforza"
+                  aria-pressed="true">Vista a forza</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-3"
+                  id="graph-vanelli"
+                  aria-pressed="false">Anelli di
+            profondità</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-2"
+                  id="graph-zoom-in">Ingrandisci</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm me-2"
+                  id="graph-zoom-out">Riduci</button>
+          <button type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  id="graph-reset">Reimposta vista</button>
+        </div>
+        <div class="form-group mb-2" style="max-width: 22rem">
+          <label for="graph-search" class="active">Cerca una
+            pagina nel grafo</label>
+          <input type="search" class="form-control form-control-sm"
+                 id="graph-search" autocomplete="off"
+                 aria-describedby="h-graph-search">
+          <small id="h-graph-search" class="form-text">
+            Le pagine il cui percorso contiene il testo restano
+            evidenziate; vuoto per azzerare.
+          </small>
+        </div>
+        <p class="small text-muted mb-2" id="graph-legend">
+          Legenda: ● home · ● entro 3 click · ● oltre 3 click o
+          senza percorso; ampiezza = link in ingresso; le frecce
+          seguono la direzione del link; negli anelli il cerchio
+          marcato è la soglia dei 3 click. Clic su un nodo blocca
+          l'evidenziazione, Esc la libera.
+        </p>
+        <p class="small mb-2" id="graph-info" role="status">
+          Seleziona un nodo (mouse o Tab) per i dettagli.
+        </p>
+        <div id="graph-svg" class="mb-4"></div>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ========= Risultati: Ranking ========= -->
+    <div class="accordion-item" id="pillar-rank-section" hidden>
+      <h2 class="accordion-header" id="pillar-rank-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="pillar-rank-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-pillar-rank"
+                aria-expanded="false"
+                aria-controls="sec-pillar-rank">
+          Risultati dell'audit: Ranking
+        </button>
+      </h2>
+      <div id="sec-pillar-rank" class="accordion-collapse collapse"
+           aria-labelledby="pillar-rank-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted">
+        I segnali che governano il posizionamento nelle due liste:
+        qualità lessicale (BM25), qualità semantica dei passaggi e
+        dati strutturati.
+      </p>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc-rank"></div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ========= Risultati: Security ========= -->
+    <div class="accordion-item" id="pillar-sec-section" hidden>
+      <h2 class="accordion-header" id="pillar-sec-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="pillar-sec-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-pillar-sec"
+                aria-expanded="false"
+                aria-controls="sec-pillar-sec">
+          Risultati dell'audit: Security
+        </button>
+      </h2>
+      <div id="sec-pillar-sec" class="accordion-collapse collapse"
+           aria-labelledby="pillar-sec-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted">
+        I controlli di sicurezza e di governo dei contenuti:
+        HTTPS, URL ancora in http e opt-out IA via meta robots
+        (noarchive/nocache).
+      </p>
+
+      <h3 class="h5">Rilievi</h3>
+      <p class="small text-muted mb-2">
+        Ogni rilievo indica gravità, dettaglio e, dove utile, la
+        correzione suggerita.
+      </p>
+      <div class="accordion mb-4" id="findings-acc-sec"></div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ================= Storico ================= -->
+    <div class="accordion-item" id="history-section" hidden>
+      <h2 class="accordion-header" id="history-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="history-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-history" aria-expanded="false"
+                aria-controls="sec-history">
+          Storico dei tuoi audit
+        </button>
+      </h2>
+      <div id="sec-history" class="accordion-collapse collapse"
+           aria-labelledby="history-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted mb-2">
+        Le esecuzioni concluse del tuo account, dalla più recente. Il
+        delta confronta lo stesso sito con l'esecuzione precedente;
+        il grafico mostra l'andamento del punteggio complessivo per
+        l'ultimo sito analizzato (soglie 40 e 70).
+      </p>
+      <div id="history-trend" class="mb-3"></div>
+      <div class="table-responsive" tabindex="0" role="group"
+           aria-label="Tabella dello storico audit, area scorrevole">
+        <table class="table table-striped align-middle"
+               id="history-table">
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Sito</th>
+              <th scope="col">Punteggio</th>
+              <th scope="col">Delta</th>
+              <th scope="col">Critici</th>
+              <th scope="col">Avvertenze</th>
+              <th scope="col">Referto</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div id="compare-box" class="mt-3" hidden>
+        <h3 class="h6">Confronta due audit dello stesso sito</h3>
+        <div class="row align-items-end">
+          <div class="col-12 col-md-4">
+            <div class="form-group mb-2">
+              <label for="f-cmp-a" class="active">Prima
+                esecuzione</label>
+              <select class="form-select" id="f-cmp-a"></select>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="form-group mb-2">
+              <label for="f-cmp-b" class="active">Seconda
+                esecuzione</label>
+              <select class="form-select" id="f-cmp-b"></select>
+            </div>
+          </div>
+          <div class="col-12 col-md-4 mb-2">
+            <button type="button" class="btn btn-outline-primary"
+                    id="btn-compare">Confronta</button>
+          </div>
+        </div>
+        <p class="small text-danger" id="compare-error"
+           role="status"></p>
+        <div id="compare-result" hidden>
+          <p class="small text-muted mb-2" id="cmp-intro"></p>
+          <p class="mb-2" id="cmp-scores"></p>
+          <div class="row">
+            <div class="col-12 col-md-6">
+              <h4 class="h6" id="cmp-resolved-title">Rilievi
+                risolti</h4>
+              <ul class="list-unstyled mb-3" id="cmp-resolved"></ul>
+            </div>
+            <div class="col-12 col-md-6">
+              <h4 class="h6" id="cmp-new-title">Rilievi nuovi</h4>
+              <ul class="list-unstyled mb-3" id="cmp-new"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    <!-- ================= Citazioni IA ================= -->
+    <div class="accordion-item" id="citations-section" hidden>
+      <h2 class="accordion-header" id="citations-heading">
+        <button type="button" class="accordion-button collapsed"
+                id="citations-toggle" data-bs-toggle="collapse"
+                data-bs-target="#sec-citations" aria-expanded="false"
+                aria-controls="sec-citations">
+          Citazioni IA nel tempo
+        </button>
+      </h2>
+      <div id="sec-citations" class="accordion-collapse collapse"
+           aria-labelledby="citations-heading">
+      <div class="accordion-body">
+
+      <p class="small text-muted mb-2">
+        Storico del monitoraggio delle citazioni reali
+        (mars_citations.py): quante risposte degli assistenti IA
+        citano il sito fra le fonti, esecuzione dopo esecuzione.
+        Una linea per provider, più il tasso complessivo.
+      </p>
+
+      <div class="form-group" id="cit-site-box" hidden>
+        <label for="f-cit-site" class="active">Sito
+          monitorato</label>
+        <select class="form-select" id="f-cit-site"></select>
+      </div>
+
+      <p class="small mb-2" id="cit-trend-summary"></p>
+      <div id="cit-chart" class="mb-3"></div>
+      <div id="cit-events-box" hidden>
+        <h3 class="h6">Eventi annotati</h3>
+        <ul class="small mb-3" id="cit-events"></ul>
+      </div>
+
+      <div class="mb-3">
+        <h3 class="h6">Aggiungi un evento</h3>
+        <div class="row align-items-end">
+          <div class="col-12 col-md-3">
+            <div class="form-group mb-2">
+              <label for="f-ev-date" class="active">Data</label>
+              <input type="date" class="form-control"
+                     id="f-ev-date">
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="form-group mb-2">
+              <label for="f-ev-label" class="active">Cosa è
+                successo</label>
+              <input type="text" class="form-control"
+                     id="f-ev-label" maxlength="120"
+                     placeholder="es. Pubblicate le FAQ">
+            </div>
+          </div>
+          <div class="col-12 col-md-3">
+            <div class="form-group mb-2">
+              <label for="f-ev-site" class="active">Sito
+                (facoltativo)</label>
+              <input type="text" class="form-control"
+                     id="f-ev-site" placeholder="miosito.it">
+            </div>
+          </div>
+          <div class="col-12 col-md-2 mb-2">
+            <button type="button" class="btn btn-outline-primary"
+                    id="btn-add-event">Aggiungi</button>
+          </div>
+        </div>
+        <p class="small" id="event-feedback" role="status"></p>
+      </div>
+
+      <div class="table-responsive" tabindex="0" role="group"
+           aria-label="Tabella dello storico citazioni, area
+                       scorrevole">
+        <table class="table table-striped align-middle"
+               id="cit-table">
+          <caption class="small">
+            Tasso di citazione: risposte che citano il sito fra le
+            fonti sul totale delle risposte ottenute, per provider.
+          </caption>
+          <!-- Intestazione statica minima (le colonne dei provider
+               vengono aggiunte dal JS): senza th la tabella verrebbe
+               scambiata per layout dagli strumenti di verifica. -->
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Complessivo</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      </div>
+      </div>
+    </div>
+
+    </div><!-- /sections-acc -->
+  </main>
+
+  <!-- brand:footer inizio -->
+  <!-- Footer istituzionale: replica quello di lymphatech.it
+       (stessa struttura, voci e link; markup rifatto pulito e
+       badge vendorizzati in brand/ — vedi brand/ORIGINI.txt). -->
+  <footer class="lt-footer">
+    <div class="container lt-footer__main">
+      <div class="row g-4">
+
+        <div class="col-lg-4">
+          <p class="lt-footer__brand mb-3">
+            <span class="lt-name">Lympha <span>Technologies</span> S.r.l.</span>
+          </p>
+          <address class="lt-footer__address mb-3">
+            <strong class="d-block mt-2">Sede legale</strong>
+            Via Guglielmo Marconi, 32 - 40122 Bologna (BO)
+            <strong class="d-block mt-2">Sede operativa</strong>
+            Via Antonio Meucci, 24/c – 40024 Castel San Pietro Terme (BO)
+            <strong class="d-block mt-2">Green Data Center 00GATE</strong>
+            Via Antonio Meucci, 24/i/2 – 40024 Castel San Pietro Terme (BO)
+            <span class="d-block mt-2">Partita IVA e Codice Fiscale 03099141206<br>
+              Numero REA BO – 491736<br>
+              SDI M5UXCR1<br>
+              Capitale Sociale 25.000 euro, i.v.</span>
+            <span class="d-block mt-2">Tel: <a href="tel:+390510981815">+39 051 0981815</a><br>
+              Email: <a href="mailto:info@lymphatech.it">info@lymphatech.it</a></span>
+            <span class="d-block mt-2">Codice LEI <a href="https://lymphatech.it/it/codice-lei">8945007RB5QFYZ1XFW64</a><br>
+              D-U-N-S ® Number 430735178<br>
+              Rating di legalità RT18284<img
+                src="brand/badge-stella-due-plus-oro.svg"
+                alt="Rating di legalità: una stella e due plus"
+                class="lt-rating-badge"></span>
+          </address>
+          <p class="lt-footer__tagline mb-0">Lympha Technologies è
+            Service Provider &amp; Systems Integrator, fornitore di
+            tecnologie, know-how e creatore d'innovazione.</p>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <h2>Servizi</h2>
+          <ul class="list-unstyled d-grid gap-2 mt-3">
+            <li><a href="https://lymphatech.it/it/data-protection">Data Protection</a></li>
+            <li><a href="https://lymphatech.it/it/cybersecurity">Cybersecurity</a></li>
+            <li><a href="https://lymphatech.it/it/private-cloud">Private Cloud &amp; VDC</a></li>
+            <li><a href="https://lymphatech.it/it/bcdr">Business Continuity</a></li>
+            <li><a href="https://lymphatech.it/it/noc">NOC &amp; Monitoraggio</a></li>
+          </ul>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <h2>Azienda</h2>
+          <ul class="list-unstyled d-grid gap-2 mt-3">
+            <li><a href="https://lymphatech.it/it/chi-siamo">Chi siamo</a></li>
+            <li><a href="https://lymphatech.it/it/sviluppo">Sviluppo</a></li>
+            <li><a href="https://lymphatech.it/it/settori">Settori</a></li>
+            <li><a href="https://lymphatech.it/it/metodo">Metodo</a></li>
+            <li><a href="https://lymphatech.it/it/blog">Blog</a></li>
+            <li><a href="https://lymphatech.it/it/contatti">Contatti</a></li>
+          </ul>
+        </div>
+
+        <div class="col-lg-4">
+          <h2>Documenti e policy</h2>
+          <ul class="list-unstyled d-grid gap-2 mt-3">
+            <li><a href="https://lymphatech.it/it/privacy-cookie">Privacy e Cookie Policy</a></li>
+            <li><a href="https://lymphatech.it/it/politica-qualita">Politica per la qualità</a></li>
+            <li><a href="https://lymphatech.it/it/certificato-qualita">Certificato qualità (ISO 9001)</a></li>
+            <li><a href="https://lymphatech.it/it/codice-etico">Codice etico</a></li>
+            <li><a href="https://lymphatech.it/it/sostenibilita">Sostenibilità</a></li>
+            <li><a href="https://lymphatech.it/it/dichiarazione-accessibilita">Dichiarazione di accessibilità</a></li>
+            <li><a href="https://lymphatechnologies.com/it/trasparenza-sull-intelligenza-artificiale">Trasparenza sulla IA</a></li>
+            <li><a href="mailto:abusi@lymphatechnologies.com">Segnala abusi o malfunzionamento IA</a></li>
+          </ul>
+          <div class="mt-3">
+            <span class="lt-cert-plate"><img
+              src="brand/accredia-kiwa.png"
+              alt="Accredia · Kiwa — Sistema di gestione certificato"></span>
+            <p class="lt-cert-cap mt-2 mb-0">ISO 9001:2015 — Reg. Num. 19349-A
+              <br>Erogazione di servizi di consulenza nel settore
+              information technology</p>
+          </div>
+          <div class="mt-3 d-flex flex-column align-items-start gap-3">
+            <img src="brand/esg-ecomate.svg" width="171" height="60"
+              alt="Rating ESG BBB (SME Rating) rilasciato da Ecomate S.R.L.">
+            <a href="https://www.green-cloud.it/api/green-certificates/v1/certificatesUuid/f0bfb489-140f-4940-a1e2-a6c24012fe79/fdf102fd-eca1-4b4c-bcba-30632e4b4404"
+              target="_blank" rel="noopener"><span class="lt-green-plate"><img
+              src="brand/green-cloud-badge.png"
+              alt="Badge Green Cloud" class="img-fluid"></span></a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="lt-footer__bar">
+      <div class="container py-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <p class="mb-0">Copyright © 2011–<span data-year>2026</span> Lympha Technologies S.r.l.</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <a href="https://www.linkedin.com/company/lympha-technologies-s-r-l-/"
+            target="_blank" rel="noopener" class="lt-footer__linkedin"
+            aria-label="LinkedIn di Lympha Technologies"><svg
+            viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"
+            focusable="false"><path d="M4.98 3.5C4.98 4.88 3.87 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM.25 8.25h4.5V23h-4.5V8.25zM8.25 8.25h4.31v2.01h.06c.6-1.14 2.07-2.34 4.26-2.34 4.56 0 5.4 3 5.4 6.9V23h-4.5v-6.54c0-1.56-.03-3.57-2.18-3.57-2.18 0-2.51 1.7-2.51 3.46V23h-4.5V8.25z"/></svg></a>
+          <img src="brand/wcag21-aa.png" class="lt-footer__wcag"
+            alt="Conformità WCAG 2.1 livello AA">
+        </div>
+      </div>
+    </div>
+  </footer>
+  <!-- brand:footer fine -->
+
+  <script src="config.js"></script>
+  <script src="vendor/bootstrap-italia/js/bootstrap-italia.bundle.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

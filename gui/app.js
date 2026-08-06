@@ -51,6 +51,52 @@
     /(?:^|[?&])embed=1(?:&|$)/.test(window.location.search);
   if (EMBED) { document.body.classList.add("mars-embed"); }
 
+  /* ------- GUI a momenti distinti (P5) -------
+     Tre pagine dedicate — accesso.html, configurazione.html,
+     scansione.html — piu' index.html smistatore (smista.js).
+     Ogni pagina dichiara data-page sul body; questo script e'
+     condiviso e attiva solo i pezzi della pagina corrente. */
+  const PAGE = document.body.getAttribute("data-page") || "";
+
+  /* URL di una pagina interna, con la modalita' embed propagata. */
+  function pageUrl(pagina, query) {
+    const parti = [];
+    if (query) { parti.push(query); }
+    if (EMBED && !/(?:^|&)embed=1(?:&|$)/.test(query || "")) {
+      parti.push("embed=1");
+    }
+    return pagina + (parti.length ? "?" + parti.join("&") : "");
+  }
+
+  /* Rientro dopo l'accesso: solo pagine interne della GUI
+     (whitelist), mai URL esterni o percorsi assoluti. */
+  const NEXT_RE =
+    /^(?:configurazione|scansione)\.html(?:\?[\w=&%.-]*)?$/;
+
+  function vaiAccesso() {
+    const qui = PAGE + ".html" + (window.location.search || "");
+    window.location.replace(
+      "accesso.html?next=" + encodeURIComponent(qui) +
+      (EMBED ? "&embed=1" : ""));
+  }
+
+  function dopoAccesso() {
+    const next = new URLSearchParams(
+      window.location.search).get("next") || "";
+    window.location.replace(
+      NEXT_RE.test(next) ? next : pageUrl("configurazione.html"));
+  }
+
+  /* In embed i link fra le pagine interne conservano ?embed=1. */
+  function adattaLinkInterni() {
+    if (!EMBED) { return; }
+    document.querySelectorAll(
+      'a[href^="accesso.html"], a[href^="configurazione.html"], ' +
+      'a[href^="scansione.html"]').forEach((a) => {
+      a.href = pageUrl(a.getAttribute("href").split("?")[0]);
+    });
+  }
+
   /* Il ciclo audit usa il modello a risorse (/api/v1/audits, job
      con id): l'id dell'ultimo job vive in localStorage cosi' il
      ricaricamento della pagina ripristina i risultati. Gli alias
@@ -235,10 +281,17 @@
 
   let me = null;
 
-  el("audit-form").addEventListener("submit", onSubmit);
-  el("f-robots").addEventListener("change", syncRobotsAck);
-  el("btn-compare").addEventListener("click", runCompare);
-  el("btn-add-event").addEventListener("click", () => {
+  /* Registra un listener solo se l'elemento esiste nella pagina
+     corrente: lo script e' condiviso fra le tre pagine. */
+  function on(id, evento, gestore) {
+    const nodo = el(id);
+    if (nodo) { nodo.addEventListener(evento, gestore); }
+  }
+
+  on("audit-form", "submit", onSubmit);
+  on("f-robots", "change", syncRobotsAck);
+  on("btn-compare", "click", runCompare);
+  on("btn-add-event", "click", () => {
     const feedback = el("event-feedback");
     feedback.textContent = "";
     apiFetch("api/citations/events", {
@@ -266,32 +319,39 @@
         feedback.textContent = "Errore di rete.";
       });
   });
-  el("f-cit-site").addEventListener("change", (event) => {
+  on("f-cit-site", "change", (event) => {
     const entry = citSites[Number(event.target.value)];
     if (entry) {
       renderCitationsSite(entry);
     }
   });
-  el("cancel-btn").addEventListener("click", cancelAudit);
-  el("login-form").addEventListener("submit", onLogin);
-  el("register-form").addEventListener("submit", onRegister);
-  el("profile-form").addEventListener("submit", onProfile);
-  el("logout-btn").addEventListener("click", onLogout);
-  ["dl-html", "dl-json", "dl-text", "dl-md", "dl-csv",
-   "open-report"].forEach((id) => {
-    el(id).addEventListener("click", (event) => {
-      if (!jobId || !me || !me.profile_complete) {
-        event.preventDefault();
-      }
+  on("cancel-btn", "click", cancelAudit);
+  on("login-form", "submit", onLogin);
+  on("register-form", "submit", onRegister);
+  on("profile-form", "submit", onProfile);
+  on("logout-btn", "click", onLogout);
+  if (PAGE === "scansione") {
+    ["dl-html", "dl-json", "dl-text", "dl-md", "dl-csv",
+     "open-report"].forEach((id) => {
+      el(id).addEventListener("click", (event) => {
+        if (!jobId || !me || !me.profile_complete) {
+          event.preventDefault();
+        }
+      });
     });
-  });
-  el("preset-save").addEventListener("click", savePreset);
-  el("preset-load").addEventListener("click", loadPreset);
-  el("preset-delete").addEventListener("click", deletePreset);
-  refreshPresetSelect();
-  bindTokenLogin();
+  }
+  on("preset-save", "click", savePreset);
+  on("preset-load", "click", loadPreset);
+  on("preset-delete", "click", deletePreset);
+  if (PAGE === "configurazione") {
+    refreshPresetSelect();
+    loadEnv();
+  }
+  if (PAGE === "accesso") {
+    bindTokenLogin();
+  }
+  adattaLinkInterni();
   adaptStaticApiLinks();
-  loadEnv();
   refreshAuth();
 
   /* ---------------- accesso e profilo ---------------- */
@@ -333,8 +393,7 @@
         .then((info) => {
           if (info.authenticated) {
             el("t-token").value = "";
-            adaptStaticApiLinks();
-            applyAuth(info.user);
+            dopoAccesso();
           } else {
             apiToken = "";
             try {
@@ -353,39 +412,43 @@
       .then((r) => r.json())
       .then((info) => {
         applyAuth(info.authenticated ? info.user : null);
-        if (me) {
-          restoreResults();
-        }
       })
       .catch(() => applyAuth(null));
   }
 
+  /* Stato di accesso sulla pagina corrente. Sull'accesso un
+     utente gia' autenticato viene reindirizzato; sulle pagine
+     protette un anonimo torna all'accesso (con rientro). */
   function applyAuth(user) {
     me = user;
-    el("auth-error").hidden = true;
-    if (me) {
-      el("auth-out").hidden = true;
-      el("auth-in").hidden = false;
-      el("auth-name").textContent = me.nome;
-      el("auth-email").textContent = me.email;
+    const errore = el("auth-error");
+    if (errore) { errore.hidden = true; }
+    if (PAGE === "accesso") {
+      if (me) { dopoAccesso(); }
+      return;
+    }
+    if (!me) {
+      vaiAccesso();
+      return;
+    }
+    el("user-bar").hidden = false;
+    el("auth-name").textContent = me.nome;
+    el("auth-email").textContent = me.email;
+    if (PAGE === "configurazione") {
+      const primaVolta = el("config-section").hidden;
+      el("profile-wrap").hidden = false;
       el("profile-block").hidden = !!me.profile_complete;
       el("profile-ok").hidden = !me.profile_complete;
       el("config-section").hidden = false;
-      setOpen("sec-auth", false);
       setOpen("sec-config", true);
+      if (primaVolta) { el("config-toggle").focus(); }
+    }
+    if (PAGE === "scansione") {
+      updateDownloadGate();
       loadHistory();
       loadCitations();
-    } else {
-      el("auth-out").hidden = false;
-      el("auth-in").hidden = true;
-      el("config-section").hidden = true;
-      el("progress-section").hidden = true;
-      setResultsHidden(true);
-      el("history-section").hidden = true;
-      el("citations-section").hidden = true;
-      setOpen("sec-auth", true);
+      initScanPage();
     }
-    updateDownloadGate();
   }
 
   function updateDownloadGate() {
@@ -410,8 +473,7 @@
           showAuthError(data.error || "Accesso non riuscito.");
           return;
         }
-        applyAuth(data.user);
-        restoreResults();
+        dopoAccesso();
       })
       .catch(() => showAuthError("Server locale non raggiungibile."));
   }
@@ -431,9 +493,7 @@
           showAuthError(data.error || "Registrazione non riuscita.");
           return;
         }
-        applyAuth(data.user);
-        el("announcer").textContent =
-          "Registrazione completata: puoi avviare il check.";
+        dopoAccesso();
       })
       .catch(() => showAuthError("Server locale non raggiungibile."));
   }
@@ -461,7 +521,9 @@
         window.localStorage.removeItem("mars_api_token");
       } catch (err) { /* ignora */ }
     }
-    postJson("api/logout", {}).finally(() => applyAuth(null));
+    postJson("api/logout", {}).finally(() => {
+      window.location.replace(pageUrl("accesso.html"));
+    });
   }
 
   /* ---------------- storico degli audit ---------------- */
@@ -1138,27 +1200,51 @@
     btn.textContent = "Annulla audit";
   }
 
-  /* Se un audit e' gia' concluso (es. pagina ricaricata), i
-     risultati vengono ripristinati senza rilanciare nulla. */
-  function restoreResults() {
+  /* Stato della pagina di scansione dal job: il deep-link
+     ?job=… ha la precedenza sull'id in localStorage. Un job in
+     corso riaggancia l'avanzamento (SSE/polling), uno concluso
+     ripristina i risultati senza rilanciare nulla; un job
+     sparito o di un altro utente rimanda alla configurazione. */
+  function initScanPage() {
+    const daUrl = new URLSearchParams(
+      window.location.search).get("job") || "";
+    if (daUrl) { setJobId(daUrl); }
     if (!jobId) {
+      el("no-job").hidden = false;
       return;
     }
     apiFetch("api/v1/audits/" + jobId)
       .then((r) => r.json())
       .then((snap) => {
-        if (!running && snap.state === "done" &&
-            snap.summary && snap.summary.site) {
-          renderLog(snap.log || []);
-          el("progress-anim").hidden = true;
-          el("progress-section").hidden = false;
-          setOpen("sec-config", false);
-          showResults(snap);
-        } else if (!snap.state) {
+        if (!snap.state) {
           setJobId("");  // job sparito o di un altro utente
+          el("no-job").hidden = false;
+          return;
+        }
+        renderLog(snap.log || []);
+        el("progress-section").hidden = false;
+        if (snap.state === "running") {
+          running = true;
+          el("progress-anim").hidden = false;
+          el("cancel-btn").hidden = false;
+          setOpen("sec-progress", true);
+          el("progress-toggle").focus();
+          watchProgress();
+        } else if (snap.state === "done" &&
+                   snap.summary && snap.summary.site) {
+          el("progress-anim").hidden = true;
+          showResults(snap);
+        } else {
+          el("progress-anim").hidden = true;
+          if (snap.state === "error") {
+            fail(snap.error ||
+              "Errore sconosciuto durante l'audit.");
+          } else {
+            el("no-job").hidden = false;
+          }
         }
       })
-      .catch(() => { /* nessun audit precedente */ });
+      .catch(() => { el("no-job").hidden = false; });
   }
 
   /* ---------------- ambiente ---------------- */
@@ -1243,6 +1329,7 @@
     clearErrors();
     const config = collectConfig();
     if (config) {
+      setSubmitState(true);
       startAudit(config);
     }
   }
@@ -1368,33 +1455,23 @@
       .then((r) => r.json().then((data) => ({ status: r.status, data })))
       .then(({ status, data }) => {
         if (status !== 202) {
+          setSubmitState(false);
           showFormError(messaggioErrore(
             data, "Avvio non riuscito."));
           return;
         }
         setJobId(data.id);
-        running = true;
-        lastPhase = "";
-        setSubmitState(true);
-        setResultsHidden(true);
-        setOpen("sec-results", false);
-        PILLARS.forEach((p) => {
-          setOpen("sec-pillar-" + p.suffix, false);
-        });
-        el("audit-error").hidden = true;
-        el("log").textContent = "";
-        el("announcer").textContent = "Audit avviato.";
-        el("progress-anim").hidden = false;
-        el("cancel-btn").hidden = false;
-        el("progress-section").hidden = false;
-        setOpen("sec-config", false);
-        setOpen("sec-progress", true);
-        el("progress-toggle").focus();
-        window.setTimeout(watchProgress, 300);
+        el("announcer").textContent =
+          "Audit avviato: apertura della pagina di scansione.";
+        window.location.assign(pageUrl("scansione.html",
+          "job=" + encodeURIComponent(data.id)));
       })
-      .catch(() => showFormError(
-        "Impossibile contattare il server locale: verifica che " +
-        "mars_gui.py sia in esecuzione."));
+      .catch(() => {
+        setSubmitState(false);
+        showFormError(
+          "Impossibile contattare il server locale: verifica " +
+          "che mars_gui.py sia in esecuzione.");
+      });
   }
 
   function showFormError(message) {
@@ -1406,6 +1483,7 @@
 
   function setSubmitState(busy) {
     const button = el("submit-btn");
+    if (!button) { return; }  // solo sulla pagina configurazione
     button.disabled = busy;
     button.textContent = busy ? "Audit in corso…" : "Avvia audit";
   }
@@ -1501,13 +1579,12 @@
 
   function cancelled() {
     running = false;
-    setSubmitState(false);
     hideCancel();
     el("progress-anim").hidden = true;
     el("announcer").textContent =
       "Audit annullato: nessun risultato prodotto. Puoi avviarne " +
-      "un altro dalla configurazione.";
-    setOpen("sec-config", true);
+      "un altro dalla pagina di configurazione.";
+    el("no-job").hidden = false;
   }
 
   function fail(message) {

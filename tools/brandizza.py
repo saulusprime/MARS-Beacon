@@ -346,6 +346,14 @@ def applica(percorso_config: Path, gui: Path) -> list:
     scritti.append(percorso_css)
 
     brand = config["brand"]
+    # GUI a momenti distinti (P5): index e' lo smistatore, i tre
+    # momenti hanno pagina e titolo dedicati (titolo_index resta
+    # la base del brand).
+    momenti = {
+        "accesso.html": "Accesso",
+        "configurazione.html": "Configurazione della scansione",
+        "scansione.html": "Scansione e report",
+    }
     pagine = {
         "index.html": (("testa",
                         testa_html(config, brand["titolo_index"])),
@@ -358,6 +366,13 @@ def applica(percorso_config: Path, gui: Path) -> list:
                      ("ragione-sociale", brand["ragione_sociale"]),
                      ("footer", footer_html(config))),
     }
+    for nome_pagina, momento in momenti.items():
+        pagine[nome_pagina] = (
+            ("testa", testa_html(config, "%s · %s"
+                                 % (momento,
+                                    brand["titolo_index"]))),
+            ("testata", testata_html(config)),
+            ("footer", footer_html(config)))
     for nome_pagina, regioni in pagine.items():
         pagina = gui / nome_pagina
         testo = pagina.read_text(encoding="utf-8")

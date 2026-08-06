@@ -1099,7 +1099,62 @@ Dettaglio nei bullet che seguono, dal più recente.
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.41.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.42.0 + `gui/`
+
+- **GUI a momenti UX distinti** (v2.42.0, 2026-08-06 — chiude il
+  programma P5 del TO-DO, solo-frontend: nessun cambio d'API, il
+  contratto resta 1.5.0): la pagina unica ad accordion è
+  diventata **tre pagine statiche dedicate** più lo smistatore.
+  **Decisione architetturale** (registrata qui; scartate le viste
+  commutate via hash nella pagina unica, che non davano URL
+  leggibili né titoli distinti): pagine reali nel bundle `gui/`
+  — `accesso.html` (login, registrazione con condizioni di
+  servizio, accesso con token API del cross-origin),
+  `configurazione.html` (form completo, preset, hint da
+  `/api/env`, completamento del profilo migrato qui
+  dall'accordion Accesso) e `scansione.html` (avanzamento con
+  SSE/polling e annullamento, risultati e sezioni pilastro,
+  download dei referti, storico e citazioni IA) — con
+  **`index.html` smistatore** (`smista.js`: `GET /api/me` con
+  cookie o token e `location.replace` verso accesso o
+  configurazione; `<noscript>` con link). **`app.js` resta
+  condiviso**: ogni pagina dichiara `data-page` sul body e lo
+  script attiva solo i pezzi della pagina corrente (helper `on`
+  che registra i listener se l'elemento esiste; nessuna
+  scomposizione in moduli: la CSP stretta senza build step rende
+  il file unico la via più robusta). **Flusso**: credenziali
+  confermate → redirect alla configurazione (`location.replace`,
+  il back non ripropone il login); avvio confermato →
+  `POST /api/v1/audits` e redirect a
+  **`scansione.html?job=…`** — il **deep-link per job** ha la
+  precedenza sul `mars_job_id` in localStorage, il ricaricamento
+  ripristina (job in corso: riaggancio SSE/polling — prima si
+  perdeva la vista di avanzamento; concluso: risultati; sparito
+  o di un altro utente: avviso `no-job` con rimando alla
+  configurazione). **Guardia di accesso** sulle pagine protette:
+  anonimo → `accesso.html?next=…` con **rientro whitelistato**
+  (regex sulle sole pagine interne, mai URL esterni); utente già
+  autenticato sull'accesso → redirect immediato. **Barra utente**
+  comune alle pagine protette dentro `<main>` (nome, email,
+  navigazione all'altro momento, Esci — visibile anche in embed,
+  dove header e footer restano spenti); titoli `<title>` distinti
+  per pagina composti da `brandizza.py` ("momento ·
+  titolo_index"), focus gestito dopo i redirect (config-toggle /
+  progress-toggle / results-toggle), **embed `?embed=1`
+  propagato** da smistatore, redirect e link interni.
+  White-label esteso alle cinque pagine (regioni brand ovunque,
+  idempotenza verificata); Pa11y CI su tos, accesso (anche
+  embed), configurazione da autenticati (registrazione →
+  redirect) e scansione senza job. Test aggiornati/nuovi in
+  `test_frontend_separato` (struttura P5: data-page, whitelist
+  del rientro, job nel deep-link, smistatore senza app.js),
+  `test_gui` (statici delle nuove pagine), `test_e2e_separato`
+  (bundle multi-pagina per copia) e `test_white_label` (cinque
+  pagine riscritte byte per byte). Suite verde, flake8 pulito,
+  `node --check` su app.js e smista.js. **AT strumentale da
+  ripassare** (31 punti in Chrome reale) alla prima occasione
+  utile: i flussi sono cambiati nella navigazione, non nei
+  widget.
 
 - **Modalità embed** (GUI v2.40.0 + mars_api v0.3.0, 2026-08-06 —
   chiude la strada A dell'analisi; la strada B, widget nativo, è

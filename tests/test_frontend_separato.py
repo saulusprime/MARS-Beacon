@@ -28,10 +28,17 @@ def test_config_js_base_api_e_fonts():
     assert 'window.MARS_API_BASE = ""' in config
 
 
-def test_index_carica_config_prima_di_app():
+def test_pagine_caricano_config_prima_dello_script():
+    for nome in ("accesso.html", "configurazione.html",
+                 "scansione.html"):
+        pagina = _leggi(nome)
+        assert pagina.index('src="config.js"') \
+            < pagina.index('src="app.js"'), nome
     indice = _leggi("index.html")
     assert indice.index('src="config.js"') \
-        < indice.index('src="app.js"')
+        < indice.index('src="smista.js"')
+    # lo smistatore non e' l'applicazione: niente app.js
+    assert 'src="app.js"' not in indice
 
 
 def test_app_js_passa_sempre_dal_wrapper():
@@ -52,11 +59,11 @@ def test_app_js_passa_sempre_dal_wrapper():
 
 
 def test_accesso_token_presente_e_accessibile():
-    indice = _leggi("index.html")
-    assert 'id="token-login"' in indice
-    assert 'for="t-token"' in indice  # etichetta sul campo
-    assert 'aria-describedby="token-hint"' in indice
-    assert 'id="password-login"' in indice  # commutabile
+    accesso = _leggi("accesso.html")
+    assert 'id="token-login"' in accesso
+    assert 'for="t-token"' in accesso  # etichetta sul campo
+    assert 'aria-describedby="token-hint"' in accesso
+    assert 'id="password-login"' in accesso  # commutabile
     app = _leggi("app.js")
     assert "bindTokenLogin" in app
     assert "mars_api_token" in app  # persistenza locale
@@ -66,7 +73,7 @@ def test_accesso_token_presente_e_accessibile():
 
 
 def test_javascript_sintatticamente_valido():
-    for nome in ("app.js", "config.js"):
+    for nome in ("app.js", "config.js", "smista.js"):
         esito = subprocess.run(
             ["node", "--check", os.path.join(GUI, nome)],
             capture_output=True, text=True)
@@ -92,6 +99,10 @@ def test_modalita_embed():
     assert "mars-embed" in app
     assert "window.MARS_EMBED" in app
     assert "embed=1" in app
+    # anche lo smistatore propaga l'embed alle destinazioni
+    smista = _leggi("smista.js")
+    assert "mars-embed" in smista
+    assert "embed=1" in smista
     config = _leggi("config.js")
     assert "window.MARS_EMBED = false" in config
     tema = _leggi("theme.css")
@@ -114,5 +125,45 @@ def test_gui_migrata_alle_rotte_v1():
     assert "setReportLinks" in app                 # referti per job
     assert "messaggioErrore" in app                # errori v1
     # i link statici dei referti sono dinamici (legati al job)
-    indice = _leggi("index.html")
-    assert "api/report/" not in indice
+    for nome in ("index.html", "accesso.html",
+                 "configurazione.html", "scansione.html"):
+        assert "api/report/" not in _leggi(nome), nome
+
+
+def test_gui_a_momenti_distinti():
+    """P5: tre pagine dedicate piu' lo smistatore; guardia di
+    accesso con rientro whitelistato e job nel deep-link."""
+    attese = {"accesso.html": "accesso",
+              "configurazione.html": "configurazione",
+              "scansione.html": "scansione",
+              "index.html": "smista"}
+    for nome, pagina in attese.items():
+        assert 'data-page="%s"' % pagina in _leggi(nome), nome
+    # i momenti protetti hanno barra utente e uscita
+    for nome in ("configurazione.html", "scansione.html"):
+        contenuto = _leggi(nome)
+        assert 'id="user-bar"' in contenuto, nome
+        assert 'id="logout-btn"' in contenuto, nome
+    # l'accesso non contiene il form dell'audit ne' i risultati
+    accesso = _leggi("accesso.html")
+    assert 'id="audit-form"' not in accesso
+    assert 'id="results-section"' not in accesso
+    # la configurazione non contiene i risultati, la scansione
+    # non contiene il form
+    assert 'id="results-section"' not in _leggi(
+        "configurazione.html")
+    scansione = _leggi("scansione.html")
+    assert 'id="audit-form"' not in scansione
+    assert 'id="no-job"' in scansione
+    app = _leggi("app.js")
+    # rientro dopo l'accesso solo su pagine interne (whitelist)
+    assert "NEXT_RE" in app
+    assert "encodeURIComponent(qui)" in app
+    # avvio: redirect alla scansione col job nell'URL
+    assert 'pageUrl("scansione.html"' in app
+    assert '"job=" + encodeURIComponent(data.id)' in app
+    # smistatore: destinazioni per stato di accesso
+    smista = _leggi("smista.js")
+    assert '"configurazione.html"' in smista
+    assert '"accesso.html"' in smista
+    assert "api/me" in smista

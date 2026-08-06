@@ -169,6 +169,19 @@ anche senza rete; si aggiornano con `tools/update-vendor.sh`, che
 scarica il pacchetto ufficiale da npm e pota i formati legacy). Una
 sola scansione del sito produce tutti i formati di referto.
 
+Dalla v2.42.0 l'esperienza è organizzata in **momenti distinti su
+pagine dedicate**: `accesso.html` (login, registrazione o token
+API), `configurazione.html` (modulo della scansione, preset,
+completamento del profilo) e `scansione.html` (avanzamento,
+risultati, referti, storico e citazioni), con **deep-link per job**
+(`scansione.html?job=…`: il ricaricamento o un link interno
+ripristinano l'audit dal job). `index.html` è lo **smistatore**:
+verifica lo stato di accesso e porta alla pagina giusta; confermate
+le credenziali si passa alla configurazione, confermato l'avvio
+alla scansione. Le pagine protette rimandano all'accesso (con
+rientro alla pagina richiesta, su whitelist interna) e la modalità
+embed si propaga nei passaggi.
+
 Cosa offre:
 
 - **Modulo di configurazione** con tutti i parametri della CLI (URL,
@@ -372,6 +385,11 @@ python3 mars_gui.py --frame-ancestors https://lymphatech.it
         title="MARS Beacon — audit di citabilità"
         style="width: 100%; height: 60rem; border: 0"></iframe>
 ```
+
+Con la GUI a pagine (v2.42.0) l'iframe può puntare a `/?embed=1`
+(lo smistatore porta alla pagina giusta) o direttamente a una
+pagina (`accesso.html?embed=1`, …): i passaggi fra accesso,
+configurazione e scansione **propagano `?embed=1`** da soli.
 
 L'autenticazione dipende dall'assetto: sullo **stesso sito**
 (app.lymphatech.it dentro lymphatech.it) i cookie viaggiano già;
@@ -645,12 +663,12 @@ lo script ed esegue `run_audit()` in un thread, catturandone il log.
 
 ```mermaid
 flowchart LR
-    B["Browser<br/>gui/index.html · app.js<br/>Bootstrap Italia vendorizzato"]
+    B["Browser<br/>gui/ a pagine: accesso · configurazione · scansione<br/>app.js condiviso · Bootstrap Italia vendorizzato"]
     S["mars_gui.py<br/>ThreadingHTTPServer · solo stdlib<br/>127.0.0.1:8765 · CSP · un audit alla volta"]
     A["mars_audit.py<br/>run_audit() in un thread<br/>referti html + json + text"]
-    B -->|"POST /api/audit"| S
-    B -->|"GET /api/status (polling 1s)"| S
-    B -->|"GET /api/report/{html,json,text}"| S
+    B -->|"POST /api/v1/audits"| S
+    B -->|"GET /api/v1/audits/{id} (SSE o polling)"| S
+    B -->|"GET /api/v1/audits/{id}/report?format=…"| S
     S --> A --> S
 ```
 

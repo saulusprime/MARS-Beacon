@@ -50,7 +50,9 @@ def origini(tmp_path, monkeypatch):
     # il bundle si distribuisce per copia: config.js con la base
     bundle = tmp_path / "bundle"
     bundle.mkdir()
-    for nome in ("index.html", "app.js"):
+    for nome in ("index.html", "accesso.html",
+                 "configurazione.html", "scansione.html",
+                 "app.js", "smista.js"):
         shutil.copy(os.path.join(GUI_DIR, nome), bundle / nome)
     with open(os.path.join(GUI_DIR, "config.js"),
               encoding="utf-8") as fh:
