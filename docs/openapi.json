@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "MARS Beacon API",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Contratto dell'API locale di MARS Beacon, generato dal registro dichiarativo delle rotte (marsbeacon/api.py): spec e codice non possono divergere per costruzione. Gli errori sono {\"error\": messaggio in italiano} (piu' \"code\" macchina dove indicato). Un audit alla volta; slot orario per utente; download dei referti riservato alla registrazione completa.",
     "license": {
       "name": "Apache 2.0",
@@ -257,6 +257,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -331,6 +334,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -804,6 +810,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -940,6 +949,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -1182,7 +1194,7 @@
         },
         "responses": {
           "202": {
-            "description": "Audit avviato.",
+            "description": "Audit avviato (job con id: le rotte /api/v1/audits/{id} lo indirizzano).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1190,10 +1202,14 @@
                   "properties": {
                     "ok": {
                       "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "id"
                   ],
                   "additionalProperties": false
                 }
@@ -1294,6 +1310,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -1304,6 +1323,10 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Id del job (vuoto per i job avviati prima del modello a risorse)."
+                    },
                     "state": {
                       "type": "string",
                       "enum": [
@@ -1357,6 +1380,7 @@
                     }
                   },
                   "required": [
+                    "id",
                     "state",
                     "log",
                     "error",
@@ -1405,6 +1429,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -1451,6 +1478,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "parameters": [
@@ -1586,11 +1616,39 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Righe per pagina.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Righe da saltare.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Righe dello storico.",
+            "description": "Righe dello storico (paginate).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1642,10 +1700,37 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
                     }
                   },
                   "required": [
-                    "runs"
+                    "runs",
+                    "limit",
+                    "offset"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit o offset non validi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
                   ],
                   "additionalProperties": false
                 }
@@ -1685,6 +1770,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "parameters": [
@@ -1812,6 +1900,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "parameters": [
@@ -1945,6 +2036,1600 @@
         }
       }
     },
+    "/api/v1/audits": {
+      "post": {
+        "operationId": "post-api-v1-audits",
+        "summary": "Avvia un audit come job con id",
+        "tags": [
+          "audit"
+        ],
+        "description": "Il modello a risorse della Fase 2: 202 con l'id del job, da seguire su GET /api/v1/audits/{id} (o sull'SSE per-job) e da cui scaricare i referti in ogni formato e lingua. Stesso corpo e stessi limiti di POST /api/audit (un audit alla volta di default, slot orario per utente); errori nell'oggetto uniforme delle rotte v1.",
+        "security": [
+          {
+            "cookieSession": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Sito da analizzare (https:// implicito se manca lo schema)."
+                  },
+                  "max_pages": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 500,
+                    "default": 25
+                  },
+                  "rrf_k": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 60
+                  },
+                  "top_n": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "default": 5
+                  },
+                  "chunk_words": {
+                    "type": "number",
+                    "minimum": 80,
+                    "maximum": 600,
+                    "default": 220
+                  },
+                  "w_lex": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10,
+                    "default": 1.0
+                  },
+                  "w_vec": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10,
+                    "default": 1.0
+                  },
+                  "delay": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 0.5
+                  },
+                  "max_body": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 10240,
+                    "default": 10
+                  },
+                  "retries": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 2
+                  },
+                  "workers": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 16,
+                    "default": 4
+                  },
+                  "render": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "auto",
+                      "always"
+                    ],
+                    "default": "off"
+                  },
+                  "market": {
+                    "type": "string",
+                    "enum": [
+                      "globale",
+                      "occidentale",
+                      "orientale"
+                    ],
+                    "default": "occidentale"
+                  },
+                  "judge": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "on",
+                      "off"
+                    ],
+                    "default": "auto"
+                  },
+                  "lighthouse": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "auto",
+                      "always"
+                    ],
+                    "default": "off"
+                  },
+                  "lighthouse_pages": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 9,
+                    "default": 3
+                  },
+                  "lighthouse_device": {
+                    "type": "string",
+                    "enum": [
+                      "mobile",
+                      "desktop"
+                    ],
+                    "default": "mobile"
+                  },
+                  "search_check": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "on",
+                      "off"
+                    ],
+                    "default": "auto"
+                  },
+                  "robots": {
+                    "type": "string",
+                    "enum": [
+                      "respect",
+                      "own",
+                      "force"
+                    ],
+                    "default": "own",
+                    "description": "Default 'own': la titolarita' e' dichiarata in registrazione."
+                  },
+                  "robots_ack": {
+                    "type": "boolean",
+                    "description": "Obbligatorio true con robots=force: assunzione esplicita di responsabilita'."
+                  },
+                  "queries": {
+                    "type": "string",
+                    "description": "Query di prova, una per riga."
+                  },
+                  "competitors": {
+                    "type": "string",
+                    "description": "Siti concorrenti, uno per riga (max 3)."
+                  },
+                  "embeddings": {
+                    "type": "string",
+                    "description": "Modello sentence-transformers; vuoto = auto, 'none' = proxy."
+                  },
+                  "lang": {
+                    "type": "string",
+                    "enum": [
+                      "it",
+                      "en",
+                      "fr",
+                      "de",
+                      "es"
+                    ],
+                    "default": "it",
+                    "description": "Lingua dei referti scaricabili (html, text, md, csv); il JSON resta canonico in italiano."
+                  },
+                  "soglie": {
+                    "type": "object",
+                    "properties": {
+                      "description_max": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 600
+                      },
+                      "description_min": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 400
+                      },
+                      "estraibilita_minima": {
+                        "type": "number",
+                        "minimum": 0.01,
+                        "maximum": 1.0
+                      },
+                      "parole_obiettivo": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000
+                      },
+                      "parole_scarse": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100000
+                      },
+                      "title_max": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 300
+                      },
+                      "title_min": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200
+                      },
+                      "varieta_anchor_minima": {
+                        "type": "number",
+                        "minimum": 0.01,
+                        "maximum": 1.0
+                      }
+                    },
+                    "additionalProperties": false,
+                    "description": "Soglie di prassi personalizzate (equivalente di --config della CLI): i rilievi dichiarano sempre la soglia usata e il referto JSON le echeggia nel blocco 'thresholds'. Coppie min/max validate sul valore efficace."
+                  },
+                  "queries_gsc": {
+                    "type": "string",
+                    "description": "Contenuto dell'export CSV \"Query\" di Google Search Console (rapporto Rendimento): prime 15 per clic e impressioni, deduplicate. Non combinabile con 'queries'."
+                  },
+                  "fail_under": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Gate di regressione: la sintesi del job echeggia soglia ed esito (fail_under, gate_passed)."
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Job creato e avviato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Configurazione non valida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Concorrenza esaurita: un audit e' gia' in corso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Slot orario gia' consumato (retry_in_s nei params).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audits/{id}": {
+      "get": {
+        "operationId": "get-api-v1-audits-id",
+        "summary": "Stato e sintesi di un job di audit",
+        "tags": [
+          "audit"
+        ],
+        "description": "Lo snapshot del job (stesso schema di GET /api/status), indirizzato per id; solo il proprietario lo vede (404 altrimenti: nessuna esistenza rivelata).",
+        "security": [
+          {
+            "cookieSession": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Id del job (dal 202 di creazione).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot del job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Id del job (vuoto per i job avviati prima del modello a risorse)."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "running",
+                        "done",
+                        "error",
+                        "cancelled"
+                      ]
+                    },
+                    "log": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "config": {
+                      "type": "object",
+                      "description": "Configurazione dell'audit avviato (echo del POST validato)."
+                    },
+                    "summary": {
+                      "type": "object",
+                      "description": "Sintesi a fine audit: punteggi, citabilita', giudizio, Lighthouse, ancora di realta', delta — stessa natura del referto JSON (schema_version)."
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "remediation": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "rrf": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "competitive": {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "log",
+                    "error",
+                    "config",
+                    "summary",
+                    "findings",
+                    "remediation",
+                    "rrf",
+                    "competitive"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job inesistente o di un altro utente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-api-v1-audits-id",
+        "summary": "Annulla un job di audit",
+        "tags": [
+          "audit"
+        ],
+        "description": "Annullamento cooperativo per id (stesse garanzie di POST /api/cancel: nessun risultato parziale, slot orario non consumato).",
+        "security": [
+          {
+            "cookieSession": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Id del job.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Annullamento avviato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job inesistente o di un altro utente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Il job non e' in corso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audits/{id}/report": {
+      "get": {
+        "operationId": "get-api-v1-audits-id-report",
+        "summary": "Referto di un job, in ogni formato e lingua",
+        "tags": [
+          "audit"
+        ],
+        "description": "La stessa scansione produce tutti i formati e, on-demand, tutte le lingue del referto (reso dal contesto del job e messo in cache): parita' con --lang senza rifare l'audit. Riservato alla registrazione completa.",
+        "security": [
+          {
+            "cookieSession": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Id del job.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Formato del referto.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "html",
+                "json",
+                "text",
+                "md",
+                "csv"
+              ],
+              "default": "json"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "description": "Lingua del referto (default: quella dell'audit; il JSON resta canonico in italiano).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "it",
+                "en",
+                "fr",
+                "de",
+                "es"
+              ]
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "description": "Se presente, risposta come allegato.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Il referto richiesto.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Formato o lingua sconosciuti.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Registrazione completa richiesta (code profile_incomplete).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job inesistente o audit non concluso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audits/{id}/events": {
+      "get": {
+        "operationId": "get-api-v1-audits-id-events",
+        "summary": "Avanzamento push di un job (SSE)",
+        "tags": [
+          "audit"
+        ],
+        "description": "Come GET /api/events ma per-job: snapshot a ogni variazione, flusso chiuso allo stato terminale, polling come ripiego.",
+        "security": [
+          {
+            "cookieSession": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Id del job.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flusso di eventi con lo snapshot serializzato.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job inesistente o di un altro utente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tokens": {
+      "post": {
+        "operationId": "post-api-v1-tokens",
+        "summary": "Crea un token API personale",
+        "tags": [
+          "account"
+        ],
+        "description": "Token Bearer per client macchina e cross-origin (stesso perimetro del cookie: slot orario e gating del profilo). Il valore in chiaro esiste SOLO in questa risposta; in tabella va lo SHA-256. La gestione dei token richiede la sessione cookie: un token non puo' crearne altri.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "description": "Etichetta mnemonica facoltativa."
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Token creato (valore visibile solo ora).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "id",
+                    "label",
+                    "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corpo della richiesta non valido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto (sessione).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "get-api-v1-tokens",
+        "summary": "Elenca i token API personali",
+        "tags": [
+          "account"
+        ],
+        "description": "Solo i metadati (id, etichetta, date): il valore del token non e' recuperabile.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token dell'utente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tokens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "number"
+                          },
+                          "last_used_at": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "created_at",
+                          "last_used_at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "tokens"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto (sessione).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tokens/{id}": {
+      "delete": {
+        "operationId": "delete-api-v1-tokens-id",
+        "summary": "Revoca un token API",
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Id del token (da GET /api/v1/tokens).",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token revocato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Id non valido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto (sessione).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token non trovato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "params": {
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "key",
+                        "message",
+                        "params"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/citations": {
       "get": {
         "operationId": "get-api-citations",
@@ -1956,6 +3641,9 @@
         "security": [
           {
             "cookieSession": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -2033,6 +3721,11 @@
         "in": "cookie",
         "name": "mars_session",
         "description": "Cookie di sessione emesso da /api/register e /api/login (HttpOnly, SameSite=Strict)."
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token API personale (POST /api/v1/tokens, valore visibile solo alla creazione): per client macchina e cross-origin, stesso perimetro del cookie."
       }
     }
   }

@@ -693,6 +693,47 @@ sono nel [README.md](README.md).
 
 ## API — contratto e registro (programma P1, branch `devapi`)
 
+- **Job con id, token Bearer, CORS e paginazione: contratto 1.3.0
+  — FASE 2 CONCLUSA** (mars_api v0.2.0, 2026-08-06). Il **modello
+  a risorse** della Fase 0: `POST /api/v1/audits` crea un job con
+  id (202; anche la rotta legacy ora restituisce l'id) registrato
+  in `JOBS` (potatura oltre 20 conclusi; `JOB` resta il "corrente"
+  legacy), **concorrenza configurabile** `AUDIT_CONCURRENCY`
+  (default 1 = comportamento storico, 409 `busy` oltre;
+  `--max-audit` su mars_api); `GET /api/v1/audits/{id}` (snapshot
+  con `id`, solo del proprietario: i job altrui sono 404, nessuna
+  esistenza rivelata), `DELETE` (annullamento cooperativo per id),
+  **`GET .../report?format=…&lang=…`** — il job conserva il
+  **contesto di rendering** e i referti in altre lingue si rendono
+  **on-demand** con cache: parità con `--lang` senza rifare la
+  scansione — e **SSE per-job** su `.../events`. **Token Bearer**
+  (`/api/v1/tokens`: POST con valore in chiaro solo alla
+  creazione, GET solo metadati, DELETE revoca): hash **SHA-256**
+  in tabella `api_tokens` — scelta dichiarata: token casuale ad
+  alta entropia, il PBKDF2 serve alle password e costerebbe 200k
+  round a ogni richiesta —, `_auth_user` = cookie O Bearer con lo
+  **stesso perimetro** (slot orario, gating del profilo), gestione
+  dei token **solo via sessione** (un token non può crearne
+  altri; `AUTH_COOKIE` nel registro, `bearerAuth` negli schemi di
+  sicurezza). **CORS spento di default**: header solo per le
+  origini dichiarate (`CORS_ORIGINS`, `--cors` ripetibile su
+  mars_api), preflight OPTIONS, **mai Allow-Credentials**
+  (cross-origin = token, il cookie SameSite non viaggia).
+  **Storico paginato** (`limit`/`offset` validati, echeggiati
+  nella risposta). **Errori uniformi sulle rotte v1**
+  `{code, key, message, params}` (chiave i18n col meccanismo dei
+  rilievi, messaggio italiano canonico; `retry_in_s` nei params
+  del 429); le rotte legacy conservano `{"error"}` con lo stesso
+  handler a doppio stile. Registro: **8 rotte nuove** (26
+  totali), snapshot con `id`, contratto **1.3.0**, golden
+  rigenerato. 6 test in più (e2e v1 completo sul sito fixture con
+  referto francese on-demand e SSE a stato terminale, proprietà e
+  401/404 uniformi, concorrenza esaurita nei due stili, ciclo
+  token completo — creazione/uso Bearer su rotte protette/limite
+  di gestione/revoca con 401 successivo —, CORS
+  spento/acceso/estraneo/preflight, paginazione con 400 sui
+  parametri): suite 396 test, flake8 pulito.
+
 - **Backend puro: motore server in `marsbeacon/api.py` ed entry
   `mars_api.py`** (GUI v2.34.0, mars_api v0.1.0, 2026-08-06 —
   primo blocco della Fase 2). Il motore del server — store utenti
@@ -1429,7 +1470,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 390 test in ~30 secondi** (inclusa
+- **Suite pytest: 396 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

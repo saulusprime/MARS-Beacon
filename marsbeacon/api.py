@@ -65,10 +65,11 @@ from marsbeacon.i18n import HTML_LANGS
 # strumento: si muove solo quando cambia il contratto. La 1.0.0
 # ha segnato il censimento completo della superficie (17 rotte);
 # la 1.1.0 la parita' CLI-API su POST /api/audit (lang, soglie,
-# queries_gsc, fail_under); la 1.2.0 aggiunge GET /api/docs (la
-# documentazione Scalar del contratto). E' il numero che compare
-# in info.version della spec.
-API_CONTRACT_VERSION = "1.2.0"
+# queries_gsc, fail_under); la 1.2.0 GET /api/docs (documentazione
+# Scalar); la 1.3.0 il modello a risorse della Fase 2 — job con id
+# (/api/v1/audits), token Bearer (/api/v1/tokens), storico
+# paginato, snapshot con id, errori uniformi sulle rotte v1.
+API_CONTRACT_VERSION = "1.3.0"
 
 
 # Nome del cookie di sessione: fa parte del contratto (schema di
@@ -77,11 +78,17 @@ API_CONTRACT_VERSION = "1.2.0"
 SESSION_COOKIE_NAME = "mars_session"
 
 
-# Modalita' di autenticazione delle rotte.
+# Modalita' di autenticazione delle rotte: nessuna, "session"
+# (cookie O token Bearer: il doppio binario della Fase 0) oppure
+# "cookie" (solo sessione: la gestione dei token, cosi' un token
+# non puo' crearne o revocarne altri).
 AUTH_NONE = "none"
 
 
 AUTH_SESSION = "session"
+
+
+AUTH_COOKIE = "cookie"
 
 
 # Schema dell'errore degli endpoint legacy (/api/*): un oggetto
@@ -113,6 +120,43 @@ OK_SCHEMA: Dict[str, object] = {
     "required": ["ok"],
     "additionalProperties": False,
 }
+
+
+# Conferma con id del job creato.
+OK_ID_SCHEMA: Dict[str, object] = {
+    "type": "object",
+    "properties": {"ok": {"type": "boolean"},
+                   "id": {"type": "string"}},
+    "required": ["ok", "id"],
+    "additionalProperties": False,
+}
+
+
+# Errore uniforme delle rotte /api/v1 (decisione di Fase 0):
+# {code, key, message, params} — codice macchina, chiave i18n col
+# meccanismo dei rilievi, messaggio italiano canonico, parametri.
+# Le rotte legacy conservano {"error": messaggio}.
+ERROR_V1_SCHEMA: Dict[str, object] = {
+    "type": "object",
+    "properties": {"error": {
+        "type": "object",
+        "properties": {
+            "code": {"type": "string"},
+            "key": {"type": "string"},
+            "message": {"type": "string"},
+            "params": {"type": "object"},
+        },
+        "required": ["code", "key", "message", "params"],
+        "additionalProperties": False,
+    }},
+    "required": ["error"],
+    "additionalProperties": False,
+}
+
+
+def _err_v1(description: str) -> Dict[str, object]:
+    return {"description": description,
+            "schema": ERROR_V1_SCHEMA}
 
 
 # Utente autenticato come esposto da /api/me (forma del dict di
@@ -215,6 +259,10 @@ _SET_COOKIE_HEADER: Dict[str, object] = {
 SNAPSHOT_SCHEMA: Dict[str, object] = {
     "type": "object",
     "properties": {
+        "id": {"type": "string",
+               "description": "Id del job (vuoto per i job "
+                              "avviati prima del modello a "
+                              "risorse)."},
         "state": {"type": "string",
                   "enum": ["idle", "running", "done", "error",
                            "cancelled"]},
@@ -237,8 +285,9 @@ SNAPSHOT_SCHEMA: Dict[str, object] = {
         "rrf": {"type": "array", "items": {"type": "object"}},
         "competitive": {"type": ["object", "null"]},
     },
-    "required": ["state", "log", "error", "config", "summary",
-                 "findings", "remediation", "rrf", "competitive"],
+    "required": ["id", "state", "log", "error", "config",
+                 "summary", "findings", "remediation", "rrf",
+                 "competitive"],
     "additionalProperties": False,
 }
 
@@ -259,6 +308,132 @@ RUN_SCHEMA: Dict[str, object] = {
     },
     "required": ["id", "site", "created_at", "overall", "scores",
                  "critical", "warning", "info", "has_report"],
+    "additionalProperties": False,
+}
+
+
+# Formati di referto prodotti dal job e relativi content type.
+REPORT_FORMATS = ("html", "json", "text", "md", "csv")
+
+
+REPORT_CTYPES = {
+    "html": "text/html; charset=utf-8",
+    "json": "application/json; charset=utf-8",
+    "text": "text/plain; charset=utf-8",
+    "md": "text/markdown; charset=utf-8",
+    "csv": "text/csv; charset=utf-8",
+}
+
+
+# Corpo di POST /api/audit e /api/v1/audits (stesso handler,
+# stesso schema): tutti i parametri della CLI.
+AUDIT_REQUEST_SCHEMA: Dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "url": {"type": "string", "minLength": 1,
+                "x-errore": "URL mancante.",
+                "description": "Sito da analizzare "
+                               "(https:// implicito se "
+                               "manca lo schema)."},
+        "max_pages": {"type": "number", "minimum": 1,
+                      "maximum": 500, "default": 25},
+        "rrf_k": {"type": "number", "minimum": 1,
+                  "maximum": 1000, "default": 60},
+        "top_n": {"type": "number",
+                  "minimum": TOP_N_MIN,
+                  "maximum": TOP_N_MAX, "default": 5},
+        "chunk_words": {"type": "number",
+                        "minimum": CHUNK_WORDS_MIN,
+                        "maximum": CHUNK_WORDS_MAX,
+                        "default": 220},
+        "w_lex": {"type": "number", "minimum": 0.1,
+                  "maximum": 10, "default": 1.0},
+        "w_vec": {"type": "number", "minimum": 0.1,
+                  "maximum": 10, "default": 1.0},
+        "delay": {"type": "number", "minimum": 0,
+                  "maximum": 10, "default": 0.5},
+        "max_body": {"type": "number", "minimum": 1,
+                     "maximum": 10240, "default": 10},
+        "retries": {"type": "number", "minimum": 0,
+                    "maximum": 10, "default": 2},
+        "workers": {"type": "number", "minimum": 1,
+                    "maximum": MAX_WORKERS, "default": 4},
+        "render": {"type": "string",
+                   "enum": list(RENDER_MODES),
+                   "default": "off"},
+        "market": {"type": "string",
+                   "enum": sorted(MARKET_WEIGHTS),
+                   "default": "occidentale"},
+        "judge": {"type": "string",
+                  "enum": list(JUDGE_MODES),
+                  "default": "auto"},
+        "lighthouse": {"type": "string",
+                       "enum": list(LIGHTHOUSE_MODES),
+                       "default": "off"},
+        "lighthouse_pages": {
+            "type": "number",
+            "minimum": LIGHTHOUSE_PAGES_MIN,
+            "maximum": LIGHTHOUSE_PAGES_MAX,
+            "default": 3},
+        "lighthouse_device": {
+            "type": "string",
+            "enum": list(LIGHTHOUSE_DEVICES),
+            "default": "mobile"},
+        "search_check": {
+            "type": "string",
+            "enum": list(SEARCH_CHECK_MODES),
+            "default": "auto"},
+        "robots": {"type": "string",
+                   "enum": list(ROBOTS_MODES),
+                   "default": "own",
+                   "description": "Default 'own': la "
+                                  "titolarita' e' "
+                                  "dichiarata in "
+                                  "registrazione."},
+        "robots_ack": {
+            "type": "boolean",
+            "description": "Obbligatorio true con "
+                           "robots=force: assunzione "
+                           "esplicita di "
+                           "responsabilita'."},
+        "queries": {"type": "string",
+                    "description": "Query di prova, una "
+                                   "per riga."},
+        "competitors": {"type": "string",
+                        "description": "Siti concorrenti, "
+                                       "uno per riga "
+                                       "(max 3)."},
+        "embeddings": {"type": "string",
+                       "description": "Modello "
+                                      "sentence-transformers"
+                                      "; vuoto = auto, "
+                                      "'none' = proxy."},
+        "lang": {"type": "string",
+                 "enum": list(HTML_LANGS),
+                 "default": "it",
+                 "description": "Lingua dei referti "
+                                "scaricabili (html, text, "
+                                "md, csv); il JSON resta "
+                                "canonico in italiano."},
+        "soglie": _schema_soglie(),
+        "queries_gsc": {
+            "type": "string",
+            "description": "Contenuto dell'export CSV "
+                           "\"Query\" di Google Search "
+                           "Console (rapporto "
+                           "Rendimento): prime 15 per "
+                           "clic e impressioni, "
+                           "deduplicate. Non combinabile "
+                           "con 'queries'."},
+        "fail_under": {
+            "type": ["number", "null"],
+            "minimum": 0, "maximum": 100,
+            "description": "Gate di regressione: la "
+                           "sintesi del job echeggia "
+                           "soglia ed esito "
+                           "(fail_under, gate_passed)."},
+    },
+    "required": ["url"],
     "additionalProperties": False,
 }
 
@@ -554,118 +729,12 @@ ROUTES: Tuple[Route, ...] = (
                     "indicati.",
         tags=("audit",),
         auth=AUTH_SESSION,
-        request_schema={
-            "type": "object",
-            "properties": {
-                "url": {"type": "string", "minLength": 1,
-                        "x-errore": "URL mancante.",
-                        "description": "Sito da analizzare "
-                                       "(https:// implicito se "
-                                       "manca lo schema)."},
-                "max_pages": {"type": "number", "minimum": 1,
-                              "maximum": 500, "default": 25},
-                "rrf_k": {"type": "number", "minimum": 1,
-                          "maximum": 1000, "default": 60},
-                "top_n": {"type": "number",
-                          "minimum": TOP_N_MIN,
-                          "maximum": TOP_N_MAX, "default": 5},
-                "chunk_words": {"type": "number",
-                                "minimum": CHUNK_WORDS_MIN,
-                                "maximum": CHUNK_WORDS_MAX,
-                                "default": 220},
-                "w_lex": {"type": "number", "minimum": 0.1,
-                          "maximum": 10, "default": 1.0},
-                "w_vec": {"type": "number", "minimum": 0.1,
-                          "maximum": 10, "default": 1.0},
-                "delay": {"type": "number", "minimum": 0,
-                          "maximum": 10, "default": 0.5},
-                "max_body": {"type": "number", "minimum": 1,
-                             "maximum": 10240, "default": 10},
-                "retries": {"type": "number", "minimum": 0,
-                            "maximum": 10, "default": 2},
-                "workers": {"type": "number", "minimum": 1,
-                            "maximum": MAX_WORKERS, "default": 4},
-                "render": {"type": "string",
-                           "enum": list(RENDER_MODES),
-                           "default": "off"},
-                "market": {"type": "string",
-                           "enum": sorted(MARKET_WEIGHTS),
-                           "default": "occidentale"},
-                "judge": {"type": "string",
-                          "enum": list(JUDGE_MODES),
-                          "default": "auto"},
-                "lighthouse": {"type": "string",
-                               "enum": list(LIGHTHOUSE_MODES),
-                               "default": "off"},
-                "lighthouse_pages": {
-                    "type": "number",
-                    "minimum": LIGHTHOUSE_PAGES_MIN,
-                    "maximum": LIGHTHOUSE_PAGES_MAX,
-                    "default": 3},
-                "lighthouse_device": {
-                    "type": "string",
-                    "enum": list(LIGHTHOUSE_DEVICES),
-                    "default": "mobile"},
-                "search_check": {
-                    "type": "string",
-                    "enum": list(SEARCH_CHECK_MODES),
-                    "default": "auto"},
-                "robots": {"type": "string",
-                           "enum": list(ROBOTS_MODES),
-                           "default": "own",
-                           "description": "Default 'own': la "
-                                          "titolarita' e' "
-                                          "dichiarata in "
-                                          "registrazione."},
-                "robots_ack": {
-                    "type": "boolean",
-                    "description": "Obbligatorio true con "
-                                   "robots=force: assunzione "
-                                   "esplicita di "
-                                   "responsabilita'."},
-                "queries": {"type": "string",
-                            "description": "Query di prova, una "
-                                           "per riga."},
-                "competitors": {"type": "string",
-                                "description": "Siti concorrenti, "
-                                               "uno per riga "
-                                               "(max 3)."},
-                "embeddings": {"type": "string",
-                               "description": "Modello "
-                                              "sentence-transformers"
-                                              "; vuoto = auto, "
-                                              "'none' = proxy."},
-                "lang": {"type": "string",
-                         "enum": list(HTML_LANGS),
-                         "default": "it",
-                         "description": "Lingua dei referti "
-                                        "scaricabili (html, text, "
-                                        "md, csv); il JSON resta "
-                                        "canonico in italiano."},
-                "soglie": _schema_soglie(),
-                "queries_gsc": {
-                    "type": "string",
-                    "description": "Contenuto dell'export CSV "
-                                   "\"Query\" di Google Search "
-                                   "Console (rapporto "
-                                   "Rendimento): prime 15 per "
-                                   "clic e impressioni, "
-                                   "deduplicate. Non combinabile "
-                                   "con 'queries'."},
-                "fail_under": {
-                    "type": ["number", "null"],
-                    "minimum": 0, "maximum": 100,
-                    "description": "Gate di regressione: la "
-                                   "sintesi del job echeggia "
-                                   "soglia ed esito "
-                                   "(fail_under, gate_passed)."},
-            },
-            "required": ["url"],
-            "additionalProperties": False,
-        },
+        request_schema=AUDIT_REQUEST_SCHEMA,
         responses={
-            202: {"description": "Audit avviato.",
-                  "schema": OK_SCHEMA},
+            202: {"description": "Audit avviato (job con id: le "
+                                 "rotte /api/v1/audits/{id} lo "
+                                 "indirizzano).",
+                  "schema": OK_ID_SCHEMA},
             400: _err("Configurazione non valida (motivo nel "
                       "messaggio)."),
             401: _err("Accesso richiesto."),
@@ -761,15 +830,28 @@ ROUTES: Tuple[Route, ...] = (
                     "dei rilievi.",
         tags=("storico",),
         auth=AUTH_SESSION,
+        params=(
+            {"name": "limit", "in": "query", "required": False,
+             "schema": {"type": "integer", "minimum": 1,
+                        "maximum": 200, "default": 50},
+             "description": "Righe per pagina."},
+            {"name": "offset", "in": "query", "required": False,
+             "schema": {"type": "integer", "minimum": 0,
+                        "default": 0},
+             "description": "Righe da saltare."},
+        ),
         responses={
-            200: {"description": "Righe dello storico.",
+            200: {"description": "Righe dello storico (paginate).",
                   "schema": {
                       "type": "object",
                       "properties": {
                           "runs": {"type": "array",
-                                   "items": RUN_SCHEMA}},
-                      "required": ["runs"],
+                                   "items": RUN_SCHEMA},
+                          "limit": {"type": "integer"},
+                          "offset": {"type": "integer"}},
+                      "required": ["runs", "limit", "offset"],
                       "additionalProperties": False}},
+            400: _err("limit o offset non validi."),
             401: _err("Accesso richiesto."),
         },
     ),
@@ -834,6 +916,229 @@ ROUTES: Tuple[Route, ...] = (
             401: _err("Accesso richiesto."),
             404: _err("Audit non confrontabili."),
             500: _err("Referto salvato illeggibile."),
+        },
+    ),
+    Route(
+        "POST", "/api/v1/audits",
+        summary="Avvia un audit come job con id",
+        description="Il modello a risorse della Fase 2: 202 con "
+                    "l'id del job, da seguire su GET "
+                    "/api/v1/audits/{id} (o sull'SSE per-job) e "
+                    "da cui scaricare i referti in ogni formato "
+                    "e lingua. Stesso corpo e stessi limiti di "
+                    "POST /api/audit (un audit alla volta di "
+                    "default, slot orario per utente); errori "
+                    "nell'oggetto uniforme delle rotte v1.",
+        tags=("audit",),
+        auth=AUTH_SESSION,
+        request_schema=AUDIT_REQUEST_SCHEMA,
+        responses={
+            202: {"description": "Job creato e avviato.",
+                  "schema": OK_ID_SCHEMA},
+            400: _err_v1("Configurazione non valida."),
+            401: _err_v1("Accesso richiesto."),
+            409: _err_v1("Concorrenza esaurita: un audit e' gia' "
+                         "in corso."),
+            429: _err_v1("Slot orario gia' consumato "
+                         "(retry_in_s nei params)."),
+        },
+    ),
+    Route(
+        "GET", "/api/v1/audits/{id}",
+        summary="Stato e sintesi di un job di audit",
+        description="Lo snapshot del job (stesso schema di "
+                    "GET /api/status), indirizzato per id; solo "
+                    "il proprietario lo vede (404 altrimenti: "
+                    "nessuna esistenza rivelata).",
+        tags=("audit",),
+        auth=AUTH_SESSION,
+        params=(
+            {"name": "id", "in": "path", "required": True,
+             "schema": {"type": "string"},
+             "description": "Id del job (dal 202 di creazione)."},
+        ),
+        responses={
+            200: {"description": "Snapshot del job.",
+                  "schema": SNAPSHOT_SCHEMA},
+            401: _err_v1("Accesso richiesto."),
+            404: _err_v1("Job inesistente o di un altro utente."),
+        },
+    ),
+    Route(
+        "DELETE", "/api/v1/audits/{id}",
+        summary="Annulla un job di audit",
+        description="Annullamento cooperativo per id (stesse "
+                    "garanzie di POST /api/cancel: nessun "
+                    "risultato parziale, slot orario non "
+                    "consumato).",
+        tags=("audit",),
+        auth=AUTH_SESSION,
+        params=(
+            {"name": "id", "in": "path", "required": True,
+             "schema": {"type": "string"},
+             "description": "Id del job."},
+        ),
+        responses={
+            202: {"description": "Annullamento avviato.",
+                  "schema": OK_SCHEMA},
+            401: _err_v1("Accesso richiesto."),
+            404: _err_v1("Job inesistente o di un altro utente."),
+            409: _err_v1("Il job non e' in corso."),
+        },
+    ),
+    Route(
+        "GET", "/api/v1/audits/{id}/report",
+        summary="Referto di un job, in ogni formato e lingua",
+        description="La stessa scansione produce tutti i formati "
+                    "e, on-demand, tutte le lingue del referto "
+                    "(reso dal contesto del job e messo in "
+                    "cache): parita' con --lang senza rifare "
+                    "l'audit. Riservato alla registrazione "
+                    "completa.",
+        tags=("audit",),
+        auth=AUTH_SESSION,
+        params=(
+            {"name": "id", "in": "path", "required": True,
+             "schema": {"type": "string"},
+             "description": "Id del job."},
+            {"name": "format", "in": "query", "required": False,
+             "schema": {"type": "string",
+                        "enum": list(REPORT_FORMATS),
+                        "default": "json"},
+             "description": "Formato del referto."},
+            {"name": "lang", "in": "query", "required": False,
+             "schema": {"type": "string",
+                        "enum": list(HTML_LANGS)},
+             "description": "Lingua del referto (default: quella "
+                            "dell'audit; il JSON resta canonico "
+                            "in italiano)."},
+            {"name": "download", "in": "query", "required": False,
+             "schema": {"type": "string"},
+             "description": "Se presente, risposta come "
+                            "allegato."},
+        ),
+        responses={
+            200: {"description": "Il referto richiesto.",
+                  "content": {
+                      "text/html": {"type": "string"},
+                      "application/json": {"type": "object"},
+                      "text/plain": {"type": "string"},
+                      "text/markdown": {"type": "string"},
+                      "text/csv": {"type": "string"}}},
+            400: _err_v1("Formato o lingua sconosciuti."),
+            401: _err_v1("Accesso richiesto."),
+            403: _err_v1("Registrazione completa richiesta "
+                         "(code profile_incomplete)."),
+            404: _err_v1("Job inesistente o audit non concluso."),
+        },
+    ),
+    Route(
+        "GET", "/api/v1/audits/{id}/events",
+        summary="Avanzamento push di un job (SSE)",
+        description="Come GET /api/events ma per-job: snapshot a "
+                    "ogni variazione, flusso chiuso allo stato "
+                    "terminale, polling come ripiego.",
+        tags=("audit",),
+        auth=AUTH_SESSION,
+        params=(
+            {"name": "id", "in": "path", "required": True,
+             "schema": {"type": "string"},
+             "description": "Id del job."},
+        ),
+        responses={
+            200: {"description": "Flusso di eventi con lo "
+                                 "snapshot serializzato.",
+                  "schema": {"type": "string"},
+                  "content_type": "text/event-stream"},
+            401: _err_v1("Accesso richiesto."),
+            404: _err_v1("Job inesistente o di un altro utente."),
+        },
+    ),
+    Route(
+        "POST", "/api/v1/tokens",
+        summary="Crea un token API personale",
+        description="Token Bearer per client macchina e "
+                    "cross-origin (stesso perimetro del cookie: "
+                    "slot orario e gating del profilo). Il "
+                    "valore in chiaro esiste SOLO in questa "
+                    "risposta; in tabella va lo SHA-256. La "
+                    "gestione dei token richiede la sessione "
+                    "cookie: un token non puo' crearne altri.",
+        tags=("account",),
+        auth=AUTH_COOKIE,
+        request_schema={
+            "type": "object",
+            "properties": {
+                "label": {"type": "string", "maxLength": 60,
+                          "description": "Etichetta mnemonica "
+                                         "facoltativa."},
+            },
+            "additionalProperties": False,
+        },
+        responses={
+            201: {"description": "Token creato (valore visibile "
+                                 "solo ora).",
+                  "schema": {
+                      "type": "object",
+                      "properties": {
+                          "ok": {"type": "boolean"},
+                          "id": {"type": "integer"},
+                          "label": {"type": "string"},
+                          "token": {"type": "string"}},
+                      "required": ["ok", "id", "label", "token"],
+                      "additionalProperties": False}},
+            400: _err_v1("Corpo della richiesta non valido."),
+            401: _err_v1("Accesso richiesto (sessione)."),
+        },
+    ),
+    Route(
+        "GET", "/api/v1/tokens",
+        summary="Elenca i token API personali",
+        description="Solo i metadati (id, etichetta, date): il "
+                    "valore del token non e' recuperabile.",
+        tags=("account",),
+        auth=AUTH_COOKIE,
+        responses={
+            200: {"description": "Token dell'utente.",
+                  "schema": {
+                      "type": "object",
+                      "properties": {"tokens": {
+                          "type": "array",
+                          "items": {
+                              "type": "object",
+                              "properties": {
+                                  "id": {"type": "integer"},
+                                  "label": {"type": "string"},
+                                  "created_at":
+                                      {"type": "number"},
+                                  "last_used_at":
+                                      {"type": "number"}},
+                              "required": ["id", "label",
+                                           "created_at",
+                                           "last_used_at"],
+                              "additionalProperties": False}}},
+                      "required": ["tokens"],
+                      "additionalProperties": False}},
+            401: _err_v1("Accesso richiesto (sessione)."),
+        },
+    ),
+    Route(
+        "DELETE", "/api/v1/tokens/{id}",
+        summary="Revoca un token API",
+        tags=("account",),
+        auth=AUTH_COOKIE,
+        params=(
+            {"name": "id", "in": "path", "required": True,
+             "schema": {"type": "integer"},
+             "description": "Id del token (da GET "
+                            "/api/v1/tokens)."},
+        ),
+        responses={
+            200: {"description": "Token revocato.",
+                  "schema": OK_SCHEMA},
+            400: _err_v1("Id non valido."),
+            401: _err_v1("Accesso richiesto (sessione)."),
+            404: _err_v1("Token non trovato."),
         },
     ),
     Route(
@@ -1028,6 +1333,9 @@ def openapi_spec() -> Dict[str, object]:
         if route.description:
             operazione["description"] = route.description
         if route.auth == AUTH_SESSION:
+            operazione["security"] = [{"cookieSession": []},
+                                      {"bearerAuth": []}]
+        elif route.auth == AUTH_COOKIE:
             operazione["security"] = [{"cookieSession": []}]
         if route.params:
             operazione["parameters"] = [
@@ -1109,13 +1417,23 @@ def openapi_spec() -> Dict[str, object]:
              "description": "Monitoraggio delle citazioni IA."},
         ],
         "paths": paths,
-        "components": {"securitySchemes": {"cookieSession": {
-            "type": "apiKey", "in": "cookie",
-            "name": SESSION_COOKIE_NAME,
-            "description": "Cookie di sessione emesso da "
-                           "/api/register e /api/login (HttpOnly, "
-                           "SameSite=Strict).",
-        }}},
+        "components": {"securitySchemes": {
+            "cookieSession": {
+                "type": "apiKey", "in": "cookie",
+                "name": SESSION_COOKIE_NAME,
+                "description": "Cookie di sessione emesso da "
+                               "/api/register e /api/login "
+                               "(HttpOnly, SameSite=Strict).",
+            },
+            "bearerAuth": {
+                "type": "http", "scheme": "bearer",
+                "description": "Token API personale (POST "
+                               "/api/v1/tokens, valore visibile "
+                               "solo alla creazione): per client "
+                               "macchina e cross-origin, stesso "
+                               "perimetro del cookie.",
+            },
+        }},
     }
 
 
@@ -1251,7 +1569,14 @@ class UserStore:
                 " critical INTEGER NOT NULL,"
                 " warning INTEGER NOT NULL,"
                 " info INTEGER NOT NULL,"
-                " report_json TEXT NOT NULL DEFAULT '');")
+                " report_json TEXT NOT NULL DEFAULT '');"
+                "CREATE TABLE IF NOT EXISTS api_tokens ("
+                " id INTEGER PRIMARY KEY,"
+                " user_id INTEGER NOT NULL,"
+                " label TEXT NOT NULL DEFAULT '',"
+                " token_hash TEXT NOT NULL UNIQUE,"
+                " created_at REAL NOT NULL,"
+                " last_used_at REAL NOT NULL DEFAULT 0);")
             # Migrazione dei database creati prima della 2.10.0
             # (multi-macchina: lo schema vecchio esiste davvero).
             cols = [r["name"] for r in
@@ -1315,6 +1640,23 @@ class UserStore:
             con.execute("DELETE FROM sessions WHERE token = ?",
                         (token,))
 
+    @staticmethod
+    def _utente(row: sqlite3.Row) -> Dict[str, object]:
+        """Riga utente -> dizionario esposto dalle API (stessa
+        forma per sessione cookie e token Bearer)."""
+        waited = time.time() - row["last_check_at"]
+        return {
+            "id": row["id"],
+            "nome": row["nome"],
+            "email": row["email"],
+            "azienda": row["azienda"],
+            "telefono": row["telefono"],
+            "profile_complete": bool(row["azienda"].strip()
+                                     and row["telefono"].strip()),
+            "next_check_in_s": max(
+                0, int(CHECK_INTERVAL_S - waited)),
+        }
+
     def user_by_token(self, token: str) -> Optional[Dict[str, object]]:
         if not token:
             return None
@@ -1326,18 +1668,68 @@ class UserStore:
                 (token, time.time())).fetchone()
             if row is None:
                 return None
-            waited = time.time() - row["last_check_at"]
-            return {
-                "id": row["id"],
-                "nome": row["nome"],
-                "email": row["email"],
-                "azienda": row["azienda"],
-                "telefono": row["telefono"],
-                "profile_complete": bool(row["azienda"].strip()
-                                         and row["telefono"].strip()),
-                "next_check_in_s": max(
-                    0, int(CHECK_INTERVAL_S - waited)),
-            }
+            return self._utente(row)
+
+    # -------------------- token Bearer (API) ----------------------
+
+    def create_api_token(self, user_id: int,
+                         label: str = "") -> Tuple[int, str]:
+        """Nuovo token Bearer: restituisce (id, token in chiaro).
+
+        In tabella va solo lo SHA-256 del token — scelta
+        dichiarata: il token e' casuale ad alta entropia, quindi
+        l'hash veloce basta; il PBKDF2 serve alle password a bassa
+        entropia e costerebbe 200k round a OGNI richiesta API. Il
+        valore in chiaro esiste solo nella risposta di creazione.
+        """
+        token = "mars_" + secrets.token_hex(24)
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with self.lock, self._connect() as con:
+            cur = con.execute(
+                "INSERT INTO api_tokens (user_id, label, "
+                "token_hash, created_at) VALUES (?, ?, ?, ?)",
+                (user_id, label, digest, time.time()))
+            return int(cur.lastrowid), token
+
+    def list_api_tokens(self, user_id: int
+                        ) -> List[Dict[str, object]]:
+        with self.lock, self._connect() as con:
+            rows = con.execute(
+                "SELECT id, label, created_at, last_used_at "
+                "FROM api_tokens WHERE user_id = ? ORDER BY id",
+                (user_id,)).fetchall()
+        return [{"id": r["id"], "label": r["label"],
+                 "created_at": r["created_at"],
+                 "last_used_at": r["last_used_at"]}
+                for r in rows]
+
+    def revoke_api_token(self, user_id: int,
+                         token_id: int) -> bool:
+        with self.lock, self._connect() as con:
+            cur = con.execute(
+                "DELETE FROM api_tokens "
+                "WHERE user_id = ? AND id = ?",
+                (user_id, token_id))
+            return cur.rowcount > 0
+
+    def user_by_api_token(
+            self, token: str) -> Optional[Dict[str, object]]:
+        """Utente dietro un token Bearer (stesso perimetro del
+        cookie: slot orario e gating del profilo identici)."""
+        if not token:
+            return None
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with self.lock, self._connect() as con:
+            row = con.execute(
+                "SELECT u.*, t.id AS token_id FROM users u "
+                "JOIN api_tokens t ON t.user_id = u.id "
+                "WHERE t.token_hash = ?", (digest,)).fetchone()
+            if row is None:
+                return None
+            con.execute(
+                "UPDATE api_tokens SET last_used_at = ? "
+                "WHERE id = ?", (time.time(), row["token_id"]))
+            return self._utente(row)
 
     def update_profile(self, user_id: int, azienda: str,
                        telefono: str) -> None:
@@ -1376,17 +1768,18 @@ class UserStore:
                  int(summary.get("info") or 0),
                  report_json))
 
-    def history(self, user_id: int,
-                limit: int = 50) -> List[Dict[str, object]]:
-        """Storico degli audit dell'utente, dal piu' recente."""
+    def history(self, user_id: int, limit: int = 50,
+                offset: int = 0) -> List[Dict[str, object]]:
+        """Storico degli audit dell'utente, dal piu' recente
+        (paginato con limit/offset)."""
         with self.lock, self._connect() as con:
             rows = con.execute(
                 "SELECT id, site, created_at, overall, scores, "
                 "critical, warning, info, "
                 "report_json != '' AS has_report "
                 "FROM audits WHERE user_id = ? "
-                "ORDER BY created_at DESC LIMIT ?",
-                (user_id, limit)).fetchall()
+                "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (user_id, limit, offset)).fetchall()
         return [
             {
                 "id": row["id"],
@@ -1443,11 +1836,37 @@ def get_store() -> UserStore:
     return STORE
 
 
-class Job:
-    """Stato dell'audit corrente (uno alla volta)."""
+def _render_report(ctx: Dict[str, object], fmt: str,
+                   lang: str) -> str:
+    """Un referto dal contesto di un audit concluso.
 
-    def __init__(self) -> None:
+    La stessa scansione produce tutti i formati e, a richiesta,
+    tutte le lingue (Job.report con ``lang``); il JSON resta
+    canonico in italiano.
+    """
+    comuni = dict(market=ctx["market"], judge=ctx["judge"],
+                  delta=ctx["delta"],
+                  lighthouse=ctx["lighthouse"],
+                  search_check=ctx["search"])
+    argomenti = (ctx["base"], ctx["pages"], ctx["findings"],
+                 ctx["scores"], ctx["results"], ctx["mode"],
+                 ctx["k"], ctx["competitive"])
+    if fmt == "json":
+        return sra.render_json(*argomenti, **comuni,
+                               rrf_params=ctx["rrf_params"],
+                               thresholds=ctx["soglie"] or None)
+    renderer = {"html": sra.render_html, "text": sra.render_text,
+                "md": sra.render_markdown,
+                "csv": sra.render_csv}[fmt]
+    return renderer(*argomenti, **comuni, lang=lang)
+
+
+class Job:
+    """Stato di un audit (job): identita', avanzamento, referti."""
+
+    def __init__(self, job_id: str = "") -> None:
         self.lock = threading.Lock()
+        self.job_id = job_id
         # idle | running | done | error | cancelled
         self.state = "idle"
         self.stop_event = threading.Event()
@@ -1461,10 +1880,14 @@ class Job:
         self.rrf: List[Dict[str, object]] = []
         self.competitive: Optional[Dict[str, object]] = None
         self.reports: Dict[str, str] = {}
+        # contesto di rendering dell'audit concluso: alimenta i
+        # referti on-demand in altre lingue (report con lang)
+        self._ctx: Optional[Dict[str, object]] = None
 
     def snapshot(self) -> Dict[str, object]:
         with self.lock:
             return {
+                "id": self.job_id,
                 "state": self.state,
                 "log": list(self.log),
                 "error": self.error,
@@ -1603,55 +2026,24 @@ class Job:
                         float(str(previous["created_at"])))
                 except (ValueError, KeyError, TypeError):
                     delta = None  # referto vecchio illeggibile
-        reports = {
-            "html": sra.render_html(base, pages, findings, scores,
-                                    results, mode, k, competitive,
-                                    market=market, judge=judge,
-                                    delta=delta,
-                                    lighthouse=lighthouse_block,
-                                    search_check=search,
-                                    lang=lang),
-            "json": sra.render_json(base, pages, findings, scores,
-                                    results, mode, k, competitive,
-                                    market=market, judge=judge,
-                                    delta=delta,
-                                    lighthouse=lighthouse_block,
-                                    search_check=search,
-                                    rrf_params={
-                                        "top_n": int(cfg.get(
-                                            "top_n",
-                                            sra.DEFAULT_TOP_N)),
-                                        "weights": list(cfg.get(
-                                            "rrf_weights")
-                                            or (1.0, 1.0)),
-                                        "chunk_words": int(cfg.get(
-                                            "chunk_words",
-                                            sra.DEFAULT_CHUNK_WORDS,
-                                        )),
-                                    },
-                                    thresholds=soglie or None),
-            "text": sra.render_text(base, pages, findings, scores,
-                                    results, mode, k, competitive,
-                                    market=market, judge=judge,
-                                    delta=delta,
-                                    lighthouse=lighthouse_block,
-                                    search_check=search,
-                                    lang=lang),
-            "md": sra.render_markdown(base, pages, findings,
-                                      scores, results, mode, k,
-                                      competitive, market=market,
-                                      judge=judge, delta=delta,
-                                      lighthouse=lighthouse_block,
-                                      search_check=search,
-                                      lang=lang),
-            "csv": sra.render_csv(base, pages, findings, scores,
-                                  results, mode, k, competitive,
-                                  market=market, judge=judge,
-                                  delta=delta,
-                                  lighthouse=lighthouse_block,
-                                  search_check=search,
-                                  lang=lang),
+        ctx: Dict[str, object] = {
+            "base": base, "pages": pages, "findings": findings,
+            "scores": scores, "results": results, "mode": mode,
+            "k": k, "competitive": competitive, "market": market,
+            "judge": judge, "delta": delta,
+            "lighthouse": lighthouse_block, "search": search,
+            "lang": lang, "soglie": soglie,
+            "rrf_params": {
+                "top_n": int(cfg.get("top_n",
+                                     sra.DEFAULT_TOP_N)),
+                "weights": list(cfg.get("rrf_weights")
+                                or (1.0, 1.0)),
+                "chunk_words": int(cfg.get(
+                    "chunk_words", sra.DEFAULT_CHUNK_WORDS)),
+            },
         }
+        reports = {fmt: _render_report(ctx, fmt, lang)
+                   for fmt in REPORT_FORMATS}
         severities = [f.severity for f in findings]
         clean, flagged, broken = sra.page_status_counts(pages,
                                                         findings)
@@ -1696,6 +2088,7 @@ class Job:
                                   reports["json"])
         with self.lock:
             self.reports = reports
+            self._ctx = ctx
             self.summary = summary
             self.findings = [f.as_dict() for f in findings]
             self.remediation = sra.build_remediation(
@@ -1704,12 +2097,78 @@ class Job:
             self.competitive = competitive
             self.state = "done"
 
-    def report(self, fmt: str) -> Optional[str]:
+    def report(self, fmt: str,
+               lang: Optional[str] = None) -> Optional[str]:
+        """Referto del job; con una ``lang`` diversa dalla lingua
+        del job viene reso al volo dal contesto e messo in cache:
+        la parita' con --lang senza rifare la scansione."""
         with self.lock:
-            return self.reports.get(fmt)
+            ctx = self._ctx
+            if lang is None or (ctx is not None
+                                and lang == ctx["lang"]):
+                return self.reports.get(fmt)
+            if ctx is None:
+                return None
+            chiave = "%s@%s" % (fmt, lang)
+            pronto = self.reports.get(chiave)
+        if pronto is not None:
+            return pronto
+        testo = _render_report(ctx, fmt, lang)
+        with self.lock:
+            self.reports[chiave] = testo
+        return testo
 
 
 JOB = Job()
+
+
+# Registro dei job per id (P1, Fase 2): POST /api/v1/audits crea un
+# job e le rotte v1 lo indirizzano per id; JOB resta il "job
+# corrente" delle rotte legacy (l'ultimo creato). I job conclusi
+# restano consultabili finche' il registro non supera JOBS_MAX
+# (potatura dei piu' vecchi non in corso).
+JOBS: Dict[str, Job] = {}
+
+
+JOBS_LOCK = threading.Lock()
+
+
+JOBS_MAX = 20
+
+
+# Audit in parallelo ammessi (coda a concorrenza configurabile,
+# decisione di Fase 0; default 1 = comportamento storico: 409
+# quando occupato). Gli entry la espongono con --max-audit.
+AUDIT_CONCURRENCY = 1
+
+
+def _running_jobs() -> int:
+    """Audit in corso: i job del registro piu' l'eventuale job
+    legacy avviato fuori registro (test, fixture)."""
+    occupati = sum(1 for job in JOBS.values()
+                   if job.state == "running")
+    if JOB.state == "running" and JOB.job_id not in JOBS:
+        occupati += 1
+    return occupati
+
+
+def _prune_jobs() -> None:
+    """Sotto JOBS_LOCK: elimina i job conclusi piu' vecchi."""
+    while len(JOBS) > JOBS_MAX:
+        for job_id, job in list(JOBS.items()):
+            if job.state != "running":
+                del JOBS[job_id]
+                break
+        else:
+            break
+
+
+# Origini cross-origin ammesse (CORS): SPENTO di default, si
+# attiva solo con un elenco esplicito (decisione di Fase 0; entry
+# mars_api: --cors). Cross-origin ci si autentica col token
+# Bearer: il cookie SameSite=Strict non viaggia e non concediamo
+# credenziali (mai Allow-Credentials).
+CORS_ORIGINS: Tuple[str, ...] = ()
 
 
 # Dalla 2.11.0 il confronto fra esecuzioni vive nel core (riusato
@@ -1984,6 +2443,10 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Security-Policy", csp or CSP)
         self.send_header("Cache-Control", "no-store")
+        origin = self.headers.get("Origin", "")
+        if origin and origin in CORS_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         if cookie:
             self.send_header("Set-Cookie", cookie)
         if download:
@@ -2011,6 +2474,47 @@ class ApiHandler(BaseHTTPRequestHandler):
     def _session_user(self) -> Optional[Dict[str, object]]:
         return get_store().user_by_token(self._session_token())
 
+    def _bearer_user(self) -> Optional[Dict[str, object]]:
+        header = self.headers.get("Authorization", "")
+        if not header.startswith("Bearer "):
+            return None
+        return get_store().user_by_api_token(header[7:].strip())
+
+    def _auth_user(self) -> Optional[Dict[str, object]]:
+        """Utente autenticato: cookie di sessione O token Bearer
+        (doppio binario della Fase 0; stesso perimetro — slot
+        orario e gating del profilo valgono per entrambi). La
+        GESTIONE dei token resta solo via sessione."""
+        return self._session_user() or self._bearer_user()
+
+    def _send_v1_error(self, status: int, code: str,
+                       message: str,
+                       params: Optional[Dict[str, object]] = None
+                       ) -> None:
+        """Errore uniforme delle rotte /api/v1: {code, key,
+        message, params} — stesso meccanismo chiave+parametri dei
+        rilievi (decisione di Fase 0); il messaggio italiano
+        resta canonico. Le rotte legacy conservano {"error"}."""
+        self._send_json(status, {"error": {
+            "code": code, "key": "api.err.%s" % code,
+            "message": message, "params": params or {}}})
+
+    def do_OPTIONS(self) -> None:  # noqa: N802 - BaseHTTPServer
+        """Preflight CORS: header solo per le origini dichiarate
+        in CORS_ORIGINS (spento di default)."""
+        origin = self.headers.get("Origin", "")
+        self.send_response(204)
+        if origin and origin in CORS_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Methods",
+                             "GET, POST, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers",
+                             "Content-Type, Authorization")
+            self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     @staticmethod
     def _cookie(token: str, expire: bool = False) -> str:
         base = "%s=%s; Path=/; HttpOnly; SameSite=Strict" \
@@ -2029,7 +2533,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                             {"error": "corpo non valido: %s" % exc})
             return None
 
-    def _stream_events(self) -> None:
+    def _stream_events(self, job: Job) -> None:
         """Avanzamento push (Server-Sent Events).
 
         Invia lo snapshot quando cambia (nuove righe di log o cambio
@@ -2047,7 +2551,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         last_sent = None
         try:
             while True:
-                snap = JOB.snapshot()
+                snap = job.snapshot()
                 marker = (snap["state"], len(snap["log"]))
                 if marker != last_sent:
                     last_sent = marker
@@ -2099,26 +2603,46 @@ class ApiHandler(BaseHTTPRequestHandler):
                     sra.DEFAULT_EMBEDDINGS_MODEL,
             })
         elif path == "/api/me":
-            user = self._session_user()
+            user = self._auth_user()
             if user is None:
                 self._send_json(200, {"authenticated": False})
             else:
                 self._send_json(200, {"authenticated": True,
                                       "user": user})
         elif path == "/api/status":
-            if self._session_user() is None:
+            if self._auth_user() is None:
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
             self._send_json(200, JOB.snapshot())
         elif path == "/api/history":
-            user = self._session_user()
+            user = self._auth_user()
             if user is None:
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
+            query = self.path.split("?", 1)[-1] \
+                if "?" in self.path else ""
+            params = dict(part.split("=", 1)
+                          for part in query.split("&")
+                          if "=" in part)
+            try:
+                limit = int(params.get("limit", "50"))
+                offset = int(params.get("offset", "0"))
+            except (TypeError, ValueError):
+                self._send_json(400, {"error": "limit e offset "
+                                               "vogliono numeri "
+                                               "interi"})
+                return
+            if not (1 <= limit <= 200 and offset >= 0):
+                self._send_json(400, {"error": "limit fra 1 e 200 "
+                                               "e offset >= 0"})
+                return
             self._send_json(200, {
-                "runs": get_store().history(int(user["id"]))})
+                "runs": get_store().history(int(user["id"]),
+                                            limit=limit,
+                                            offset=offset),
+                "limit": limit, "offset": offset})
         elif path == "/api/citations":
-            if self._session_user() is None:
+            if self._auth_user() is None:
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
             self._send_json(200, {
@@ -2128,7 +2652,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     str(CITATIONS_HISTORY.with_name(
                         "eventi.jsonl")))})
         elif path == "/api/history/compare":
-            user = self._session_user()
+            user = self._auth_user()
             if user is None:
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
@@ -2173,7 +2697,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "newer_at": newer["created_at"],
                 "delta": delta})
         elif path == "/api/history/report":
-            user = self._session_user()
+            user = self._auth_user()
             if user is None:
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
@@ -2206,12 +2730,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                        str(stored["report_json"]).encode("utf-8"),
                        CONTENT_TYPES[".json"], download=download)
         elif path == "/api/events":
-            if self._session_user() is None:
+            if self._auth_user() is None:
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
-            self._stream_events()
+            self._stream_events(JOB)
         elif path.startswith("/api/report/"):
-            user = self._session_user()
+            user = self._auth_user()
             if user is None:
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
@@ -2228,11 +2752,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     or report is None:
                 self._send_json(404, {"error": "referto non disponibile"})
                 return
-            ctypes = {"html": CONTENT_TYPES[".html"],
-                      "json": CONTENT_TYPES[".json"],
-                      "text": "text/plain; charset=utf-8",
-                      "md": "text/markdown; charset=utf-8",
-                      "csv": "text/csv; charset=utf-8"}
+            ctypes = REPORT_CTYPES
             download = ""
             if "download" in self.path:
                 ext = {"html": "html", "json": "json",
@@ -2243,6 +2763,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(200, report.encode("utf-8"), ctypes[fmt],
                        download=download,
                        csp=REPORT_CSP if fmt == "html" else "")
+        elif path.startswith("/api/v1/audits/"):
+            self._get_v1_audit(path)
+        elif path == "/api/v1/tokens":
+            self._get_v1_tokens()
         elif path.startswith("/api/"):
             self._send_json(404, {"error": "endpoint sconosciuto"})
         else:
@@ -2282,7 +2806,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         elif path == "/api/profile":
             self._post_profile()
         elif path == "/api/citations/events":
-            if self._session_user() is None:
+            if self._auth_user() is None:
                 self._send_json(401, {"error": "accesso richiesto"})
                 return
             raw = self._read_json()
@@ -2316,7 +2840,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(201, {"ok": True, "event": evento})
         elif path == "/api/cancel":
-            if self._session_user() is None:
+            if self._auth_user() is None:
                 self._send_json(401, {"error": "accesso richiesto"})
             elif JOB.cancel():
                 self._send_json(202, {"ok": True})
@@ -2325,8 +2849,167 @@ class ApiHandler(BaseHTTPRequestHandler):
                                                "corso da annullare."})
         elif path == "/api/audit":
             self._post_audit()
+        elif path == "/api/v1/audits":
+            self._post_audit(v1=True)
+        elif path == "/api/v1/tokens":
+            self._post_v1_token()
         else:
             self._send_json(404, {"error": "endpoint sconosciuto"})
+
+    def do_DELETE(self) -> None:  # noqa: N802 - BaseHTTPServer
+        path = self.path.split("?", 1)[0]
+        if path.startswith("/api/v1/audits/"):
+            self._delete_v1_audit(path)
+        elif path.startswith("/api/v1/tokens/"):
+            self._delete_v1_token(path)
+        else:
+            self._send_json(404, {"error": "endpoint sconosciuto"})
+
+    # ---------------- rotte /api/v1 (job e token) -----------------
+
+    def _job_v1(self, job_id: str) -> Tuple[Optional[Job],
+                                            Optional[Dict[str,
+                                                          object]]]:
+        """Job per id, solo del proprietario. Risponde da solo su
+        errore e ritorna (None, None); i job altrui non esistono
+        (404: nessuna esistenza rivelata)."""
+        user = self._auth_user()
+        if user is None:
+            self._send_v1_error(401, "unauthorized",
+                                "Accesso richiesto.")
+            return None, None
+        job = JOBS.get(job_id)
+        if job is None or job.user_id != int(user["id"]):
+            self._send_v1_error(404, "not_found",
+                                "Audit non trovato.",
+                                {"id": job_id})
+            return None, None
+        return job, user
+
+    def _get_v1_audit(self, path: str) -> None:
+        parti = path[len("/api/v1/audits/"):].split("/")
+        if len(parti) == 1:
+            job, _ = self._job_v1(parti[0])
+            if job is not None:
+                self._send_json(200, job.snapshot())
+        elif len(parti) == 2 and parti[1] == "report":
+            self._get_v1_report(parti[0])
+        elif len(parti) == 2 and parti[1] == "events":
+            job, _ = self._job_v1(parti[0])
+            if job is not None:
+                self._stream_events(job)
+        else:
+            self._send_v1_error(404, "not_found",
+                                "Percorso sconosciuto.")
+
+    def _get_v1_report(self, job_id: str) -> None:
+        job, user = self._job_v1(job_id)
+        if job is None or user is None:
+            return
+        if not user["profile_complete"]:
+            self._send_v1_error(
+                403, "profile_incomplete",
+                "Il download dei referti richiede la "
+                "registrazione completa: aggiungi azienda e "
+                "telefono al profilo.")
+            return
+        query = self.path.split("?", 1)[-1] \
+            if "?" in self.path else ""
+        params = dict(part.split("=", 1)
+                      for part in query.split("&") if "=" in part)
+        fmt = params.get("format", "json")
+        lang = params.get("lang", "")
+        if fmt not in REPORT_FORMATS:
+            self._send_v1_error(400, "invalid_format",
+                                "Formato del referto sconosciuto.",
+                                {"format": fmt})
+            return
+        if lang and lang not in sra.HTML_LANGS:
+            self._send_v1_error(400, "invalid_lang",
+                                "Lingua del referto sconosciuta.",
+                                {"lang": lang})
+            return
+        report = job.report(fmt, lang or None)
+        if report is None:
+            self._send_v1_error(404, "report_not_ready",
+                                "Referto non disponibile: l'audit "
+                                "non e' concluso.")
+            return
+        download = ""
+        if "download" in params:
+            ext = {"html": "html", "json": "json", "text": "txt",
+                   "md": "md", "csv": "csv"}
+            nome = ("rilievi-mars" if fmt == "csv"
+                    else "referto-mars")
+            download = "%s.%s" % (nome, ext[fmt])
+        self._send(200, report.encode("utf-8"),
+                   REPORT_CTYPES[fmt], download=download,
+                   csp=REPORT_CSP if fmt == "html" else "")
+
+    def _delete_v1_audit(self, path: str) -> None:
+        resto = path[len("/api/v1/audits/"):]
+        if "/" in resto:
+            self._send_v1_error(404, "not_found",
+                                "Percorso sconosciuto.")
+            return
+        job, _ = self._job_v1(resto)
+        if job is None:
+            return
+        if job.cancel():
+            self._send_json(202, {"ok": True})
+        else:
+            self._send_v1_error(409, "not_running",
+                                "Nessun audit in corso da "
+                                "annullare.")
+
+    def _post_v1_token(self) -> None:
+        # Gestione dei token SOLO via sessione cookie: un token
+        # non puo' crearne o revocarne altri.
+        user = self._session_user()
+        if user is None:
+            self._send_v1_error(401, "unauthorized",
+                                "Accesso richiesto (sessione).")
+            return
+        raw = self._read_json()
+        if raw is None:
+            return
+        label = str(raw.get("label", "")).strip()[:60]
+        token_id, token = get_store().create_api_token(
+            int(user["id"]), label)
+        # il token in chiaro esiste solo in questa risposta
+        self._send_json(201, {"ok": True, "id": token_id,
+                              "label": label, "token": token})
+
+    def _get_v1_tokens(self) -> None:
+        user = self._session_user()
+        if user is None:
+            self._send_v1_error(401, "unauthorized",
+                                "Accesso richiesto (sessione).")
+            return
+        self._send_json(200, {
+            "tokens": get_store().list_api_tokens(
+                int(user["id"]))})
+
+    def _delete_v1_token(self, path: str) -> None:
+        user = self._session_user()
+        if user is None:
+            self._send_v1_error(401, "unauthorized",
+                                "Accesso richiesto (sessione).")
+            return
+        resto = path[len("/api/v1/tokens/"):]
+        try:
+            token_id = int(resto)
+        except (TypeError, ValueError):
+            self._send_v1_error(400, "invalid_id",
+                                "Id del token non valido.",
+                                {"id": resto})
+            return
+        if get_store().revoke_api_token(int(user["id"]), token_id):
+            self._send_json(200, {"ok": True})
+        else:
+            self._send_v1_error(404, "not_found",
+                                "Token non trovato.",
+                                {"id": token_id})
 
     def _post_register(self) -> None:
         raw = self._read_json()
@@ -2377,7 +3060,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         cookie=self._cookie(token))
 
     def _post_profile(self) -> None:
-        user = self._session_user()
+        user = self._auth_user()
         if user is None:
             self._send_json(401, {"error": "accesso richiesto"})
             return
@@ -2397,35 +3080,59 @@ class ApiHandler(BaseHTTPRequestHandler):
             "user": get_store().user_by_token(
                 self._session_token())})
 
-    def _post_audit(self) -> None:
-        user = self._session_user()
+    def _audit_error(self, v1: bool, status: int, code: str,
+                     message: str,
+                     params: Optional[Dict[str, object]] = None
+                     ) -> None:
+        """Stesso handler, due stili: le rotte legacy conservano
+        {"error"} (piu' retry_in_s sul 429), le /api/v1 usano
+        l'oggetto uniforme."""
+        if v1:
+            self._send_v1_error(status, code, message, params)
+            return
+        corpo: Dict[str, object] = {"error": message}
+        if params and "retry_in_s" in params:
+            corpo["retry_in_s"] = params["retry_in_s"]
+        self._send_json(status, corpo)
+
+    def _post_audit(self, v1: bool = False) -> None:
+        global JOB
+        user = self._auth_user()
         if user is None:
-            self._send_json(401, {
-                "error": "Per avviare un check devi registrarti o "
-                         "accedere."})
+            self._audit_error(v1, 401, "unauthorized",
+                              "Per avviare un check devi "
+                              "registrarti o accedere.")
             return
         raw = self._read_json()
         if raw is None:
             return
         config, err = validate_config(raw)
         if config is None:
-            self._send_json(400, {"error": err})
+            self._audit_error(v1, 400, "invalid_config", err)
             return
         wait_s = int(user["next_check_in_s"])
         if wait_s > 0:
-            self._send_json(429, {
-                "error": "Hai gia' effettuato un check nell'ultima "
-                         "ora: potrai avviarne un altro fra %d "
-                         "minuti." % max(1, wait_s // 60),
-                "retry_in_s": wait_s})
+            self._audit_error(
+                v1, 429, "hourly_slot",
+                "Hai gia' effettuato un check nell'ultima ora: "
+                "potrai avviarne un altro fra %d minuti."
+                % max(1, wait_s // 60),
+                {"retry_in_s": wait_s})
             return
-        if not JOB.start(config, user_id=int(user["id"])):
-            self._send_json(409, {"error": "Un audit e' gia' in corso: "
-                                           "attendi che finisca."})
-            return
+        with JOBS_LOCK:
+            if _running_jobs() >= AUDIT_CONCURRENCY:
+                self._audit_error(v1, 409, "busy",
+                                  "Un audit e' gia' in corso: "
+                                  "attendi che finisca.")
+                return
+            job = Job(job_id=secrets.token_hex(8))
+            job.start(config, user_id=int(user["id"]))
+            JOBS[job.job_id] = job
+            _prune_jobs()
+            JOB = job
         get_store().record_check(int(user["id"]))
-        threading.Thread(target=JOB.run, daemon=True).start()
-        self._send_json(202, {"ok": True})
+        threading.Thread(target=job.run, daemon=True).start()
+        self._send_json(202, {"ok": True, "id": job.job_id})
 
     def log_message(self, fmt: str, *args: object) -> None:
         pass  # niente rumore in console: il log utile e' nella GUI

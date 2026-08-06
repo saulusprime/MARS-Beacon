@@ -465,7 +465,8 @@ def test_contract_audit_e2e_parita(base, site):
          "soglie": {"title_min": 190, "title_max": 195},
          "fail_under": 100},
         cookie=cookie)
-    assert (stato, corpo) == (202, {"ok": True})
+    assert stato == 202 and corpo["ok"] is True
+    assert corpo["id"]  # job con id (modello a risorse, Fase 2)
     snap = _attendi(base, cookie, ("done", "error"))
     assert snap["state"] == "done", snap.get("error")
     _conforme("GET", "/api/status", 200, snap)
@@ -590,3 +591,218 @@ def test_combinato_invariato_serve_la_gui(base):
     assert stato == 200
     assert headers.get("Content-Type", "").startswith("text/html")
     assert "MARS" in pagina
+
+
+# ---------------- Fase 2: job a id, token, CORS -------------------
+
+def _v1_err(corpo):
+    jsonschema.validate(corpo, api.ERROR_V1_SCHEMA)
+    return corpo["error"]
+
+
+def test_v1_audits_job_e2e(base, site):
+    """Ciclo v1 completo: crea job, segui per id, referto in
+    un'altra lingua on-demand, DELETE su job concluso."""
+    cookie = _registra(base, email="job@esempio.it",
+                       completo=True)
+    stato, corpo, _ = _api(base, "/api/v1/audits",
+                           {"url": site, "max_pages": 3,
+                            "delay": 0, "lighthouse": "off"},
+                           cookie=cookie)
+    assert stato == 202
+    _conforme("POST", "/api/v1/audits", 202, corpo)
+    job_id = corpo["id"]
+
+    scadenza = 120
+    import time as _t
+    fine = _t.time() + scadenza
+    snap = {}
+    while _t.time() < fine:
+        stato, snap, _ = _api(base, "/api/v1/audits/%s" % job_id,
+                              cookie=cookie)
+        assert stato == 200
+        if snap["state"] in ("done", "error"):
+            break
+        _t.sleep(0.3)
+    assert snap["state"] == "done", snap.get("error")
+    assert snap["id"] == job_id
+    _conforme("GET", "/api/v1/audits/{id}", 200, snap)
+
+    # referto del job: lingua diversa resa on-demand dal contesto
+    stato, testo, _ = _api_grezza(
+        base, "/api/v1/audits/%s/report?format=text&lang=fr"
+        % job_id, cookie=cookie)
+    assert stato == 200
+    assert "Pages analysées" in testo
+    # DELETE su job concluso: 409 uniforme
+    stato, corpo, _ = _api_delete(base,
+                                  "/api/v1/audits/%s" % job_id,
+                                  cookie=cookie)
+    assert stato == 409
+    assert _v1_err(corpo)["code"] == "not_running"
+    # SSE per-job: stato terminale -> un solo evento e chiusura
+    stato, flusso, headers = _api_grezza(
+        base, "/api/v1/audits/%s/events" % job_id, cookie=cookie)
+    assert stato == 200
+    assert headers.get("Content-Type", "").startswith(
+        "text/event-stream")
+    assert '"state": "done"' in flusso
+
+
+def test_v1_audits_proprieta_e_errori(base):
+    cookie = _registra(base, email="a@esempio.it")
+    stato, corpo, _ = _api(base, "/api/v1/audits/inesistente",
+                           cookie=cookie)
+    assert stato == 404
+    assert _v1_err(corpo)["code"] == "not_found"
+    # job di un altro utente: 404, nessuna esistenza rivelata
+    import secrets as _s
+    job = gui.Job(job_id=_s.token_hex(8))
+    job.user_id = 999999
+    api.JOBS[job.job_id] = job
+    stato, corpo, _ = _api(base, "/api/v1/audits/%s" % job.job_id,
+                           cookie=cookie)
+    assert stato == 404
+    # senza accesso: 401 uniforme
+    stato, corpo, _ = _api(base, "/api/v1/audits/x")
+    assert stato == 401
+    assert _v1_err(corpo)["code"] == "unauthorized"
+
+
+def test_v1_audits_concorrenza(base):
+    cookie = _registra(base, email="c@esempio.it")
+    occupato = gui.Job(job_id="occupato1")
+    occupato.state = "running"
+    api.JOBS["occupato1"] = occupato
+    try:
+        stato, corpo, _ = _api(base, "/api/v1/audits",
+                               {"url": "esempio.test"},
+                               cookie=cookie)
+        assert stato == 409
+        assert _v1_err(corpo)["code"] == "busy"
+        # anche la rotta legacy rifiuta, nello stile legacy
+        stato, corpo, _ = _api(base, "/api/audit",
+                               {"url": "esempio.test"},
+                               cookie=cookie)
+        assert stato == 409 and "error" in corpo
+        assert isinstance(corpo["error"], str)
+    finally:
+        del api.JOBS["occupato1"]
+
+
+def test_v1_tokens_ciclo_completo(base):
+    cookie = _registra(base, email="t@esempio.it")
+    # creazione: token visibile solo ora
+    stato, corpo, _ = _api(base, "/api/v1/tokens",
+                           {"label": "ci"}, cookie=cookie)
+    assert stato == 201
+    _conforme("POST", "/api/v1/tokens", 201, corpo)
+    token = corpo["token"]
+    assert token.startswith("mars_")
+    token_id = corpo["id"]
+    # elenco: solo metadati
+    stato, corpo, _ = _api(base, "/api/v1/tokens", cookie=cookie)
+    assert stato == 200
+    _conforme("GET", "/api/v1/tokens", 200, corpo)
+    assert [t["id"] for t in corpo["tokens"]] == [token_id]
+    assert "token" not in corpo["tokens"][0]
+    # il Bearer autentica le rotte protette (stesso perimetro)
+    req = urllib.request.Request(base + "/api/me")
+    req.add_header("Authorization", "Bearer %s" % token)
+    with urllib.request.urlopen(req) as resp:
+        me = json.loads(resp.read())
+    assert me["authenticated"] is True
+    req = urllib.request.Request(base + "/api/status")
+    req.add_header("Authorization", "Bearer %s" % token)
+    with urllib.request.urlopen(req) as resp:
+        assert resp.status == 200
+    # ma NON gestisce i token (solo sessione cookie)
+    req = urllib.request.Request(
+        base + "/api/v1/tokens", data=b"{}",
+        headers={"Content-Type": "application/json",
+                 "Authorization": "Bearer %s" % token})
+    try:
+        urllib.request.urlopen(req)
+        raise AssertionError("atteso 401")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 401
+    # revoca: il token smette di funzionare
+    stato, corpo, _ = _api_delete(base,
+                                  "/api/v1/tokens/%d" % token_id,
+                                  cookie=cookie)
+    assert (stato, corpo) == (200, {"ok": True})
+    req = urllib.request.Request(base + "/api/status")
+    req.add_header("Authorization", "Bearer %s" % token)
+    try:
+        urllib.request.urlopen(req)
+        raise AssertionError("atteso 401")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 401
+    # revoca di un id inesistente: 404 uniforme
+    stato, corpo, _ = _api_delete(base, "/api/v1/tokens/9999",
+                                  cookie=cookie)
+    assert stato == 404
+    assert _v1_err(corpo)["code"] == "not_found"
+
+
+def test_cors_spento_di_default_e_origini_esplicite(
+        base, monkeypatch):
+    # spento: nessun header anche con Origin presente
+    req = urllib.request.Request(base + "/api/env")
+    req.add_header("Origin", "https://altrove.test")
+    with urllib.request.urlopen(req) as resp:
+        assert "Access-Control-Allow-Origin" not in resp.headers
+    # acceso per un'origine esplicita
+    monkeypatch.setattr(api, "CORS_ORIGINS",
+                        ("https://altrove.test",))
+    with urllib.request.urlopen(req) as resp:
+        assert resp.headers["Access-Control-Allow-Origin"] \
+            == "https://altrove.test"
+        assert "Access-Control-Allow-Credentials" \
+            not in resp.headers
+    # origine non in elenco: niente header
+    req2 = urllib.request.Request(base + "/api/env")
+    req2.add_header("Origin", "https://estranea.test")
+    with urllib.request.urlopen(req2) as resp:
+        assert "Access-Control-Allow-Origin" not in resp.headers
+    # preflight OPTIONS
+    req3 = urllib.request.Request(base + "/api/v1/audits",
+                                  method="OPTIONS")
+    req3.add_header("Origin", "https://altrove.test")
+    with urllib.request.urlopen(req3) as resp:
+        assert resp.status == 204
+        assert "Authorization" in resp.headers[
+            "Access-Control-Allow-Headers"]
+
+
+def test_history_paginata(base):
+    cookie = _registra(base, email="h@esempio.it")
+    uid = json.loads(_api_grezza(
+        base, "/api/me", cookie=cookie)[1])["user"]["id"]
+    for indice in range(3):
+        api.get_store().add_audit(uid, {
+            "site": "https://x.it/", "overall": 50.0 + indice,
+            "scores": {}, "critical": 0, "warning": 0,
+            "info": 0}, "")
+    stato, corpo, _ = _api(base,
+                           "/api/history?limit=2&offset=1",
+                           cookie=cookie)
+    assert stato == 200
+    _conforme("GET", "/api/history", 200, corpo)
+    assert (corpo["limit"], corpo["offset"]) == (2, 1)
+    assert len(corpo["runs"]) == 2
+    stato, corpo, _ = _api(base, "/api/history?limit=abc",
+                           cookie=cookie)
+    assert stato == 400
+
+
+def _api_delete(base_url, path, cookie=""):
+    req = urllib.request.Request(base_url + path, method="DELETE")
+    if cookie:
+        req.add_header("Cookie", cookie)
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return (resp.status, json.loads(resp.read()),
+                    dict(resp.headers))
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.loads(exc.read()), dict(exc.headers)

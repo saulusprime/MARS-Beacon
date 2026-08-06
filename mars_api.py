@@ -34,7 +34,7 @@ from typing import List, Optional
 
 from marsbeacon import api as mars_api
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 class Handler(mars_api.ApiHandler):
@@ -69,11 +69,30 @@ def main(argv: Optional[List[str]] = None) -> int:
                              "citazioni esposto da /api/citations "
                              "(default %s)"
                              % mars_api.CITATIONS_HISTORY)
+    parser.add_argument("--cors", metavar="ORIGINE",
+                        action="append", default=[],
+                        help="origine cross-origin ammessa (es. "
+                             "https://gui.esempio.it), ripetibile. "
+                             "SPENTO di default: senza origini "
+                             "dichiarate nessun header CORS; "
+                             "cross-origin ci si autentica col "
+                             "token Bearer, mai col cookie")
+    parser.add_argument("--max-audit", type=int, default=1,
+                        metavar="N",
+                        help="audit in parallelo ammessi (default "
+                             "1 = un audit alla volta, come il "
+                             "combinato; oltre: 409 quando la "
+                             "concorrenza e' esaurita)")
     parser.add_argument("--version", action="version",
                         version="%(prog)s " + __version__)
     args = parser.parse_args(argv)
 
+    if args.max_audit < 1:
+        print("--max-audit vuole un intero >= 1.", file=sys.stderr)
+        return 2
     mars_api.CITATIONS_HISTORY = Path(args.citations_history)
+    mars_api.CORS_ORIGINS = tuple(args.cors)
+    mars_api.AUDIT_CONCURRENCY = args.max_audit
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print("API disponibile su http://%s:%d/ — contratto: "

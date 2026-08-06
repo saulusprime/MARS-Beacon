@@ -56,22 +56,16 @@ fail_under) e documentazione Scalar vendorizzata su `/api/docs`.
 
 ### Fase 2 — Backend puro
 
-L'estrazione del motore server in `marsbeacon/api.py` e l'entry
-solo-API **`mars_api.py`** sono **fatti** (2026-08-06 — vedi AS-IS
-"API — contratto e registro"). Resta:
-
-- [ ] Job di audit: `POST /api/v1/audits` (202 + id), `GET
-      /api/v1/audits/{id}` (stato+sintesi), `DELETE` (annullamento
-      cooperativo per id), `GET /api/v1/audits/{id}/report?format=
-      …&lang=…`; l'SSE diventa per-job (`/api/v1/audits/{id}/
-      events`) col ripiego sul polling com'è oggi.
-- [ ] Token Bearer: emissione/revoca dal profilo, hash in DB
-      (pattern PBKDF2 esistente), stesso perimetro del cookie
-      (slot orario, gating del profilo completo sui download).
-- [ ] CORS opzionale esplicito (preflight, credenziali solo se
-      necessario), binding configurabile con default 127.0.0.1 e
-      nota reverse proxy; paginazione dello storico; validazioni
-      già in italiano riusate con le chiavi d'errore uniformi.
+**COMPLETATA il 2026-08-06 su `devapi`** (vedi AS-IS "API —
+contratto e registro"): motore server estratto in
+`marsbeacon/api.py` con entry solo-API `mars_api.py`; job di
+audit con id (POST/GET/DELETE su `/api/v1/audits`, referti per
+job in ogni formato e lingua on-demand, SSE per-job, concorrenza
+configurabile); token Bearer (`/api/v1/tokens`, SHA-256
+dichiarato, stesso perimetro del cookie, gestione solo via
+sessione); CORS opzionale esplicito senza credenziali, storico
+paginato, errori uniformi `{code, key, message, params}` sulle
+rotte v1. `API_CONTRACT_VERSION` 1.3.0.
 
 ### Fase 3 — Frontend statico separato
 

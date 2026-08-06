@@ -369,12 +369,19 @@ branch `devapi` anche `lang`, `soglie`, `queries_gsc` e
 `fail_under` per la parità con la CLI),
 `GET /api/status` (stato, log, sintesi, rilievi, esiti RRF),
 `GET /api/report/{html,json,text,md,csv}` (referti, `?download=1`
-per lo scarico). Il **contratto OpenAPI 3.1** è generato dal
-registro dichiarativo delle rotte (`marsbeacon/api.py`) e servito
-da `GET /api/v1/openapi.json` (snapshot golden in
-[docs/openapi.json](docs/openapi.json)); la **documentazione
-navigabile** è su `GET /api/docs` (Scalar vendorizzato, nessuna
-origine esterna).
+per lo scarico). Dal branch `devapi` c'è anche il **modello a
+risorse**: `POST /api/v1/audits` crea un job con id da seguire su
+`GET /api/v1/audits/{id}` (o via SSE per-job), annullare con
+`DELETE` e da cui scaricare i referti **in ogni formato e lingua**
+(`.../report?format=…&lang=…`, resi on-demand dalla stessa
+scansione); **token Bearer** personali su `/api/v1/tokens` per i
+client macchina (stesso perimetro del cookie), CORS opzionale a
+origini esplicite, storico paginato. Il **contratto OpenAPI 3.1**
+è generato dal registro dichiarativo delle rotte
+(`marsbeacon/api.py`) e servito da `GET /api/v1/openapi.json`
+(snapshot golden in [docs/openapi.json](docs/openapi.json)); la
+**documentazione navigabile** è su `GET /api/docs` (Scalar
+vendorizzato, nessuna origine esterna).
 
 ## Le aree misurate
 
@@ -599,7 +606,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 390 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 396 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
