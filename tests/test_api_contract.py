@@ -149,9 +149,9 @@ def base():
 
 @pytest.fixture(autouse=True)
 def ambiente_pulito(tmp_path):
-    gui.JOB = gui.Job()
-    gui.STORE = gui.UserStore(tmp_path / "users.db")
-    gui.CITATIONS_HISTORY = tmp_path / "citazioni.jsonl"
+    api.JOB = gui.Job()
+    api.STORE = gui.UserStore(tmp_path / "users.db")
+    api.CITATIONS_HISTORY = tmp_path / "citazioni.jsonl"
     yield
 
 
@@ -540,3 +540,53 @@ def test_bundle_scalar_vendorizzato_e_pulito():
         assert host not in testo, host
     # il bundle resta autonomo: niente chunk dinamici
     assert "dist/browser/chunks" not in testo
+
+
+# ----------------- server solo-API (mars_api.py) ------------------
+
+@pytest.fixture(scope="module")
+def base_solo_api():
+    import mars_api as solo
+    server = ThreadingHTTPServer(("127.0.0.1", 0), solo.Handler)
+    thread = threading.Thread(target=server.serve_forever,
+                              daemon=True)
+    thread.start()
+    yield "http://127.0.0.1:%d" % server.server_address[1]
+    server.shutdown()
+
+
+def test_solo_api_niente_statici_ne_pagine(base_solo_api):
+    """mars_api serve il contratto ma NON il frontend della GUI."""
+    for percorso in ("/", "/index.html", "/app.js", "/tos.html",
+                     "/vendor/bootstrap-italia/css/"
+                     "bootstrap-italia.min.css"):
+        stato, corpo, _ = _api(base_solo_api, percorso)
+        assert stato == 404, percorso
+        assert corpo == {"error": "non trovato"}, percorso
+
+
+def test_solo_api_contratto_e_docs(base_solo_api):
+    import mars_api as solo
+    stato, corpo, _ = _api(base_solo_api, "/api/v1/openapi.json")
+    assert stato == 200 and corpo == api.openapi_spec()
+    stato, corpo, _ = _api(base_solo_api, "/api/env")
+    assert stato == 200
+    assert corpo["gui_version"] == solo.__version__
+    _conforme("GET", "/api/env", 200, corpo)
+    # la pagina di documentazione e i suoi asset in whitelist
+    stato, pagina, _ = _api_grezza(base_solo_api, "/api/docs")
+    assert stato == 200
+    assert 'data-url="/api/v1/openapi.json"' in pagina
+    stato, _, headers = _api_grezza(base_solo_api,
+                                    "/vendor/scalar/standalone.js")
+    assert stato == 200
+    assert headers.get("Content-Type", "").startswith(
+        "application/javascript")
+
+
+def test_combinato_invariato_serve_la_gui(base):
+    """Il combinato (mars_gui) continua a servire il frontend."""
+    stato, pagina, headers = _api_grezza(base, "/")
+    assert stato == 200
+    assert headers.get("Content-Type", "").startswith("text/html")
+    assert "MARS" in pagina

@@ -56,12 +56,10 @@ fail_under) e documentazione Scalar vendorizzata su `/api/docs`.
 
 ### Fase 2 — Backend puro
 
-- [ ] Estrazione degli handler API da `mars_gui.py` nel modulo
-      **`marsbeacon/api.py`** (stesso metodo della scomposizione
-      v1.58.0: spostamento meccanico, facciata invariata);
-      `mars_gui.py` resta il combinato statici+API a zero
-      configurazione, il nuovo entry **`mars_api.py`** serve solo
-      l'API (niente filesystem statico, niente pagine).
+L'estrazione del motore server in `marsbeacon/api.py` e l'entry
+solo-API **`mars_api.py`** sono **fatti** (2026-08-06 — vedi AS-IS
+"API — contratto e registro"). Resta:
+
 - [ ] Job di audit: `POST /api/v1/audits` (202 + id), `GET
       /api/v1/audits/{id}` (stato+sintesi), `DELETE` (annullamento
       cooperativo per id), `GET /api/v1/audits/{id}/report?format=

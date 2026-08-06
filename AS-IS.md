@@ -693,6 +693,40 @@ sono nel [README.md](README.md).
 
 ## API — contratto e registro (programma P1, branch `devapi`)
 
+- **Backend puro: motore server in `marsbeacon/api.py` ed entry
+  `mars_api.py`** (GUI v2.34.0, mars_api v0.1.0, 2026-08-06 —
+  primo blocco della Fase 2). Il motore del server — store utenti
+  SQLite, job di audit, lettori citazioni, `validate_config` e
+  l'handler delle rotte del contratto — è **estratto da
+  mars_gui.py** in `marsbeacon/api.py` col metodo della
+  scomposizione v1.58.0 (spostamento meccanico, facciata
+  invariata: i nomi storici restano importabili da mars_gui, che
+  passa da ~1.360 a ~150 righe). Architettura a eredità:
+  **`ApiHandler`** nel motore serve le sole rotte del contratto
+  più la pagina `/api/docs` coi suoi asset in **whitelist
+  puntuale** (`DOCS_ASSETS`: bundle Scalar e tre woff2 del
+  Titillium — lettura di file noti, nessuna navigazione del
+  filesystem); l'hook **`_fallback`** risponde 404 a tutto il
+  resto, e **`mars_gui.Handler`** lo sovrascrive per servire il
+  frontend statico della GUI: il combinato a zero configurazione
+  resta identico. Il nuovo entry **`mars_api.py`** (porta 8766 di
+  default, per convivere col combinato) monta il motore così
+  com'è: niente filesystem statico, niente pagine. Adeguamenti
+  dichiarati nello spostamento: cookie di sessione unificato
+  sulla costante del contratto (`SESSION_COOKIE_NAME`; mars_gui
+  conserva l'alias storico `SESSION_COOKIE`), `gui_version` di
+  `/api/env` ora arriva dall'attributo **`app_version`**
+  dell'applicazione che monta il motore (2.34.0 sul combinato,
+  0.1.0 sul solo-API), gli **stati mutabili (JOB, STORE,
+  CITATIONS_HISTORY) vivono nel motore**: fixture dei test e
+  `tools/verifica_at.py` adeguati a impostarli su
+  `marsbeacon.api`. 3 test in più (il solo-API rifiuta con 404
+  ogni percorso statico della GUI ma serve contratto, docs e
+  asset in whitelist con `gui_version` proprio; il combinato
+  continua a servire il frontend); contratto invariato (1.2.0,
+  golden intatto). Verifica dal vivo dei due server affiancati
+  (8765 combinato, 8766 solo-API). Suite 390 test, flake8 pulito.
+
 - **Documentazione Scalar su /api/docs: contratto 1.2.0 — FASE 1
   CONCLUSA** (GUI v2.33.0, 2026-08-06). **Scalar API Reference
   1.64.0 vendorizzato** in `gui/vendor/scalar/` (3,6 MB, licenza
@@ -852,7 +886,12 @@ sono nel [README.md](README.md).
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.33.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.34.0 + `gui/`
+
+- **Facciata sul motore server** (v2.34.0, 2026-08-06, branch
+  `devapi`): il motore vive in `marsbeacon/api.py`, mars_gui
+  eredita `ApiHandler` e aggiunge i file statici — dettaglio
+  nella sezione "API — contratto e registro" più sopra.
 
 - **Documentazione del contratto su /api/docs** (v2.33.0,
   2026-08-06, branch `devapi`): Scalar vendorizzato, pagina
@@ -1390,7 +1429,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 387 test in ~30 secondi** (inclusa
+- **Suite pytest: 390 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

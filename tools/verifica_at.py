@@ -27,6 +27,7 @@ CHROME_PATHS = {
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import mars_gui as gui  # noqa: E402
+from marsbeacon import api as engine  # noqa: E402
 
 PAGES = {
     "/": ("<!DOCTYPE html><html lang=\"it\"><head>"
@@ -120,7 +121,7 @@ def main():
                      daemon=True).start()
     site = "http://127.0.0.1:%d" % site_srv.server_address[1]
 
-    gui.STORE = gui.UserStore(
+    engine.STORE = gui.UserStore(
         Path(tempfile.mkdtemp()) / "users.db")
     gui_srv = ThreadingHTTPServer(("127.0.0.1", 0), gui.Handler)
     threading.Thread(target=gui_srv.serve_forever,

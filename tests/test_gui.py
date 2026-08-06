@@ -11,6 +11,7 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 import mars_gui as gui
+from marsbeacon import api as engine
 
 
 def _patch(monkeypatch, name, value):
@@ -42,8 +43,8 @@ def gui_base():
 
 @pytest.fixture(autouse=True)
 def ambiente_pulito(tmp_path):
-    gui.JOB = gui.Job()
-    gui.STORE = gui.UserStore(tmp_path / "users.db")
+    engine.JOB = gui.Job()
+    engine.STORE = gui.UserStore(tmp_path / "users.db")
     yield
 
 
@@ -427,7 +428,7 @@ def test_api_citazioni_richiede_accesso(gui_base):
 
 def test_api_citazioni_raggruppa_per_sito(gui_base, tmp_path,
                                           monkeypatch):
-    monkeypatch.setattr(gui, "CITATIONS_HISTORY",
+    monkeypatch.setattr(engine, "CITATIONS_HISTORY",
                         _storico_citazioni(tmp_path))
     cookie = _register(gui_base)
     status, body, _ = _api(gui_base, "/api/citations",
@@ -443,7 +444,7 @@ def test_api_citazioni_raggruppa_per_sito(gui_base, tmp_path,
 
 def test_api_citazioni_senza_storico(gui_base, tmp_path,
                                      monkeypatch):
-    monkeypatch.setattr(gui, "CITATIONS_HISTORY",
+    monkeypatch.setattr(engine, "CITATIONS_HISTORY",
                         tmp_path / "inesistente.jsonl")
     cookie = _register(gui_base)
     status, body, _ = _api(gui_base, "/api/citations",
@@ -705,7 +706,7 @@ def test_eventi_sse(gui_base):
 
 def test_eventi_citazioni_nel_grafico(gui_base, tmp_path,
                                       monkeypatch):
-    monkeypatch.setattr(gui, "CITATIONS_HISTORY",
+    monkeypatch.setattr(engine, "CITATIONS_HISTORY",
                         _storico_citazioni(tmp_path))
     eventi = tmp_path / "eventi.jsonl"
     eventi.write_text(
@@ -778,7 +779,7 @@ def test_confronto_fra_due_audit_scelti(gui_base):
 
 
 def test_aggiunta_evento_via_api(gui_base, tmp_path, monkeypatch):
-    monkeypatch.setattr(gui, "CITATIONS_HISTORY",
+    monkeypatch.setattr(engine, "CITATIONS_HISTORY",
                         tmp_path / "citazioni.jsonl")
     status, _, _ = _api(gui_base, "/api/citations/events",
                         {"date": "2026-08-04", "label": "x"})
