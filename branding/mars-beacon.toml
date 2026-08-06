@@ -1,0 +1,41 @@
+# Brand generico "MARS Beacon" per il bundle statico gui/.
+# Si applica con: python tools/brandizza.py branding/mars-beacon.toml
+# E' il punto di partenza per il white-label: nessun riferimento a
+# Lympha Technologies nelle pagine, footer minimo con la sola
+# ragione sociale, nota di onesta' e copyright. Per un rivenditore:
+# copiare questo file, sostituire nomi, asset e palette.
+
+[brand]
+nome = "MARS"                  # prima riga del marchio in testata
+sottonome = "beacon"           # seconda riga (lt-tag)
+ragione_sociale = "MARS Beacon"
+titolo_index = "MARS Beacon"
+anno = 2026            # anno statico mostrato senza JavaScript
+copyright_dal = 2026   # = anno: il copyright mostra un anno solo
+
+[asset]
+# Il logo dell'applicazione fa anche da marchio e favicon del
+# brand generico (nomi senza directory = file in gui/brand/).
+logo = "mars-logo.png"
+favicon = "mars-logo.png"
+
+[palette]
+# Palette "Marte": ardesia neutra con accento ruggine. Luminanze
+# allineate ai token Lympha, cosi' ogni coppia verificata dal tool
+# resta sopra 4.5:1 con margine.
+teal = "#4a5568"       # primario ardesia
+teal_700 = "#37414f"   # hover/active e testo link su chiaro
+teal_900 = "#212a35"   # superfici scure (footer)
+navy = "#232f3e"       # sezioni profonde
+navy_700 = "#161f2b"   # barre/bordi scuri
+gray_grave = "#373737" # grigio del footer
+aqua = "#8fa8bd"       # decorativo (mai per testo su bianco)
+aqua_soft = "#c3d2de"  # decorativo / testo su fondo scuro
+mist = "#eef1f4"       # sfondi chiari
+orange = "#c0532b"     # accento ruggine (decorativo)
+orange_700 = "#9a3f1e" # accento come testo su chiaro
+ink = "#1a2530"        # testo principale su chiaro
+ink_soft = "#46525c"   # testo secondario su chiaro
+border = "rgba(20,32,42,.12)" # bordi tenui (non verificato: alpha)
+
+# Nessuna tabella [footer]: il tool genera il footer minimo.

@@ -1,79 +1,53 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- brand:testa inizio -->
-  <title>Condizioni di servizio — MARS Beacon</title>
-  <link rel="icon" type="image/png" href="brand/favicon.png">
-  <!-- brand:testa fine -->
-  <link rel="stylesheet" href="vendor/bootstrap-italia/css/bootstrap-italia.min.css">
-  <link rel="stylesheet" href="brand/brand.css">
-  <link rel="stylesheet" href="theme.css">
-</head>
-<body>
-  <header class="lt-header py-3">
-    <div class="container d-flex flex-wrap align-items-center
-                column-gap-4 row-gap-2">
-      <!-- brand:testata inizio -->
-      <div class="lt-brand">
-        <img class="lt-logo" src="brand/lympha-mark.svg" alt=""
-             aria-hidden="true">
-        <span>
-          <span class="lt-name d-block">Lympha</span>
-          <span class="lt-tag d-block">technologies</span>
-        </span>
-      </div>
-      <!-- brand:testata fine -->
-      <span class="lt-divider d-none d-sm-block" aria-hidden="true"></span>
-      <h1 class="h5 mb-0 lt-app-title">Condizioni di servizio</h1>
-    </div>
-  </header>
+# Brand Lympha Technologies per il bundle statico gui/.
+# Si applica con: python tools/brandizza.py branding/lympha-technologies.toml
+# E' il brand del repository: applicarlo su un albero pulito non
+# deve produrre alcuna differenza (verificato dalla suite).
+#
+# I token CSS di questo file erano gui/brand/lympha-brand.css: da
+# qui il tool genera gui/brand/brand.css (stessa separazione del
+# de-theming: la STRUTTURA vive in theme.css e consuma i token via
+# var(--lt-*); il DELTA di brand sta tutto in questo file).
 
-  <main class="container my-4" style="max-width: 46rem">
-    <p class="text-muted small">Ultimo aggiornamento: 3 agosto 2026</p>
+[brand]
+nome = "Lympha"                # prima riga del marchio in testata
+sottonome = "technologies"     # seconda riga (lt-tag)
+ragione_sociale = "Lympha Technologies S.r.l."
+titolo_index = "MARS Beacon — Lympha Technologies"
+anno = 2026            # anno statico mostrato senza JavaScript
+copyright_dal = 2011   # usato solo dal footer minimo generato
 
-    <h2 class="h5">1. Il servizio</h2>
-    <p>Lo strumento "MARS Beacon" di <!-- brand:ragione-sociale inizio -->Lympha Technologies S.r.l.<!-- brand:ragione-sociale fine -->
-    esegue, su richiesta dell'utente, una scansione tecnica del sito
-    indicato e produce un referto con punteggi, rilievi e
-    suggerimenti. La scansione scarica un numero limitato di pagine
-    pubbliche del sito, con richieste moderate e identificate dallo
-    user agent <code>SeoRrfAudit</code>.</p>
+[asset]
+# Nomi senza directory = file gia' presenti in gui/brand/;
+# un percorso con directory (relativo a questo file) viene
+# copiato dal tool dentro gui/brand/.
+logo = "lympha-mark.svg"
+favicon = "favicon.png"
 
-    <h2 class="h5">2. Proprietà del sito analizzato</h2>
-    <p>Registrandoti e avviando un check dichiari che il sito
-    indicato è <strong>di tua proprietà</strong>, o che hai un
-    mandato esplicito del proprietario per analizzarlo (ad esempio
-    come agenzia o consulente). L'analisi di siti di terzi senza
-    autorizzazione non è consentita.</p>
+[palette]
+# Palette del logo. Il tool verifica i contrasti WCAG AA delle
+# coppie realmente usate da theme.css e rifiuta il brand se una
+# scende sotto 4.5:1 (il referto e la GUI non devono mai mentire
+# sull'accessibilita' dichiarata).
+teal = "#186078"       # primario (dal logo)
+teal_700 = "#0f4a5b"   # hover/active e testo link su chiaro
+teal_900 = "#0c3540"   # superfici scure (footer)
+navy = "#17324d"       # navy di brand (sezioni profonde)
+navy_700 = "#0f2236"   # navy piu' scuro per barre/bordi
+gray_grave = "#373737" # grigio del footer
+aqua = "#5bb6bf"       # decorativo (mai per testo su bianco)
+aqua_soft = "#b7e0e3"  # decorativo / testo su fondo scuro
+mist = "#eef6f7"       # sfondi chiari
+orange = "#d86010"     # accento brand (dal logo, decorativo)
+orange_700 = "#a8480f" # accento come testo su chiaro
+ink = "#14272b"        # testo principale su chiaro
+ink_soft = "#3c5054"   # testo secondario su chiaro
+border = "rgba(8,49,58,.12)"  # bordi tenui (non verificato: alpha)
 
-    <h2 class="h5">3. Account e limiti d'uso</h2>
-    <p>La registrazione è gratuita e consente <strong>un check
-    all'ora per utente</strong>. Il download dei referti (HTML,
-    JSON, testo) richiede la registrazione completa, con azienda e
-    telefono nel profilo. Un check annullato non consuma il limite
-    orario.</p>
-
-    <h2 class="h5">4. Dati personali</h2>
-    <p>I dati forniti alla registrazione (nome, email, e
-    facoltativamente azienda e telefono) sono conservati localmente
-    dall'installazione dello strumento e usati solo per gestire
-    l'account e i limiti d'uso. Le password sono salvate in forma
-    cifrata (hash con salt), mai in chiaro.</p>
-
-    <h2 class="h5">5. Limitazione di responsabilità</h2>
-    <p>Il referto è uno strumento diagnostico automatico fornito
-    "così com'è": punteggi e simulazioni RRF sono indicazioni
-    tecniche, non garanzie di posizionamento nei motori di ricerca o
-    nelle risposte dei motori IA.</p>
-
-    <p class="mt-4">
-      <a href="index.html">&larr; Torna allo strumento</a>
-    </p>
-  </main>
-
-  <!-- brand:footer inizio -->
+[footer]
+# Footer istituzionale completo (index.html e tos.html); senza
+# questo campo il tool genera il footer minimo con la sola
+# ragione sociale, la nota di onesta' e il copyright.
+frammento_html = '''
   <!-- Footer istituzionale: replica quello di lymphatech.it
        (stessa struttura, voci e link; markup rifatto pulito e
        badge vendorizzati in brand/ — vedi brand/ORIGINI.txt). -->
@@ -186,6 +160,4 @@
       </div>
     </div>
   </footer>
-  <!-- brand:footer fine -->
-</body>
-</html>
+'''

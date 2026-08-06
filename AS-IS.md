@@ -1046,7 +1046,35 @@ Dettaglio nei bullet che seguono, dal più recente.
   Il censimento delle altre 12 rotte e' stato completato nel
   blocco successivo (bullet qui sopra: contratto 1.0.0).
 
-## Interfaccia grafica locale — `mars_gui.py` v2.37.0 + `gui/`
+## Interfaccia grafica locale — `mars_gui.py` v2.38.0 + `gui/`
+
+- **White-label da un unico file TOML** (v2.38.0, 2026-08-06,
+  chiude la voce P2 del TO-DO): `tools/brandizza.py` applica un
+  brand al bundle statico — genera `gui/brand/brand.css` (i token
+  che erano `lympha-brand.css`, ora prodotti dal TOML), copia
+  logo e favicon, riscrive le **regioni marcate**
+  `<!-- brand:… inizio/fine -->` di index.html e tos.html (testa
+  con titolo e favicon, testata col marchio, ragione sociale
+  nelle condizioni di servizio, footer intero). Deterministico e
+  **idempotente per costruzione**: il repository È
+  `branding/lympha-technologies.toml` applicato (il footer
+  istituzionale completo vive nel TOML come frammento HTML;
+  riapplicarlo non cambia un byte e la suite lo verifica, come
+  l'andata/ritorno col brand generico). Il secondo brand pronto,
+  `branding/mars-beacon.toml`, è il **generico da rivendita**:
+  palette "Marte" (ardesia + ruggine), footer minimo con ragione
+  sociale, nota di onestà e copyright, **zero occorrenze di
+  Lympha** nelle pagine (test dedicato). Guardia di
+  accessibilità nel tool: i **contrasti WCAG AA** delle dieci
+  coppie di colori realmente usate dal tema (compresi i grigi
+  fissi del footer scuro su teal-900/700) sono calcolati
+  all'applicazione e un brand sotto 4.5:1 è rifiutato con
+  messaggio in italiano — il bundle dichiara la conformità WCAG
+  e non deve mentire; i rapporti calcolati sono documentati nel
+  brand.css generato. Un frammento footer senza `footer-info` o
+  `data-year` è rifiutato (contratto con app.js). 6 test nuovi
+  (`tests/test_white_label.py`), suite a **411**; Pa11y 3/3 con
+  0 errori e AT 31/31 col brand del repo riapplicato.
 
 - **Footer istituzionale identico a lymphatech.it** (v2.37.0,
   2026-08-06, in vista della pubblicazione dell'app sul dominio

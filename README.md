@@ -38,7 +38,9 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | [mars_gui.py](mars_gui.py) | Interfaccia web locale: il server combinato statici+API a zero configurazione (facciata sul motore `marsbeacon/api.py`) |
 | [mars_api.py](mars_api.py) | Server **solo API** (porta 8766): contratto, documentazione e rotte del motore, niente pagine della GUI |
 | [mars_citations.py](mars_citations.py) | Monitoraggio periodico delle citazioni IA effettive (Claude, Perplexity) con storico e soglie |
-| [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies |
+| [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies, ri-brandizzabile (white-label) |
+| [branding/](branding/) | Brand white-label pronti: `lympha-technologies.toml` (quello del repo) e `mars-beacon.toml` (generico) |
+| [tools/brandizza.py](tools/brandizza.py) | Applica un brand TOML al bundle `gui/`: token CSS, logo, favicon, ragione sociale e footer, con verifica dei contrasti WCAG |
 | [deploy/](deploy/) | Unit systemd per l'esecuzione come servizio automatico sulle macchine dei clienti |
 | [tools/update-lighthouse.sh](tools/update-lighthouse.sh) | Installa il fork di Google Lighthouse in `lighthouse/` (tag pinnato, build inclusa, mai nel repo) |
 | [tools/update-scalar.sh](tools/update-scalar.sh) | Vendorizza il lettore Scalar della spec OpenAPI in `gui/vendor/scalar/` (denylist telemetria, origini dichiarate) |
@@ -322,6 +324,29 @@ hardening, database condivisibile con la GUI, convivenza su
 [deploy/nginx-mars.conf.example](deploy/nginx-mars.conf.example)
 per l'assetto separato (statici + proxy, oppure origini diverse
 con `--cors` e token).
+
+### White-label
+
+Il bundle `gui/` è ri-brandizzabile da un **unico file TOML** per
+brand: [tools/brandizza.py](tools/brandizza.py) genera i token CSS
+(`gui/brand/brand.css`), copia logo e favicon e riscrive le
+regioni marcate `<!-- brand:… -->` delle pagine (titolo, testata,
+ragione sociale nelle condizioni di servizio, footer). I
+**contrasti WCAG AA** delle coppie di colori realmente usate dal
+tema sono verificati all'applicazione: un brand sotto 4.5:1 viene
+rifiutato, perché il bundle dichiara la conformità e non deve
+mentire. Due brand pronti in [branding/](branding/):
+
+```bash
+python tools/brandizza.py branding/mars-beacon.toml          # generico
+python tools/brandizza.py branding/lympha-technologies.toml  # del repo
+```
+
+L'applicazione è deterministica e il repository *è* il brand
+Lympha applicato: riapplicarlo non cambia un byte (la suite lo
+verifica). Il footer istituzionale completo vive nel TOML Lympha
+come frammento HTML; il brand generico MARS Beacon genera il
+footer minimo con ragione sociale, nota di onestà e copyright.
 
 ## Monitoraggio delle citazioni IA effettive
 
@@ -616,7 +641,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 405 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 411 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 

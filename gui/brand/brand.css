@@ -1,0 +1,49 @@
+/* =====================================================================
+   Token di BRAND del bundle — FILE GENERATO, non modificare a mano.
+   Sorgente: branding/lympha-technologies.toml, applicata da tools/brandizza.py.
+   La STRUTTURA (componenti, selettori .lt-*) vive in theme.css e
+   consuma questi token via var(--lt-*): per cambiare brand si
+   modifica il TOML e si riapplica il tool.
+   Contrasti verificati all'applicazione (soglia 4.5:1):
+     bianco su teal (primario)         7.0:1
+     teal_700 su bianco (link)         9.8:1
+     bianco su teal_900 (footer)      13.1:1
+     aqua_soft su teal_900             9.2:1
+     orange_700 su bianco              5.8:1
+     ink su bianco                    15.5:1
+     ink_soft su bianco                8.5:1
+     anagrafica #cdd8e4 su teal_900    9.1:1
+     note #aebfd0 su teal_900          7.0:1
+     barra #aebfd0 su teal_700         5.2:1
+   ===================================================================== */
+
+:root {
+  /* --- Palette brand --- */
+  --lt-teal:         #186078;
+  --lt-teal-700:     #0f4a5b;
+  --lt-teal-900:     #0c3540;
+  --lt-navy:         #17324d;
+  --lt-navy-700:     #0f2236;
+  --lt-gray-grave:   #373737;
+  --lt-aqua:         #5bb6bf;
+  --lt-aqua-soft:    #b7e0e3;
+  --lt-mist:         #eef6f7;
+  --lt-orange:       #d86010;
+  --lt-orange-700:   #a8480f;
+  --lt-ink:          #14272b;
+  --lt-ink-soft:     #3c5054;
+  --lt-border:       rgba(8,49,58,.12);
+
+  /* --- Override variabili Bootstrap Italia / Bootstrap 5 --- */
+  --bs-primary: var(--lt-teal);
+  --bs-primary-rgb: 24, 96, 120;
+  --bs-link-color: var(--lt-teal-700);
+  --bs-link-hover-color: var(--lt-teal-900);
+  --bs-body-color: var(--lt-ink);
+  --bs-body-font-family: "Titillium Web", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --bs-border-radius: .75rem;
+  --bs-border-radius-lg: 1.25rem;
+
+  /* Altezza header sticky, usata per lo scroll-margin delle ancore */
+  --lt-header-h: 84px;
+}

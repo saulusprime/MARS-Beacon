@@ -104,7 +104,7 @@ def test_statici_con_csp_e_traversal_negato(gui_base):
                          ("/config.js", b"__PUBLIC_PATH__"),
                          ("/theme.css", b"--lt-teal"),
                          ("/tos.html", b"Condizioni di servizio"),
-                         ("/brand/lympha-brand.css", b"--lt-teal"),
+                         ("/brand/brand.css", b"--lt-teal"),
                          ("/brand/lympha-mark.svg", b"<svg"),
                          ("/brand/favicon.png", b"PNG")):
         status, body, headers = _api(gui_base, path)
