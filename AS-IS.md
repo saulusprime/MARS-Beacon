@@ -691,7 +691,107 @@ sono nel [README.md](README.md).
   progetto su GitHub), throttle configurabile (`--delay`), timeout
   20 s; PEP8, `flake8` pulito, licenza dichiarata nel modulo.
 
-## Interfaccia grafica locale — `mars_gui.py` v2.30.0 + `gui/`
+## API — contratto e registro (programma P1, branch `devapi`)
+
+- **Le sei decisioni preliminari della P1 API-first**, ratificate
+  il 2026-08-06, qui per memoria (pattern delle quattro decisioni
+  P1 Lighthouse): *contratto* **auto-generato** da un registro
+  dichiarativo delle rotte — la prima stesura "spec scritta a
+  mano" e' stata bocciata dal titolare: una spec a mano deriva
+  sempre dal codice; il generatore e' nostro, in stdlib, come lo
+  squarify — con snapshot `docs/openapi.json` a pattern golden;
+  *autenticazione* a doppio binario (cookie HttpOnly same-origin
+  com'e' oggi + token Bearer per macchine e cross-origin, CORS
+  spento di default con origini esplicite); *versionamento* con
+  prefisso `/api/v1` e alias legacy `/api/*` deprecati
+  dichiaratamente, mai rimossi in silenzio; *modello a risorse*
+  con l'audit come job a id (202+id, stato/referti/annullamento
+  per id, coda a concorrenza configurabile con default 1, slot
+  orario invariato); *errori uniformi* `{code, key, params,
+  message}` col meccanismo i18n dei rilievi; *documentazione*
+  della spec con **solo Scalar** vendorizzato (MIT; la
+  coesistenza con Swagger UI, analizzata e fattibile, e' scartata
+  per scelta — un solo lettore da mantenere, la spec grezza resta
+  importabile ovunque; `withDefaultFonts: false` obbligatorio
+  perche' di default Scalar carica font da fonts.scalar.com,
+  `--scalar-font` sul Titillium Web del brand).
+
+- **Censimento completo: contratto 1.0.0** (2026-08-06, secondo
+  blocco della Fase 1): il registro copre **tutte le 17 rotte**
+  della superficie attuale. Modello `Route` esteso con **parametri
+  di percorso e query** (`/api/report/{formato}` col formato come
+  path param enum; `id`, `a`/`b`, `download` in query), **risposte
+  multi-formato** (chiave `content`: i referti dichiarano i cinque
+  media type), **content type non-JSON** (`/api/events` come
+  `text/event-stream` con lo snapshot serializzato) e **header
+  documentati** (`Set-Cookie` su register/login/logout). Censite
+  con schemi fedeli agli handler: account (register con i quattro
+  messaggi storici via `x-errore` — tos, nome, email, password —
+  login, logout, profile), audit (`POST /api/audit` con **tutti i
+  campi di `validate_config`**: limiti numerici min/max dalle
+  costanti del core, enum per render/market/judge/lighthouse/
+  device/search_check/robots, `robots_ack`, 202/400/401/409 e
+  **429 con `retry_in_s`**), stato (`SNAPSHOT_SCHEMA` condiviso
+  fra `/api/status` e SSE: primo livello preciso, strutture
+  profonde dichiarate della stessa natura del referto JSON gia'
+  versionato da `schema_version`), storico (righe `RUN_SCHEMA`,
+  referto per id con 403 `profile_incomplete` a **schema con
+  codice macchina** `CODED_ERROR_SCHEMA`, confronto fra audit) e
+  citazioni. **`API_CONTRACT_VERSION` 1.0.0** (censimento
+  completo dichiarato), golden `docs/openapi.json` rigenerato
+  (~1.950 righe). Contract test estesi a **18** (account con
+  201+Set-Cookie/400/409, login 200/401, logout, profile
+  401/400/200 con `profile_complete`, status/history/citations
+  401+200 validati, referti e storico protetti — 401/403/404/400
+  — audit 401/400 coi messaggi storici, SSE 401): suite 381
+  test, flake8 pulito. Restano le fasi 2-4 del TO-DO (backend
+  puro con job a id, frontend separato, Scalar, deploy).
+
+- **Contratto auto-generato dal registro delle rotte** (GUI
+  v2.31.0, 2026-08-06 — primo blocco della Fase 1 del programma
+  API-first; decisione di Fase 0 ratificata: la spec a mano e'
+  stata bocciata dal titolare). Nuovo modulo **`marsbeacon/api.py`**
+  (fuori dalla facciata dello strumento: e' il livello API,
+  consumato dal server): dataclass `Route` (metodo, percorso,
+  riassunto, tag, autenticazione, schema di richiesta, risposte
+  per stato) e registro `ROUTES` come **unica fonte di verita'**,
+  da cui derivano tre cose insieme — la **spec OpenAPI 3.1**
+  (`openapi_spec()`, servita al volo da `GET /api/v1/openapi.json`,
+  mai letta da file), la **validazione delle richieste a runtime**
+  (`validate_request` col mini-validatore in sola stdlib:
+  sottoinsieme di JSON Schema con type/required/properties/
+  additionalProperties/min-maxLength/pattern/enum/min-maximum/
+  items; il pacchetto `jsonschema` resta confinato alla suite) e i
+  **contract test**. La chiave `x-errore` negli schemi preserva i
+  messaggi storici in italiano della GUI (l'endpoint
+  `POST /api/citations/events` ora valida dal registro con gli
+  stessi messaggi di prima, byte per byte) e viene rimossa dalla
+  spec pubblicata. **Versione del contratto** separata dalla
+  versione dello strumento (`API_CONTRACT_VERSION`, oggi `0.1.0`:
+  resta 0.x finche' il censimento non e' completo — dichiarato
+  nella spec stessa); il nome del cookie di sessione e' parte del
+  contratto (`SESSION_COOKIE_NAME`, coerenza con mars_gui
+  verificata da un test). **Snapshot golden** `docs/openapi.json`
+  versionato e verificato dalla suite (stessa rigenerazione
+  intenzionale dei golden dei renderer, `MARS_RIGENERA_GOLDEN=1`).
+  Prima tranche censita: `GET /api/v1/openapi.json` (la spec
+  descrive se stessa), `GET /api/env`, `GET /api/me`,
+  `POST /api/cancel`, `POST /api/citations/events` — 13 test in
+  `tests/test_api_contract.py` (copertura spec↔registro, schemi
+  JSON Schema validi, x-errore fuori dalla spec, golden,
+  validatore coi messaggi storici, contract test sul server reale:
+  risposte 200/201/400/401/409 validate contro gli schemi del
+  registro con `jsonschema`). Suite 376 test, flake8 pulito.
+  Il censimento delle altre 12 rotte e' stato completato nel
+  blocco successivo (bullet qui sopra: contratto 1.0.0).
+
+## Interfaccia grafica locale — `mars_gui.py` v2.31.0 + `gui/`
+
+- **Contratto API dal registro delle rotte** (v2.31.0,
+  2026-08-06, branch `devapi`): il server serve la spec generata
+  su `GET /api/v1/openapi.json` e valida
+  `POST /api/citations/events` con gli schemi del registro —
+  dettaglio nella sezione "API — contratto e registro" piu' sopra.
 
 - **Grafo dei link, motore evoluto** (v2.30.0, 2026-08-05): vedi
   la voce v1.59.0 dello strumento CLI — fisica viva, anelli di
@@ -1213,7 +1313,7 @@ sono nel [README.md](README.md).
   run_lighthouse); ultimo esito 31/31 il 2026-08-05 —
   dichiaratamente non sostitutiva della sessione umana.
 
-- **Suite pytest: 363 test in ~30 secondi** (inclusa
+- **Suite pytest: 381 test in ~30 secondi** (inclusa
   l'integrazione con Lighthouse vero, dove disponibile), senza rete
   esterna: nucleo numerico fissato sui valori calcolati a mano (idf
   BM25, saturazione della frequenza, coseno in [0,1], addendi RRF con

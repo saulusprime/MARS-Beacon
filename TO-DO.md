@@ -34,93 +34,29 @@ Sinergie: il frontend separato è il pacchetto da brandizzare del
 white-label (P2); il modello a job è il prerequisito della modalità
 batch (P3).
 
-### Fase 0 — Decisioni preliminari (da ratificare prima di iniziare)
-
-- [ ] **Contratto auto-generato dal codice** (decisione corretta
-      il 2026-08-06: la prima stesura prevedeva la spec scritta a
-      mano — ribaltata, una spec mantenuta a mano deriva sempre
-      dal codice). Unica fonte di verità: un **registro
-      dichiarativo delle rotte** in `marsbeacon/api.py` —
-      percorso, metodo, schemi di richiesta e risposta, errori,
-      autenticazione per ogni endpoint — da cui derivano **sia il
-      dispatch del server sia la spec** (OpenAPI 3.1): spec e
-      codice non possono divergere per costruzione, senza
-      adottare un framework esterno (il vincolo stdlib resta; il
-      generatore è nostro, come il layout del grafo o lo
-      squarify). `GET /api/v1/openapi.json` genera al volo dal
-      registro; lo **snapshot `docs/openapi.json` è versionato
-      col pattern golden** (un test verifica che il file
-      committato coincida col generato; rigenerazione
-      intenzionale e diff in revisione). Il registro alimenta
-      anche la **validazione delle richieste** a runtime (stessi
-      schemi: niente doppia scrittura) e i **contract test**
-      (ogni risposta reale validata contro gli schemi;
-      `jsonschema` in requirements-dev, come tomli: solo per la
-      suite).
-- [ ] **Autenticazione a doppio binario**: cookie di sessione
-      HttpOnly per il frontend same-origin (com'è oggi) + **token
-      Bearer per utente** per i client macchina e il cross-origin
-      (generazione/revoca dal profilo, hash in SQLite, rate limit
-      per token). CORS **spento di default**, attivabile solo con
-      elenco esplicito di origini in configurazione.
-- [ ] **Versionamento**: prefisso `/api/v1`; gli attuali `/api/*`
-      restano come alias durante la migrazione della GUI e la loro
-      deprecazione viene dichiarata (data e sostituto nella spec).
-- [ ] **Modello a risorse**: l'audit diventa un **job con id**
-      (`POST /api/v1/audits` → 202 + id; stato, referti e
-      annullamento per id), con coda a concorrenza configurabile
-      (default 1: comportamento attuale invariato). Lo slot orario
-      per utente resta.
-- [ ] **Errori uniformi**: oggetto unico `{code, key, params,
-      message}` con chiave+parametri — lo stesso meccanismo i18n
-      dei rilievi, così anche gli errori API sono traducibili e il
-      messaggio italiano resta canonico.
-- [ ] **Documentazione della spec con Scalar, unico lettore**
-      (decisione del 2026-08-06; la coesistenza Swagger UI +
-      Scalar era stata analizzata e giudicata fattibile, ma è
-      stata **scartata per scelta**: un solo lettore da
-      vendorizzare e mantenere — non rivalutare). Scalar (MIT,
-      uso commerciale libero) renderizza `openapi.json` con
-      lettura moderna, client di prova integrato e snippet di
-      codice generati (curl/Python/JS); gli integratori
-      abituati a Swagger UI hanno comunque la spec grezza su
-      `/api/v1/openapi.json`, importabile in qualunque
-      strumento. Condizioni non negoziabili: bundle
-      **vendorizzato** e offline — attenzione dichiarata: Scalar
-      di default carica Inter e JetBrains Mono da
-      fonts.scalar.com, va spento con `withDefaultFonts: false`
-      e font locali via `--scalar-font` (occasione: puntarlo al
-      Titillium Web già vendorizzato del brand) — attribuzione
-      MIT nel NOTICE, verifica automatica "nessuna origine
-      esterna" nella suite.
+Le **sei decisioni preliminari (Fase 0)** sono state ratificate il
+2026-08-06 e spostate in AS-IS ("qui per memoria", come le quattro
+decisioni della P1 Lighthouse): contratto auto-generato dal
+registro delle rotte, autenticazione a doppio binario
+(cookie + token Bearer, CORS spento di default), versionamento
+`/api/v1` con alias legacy deprecati dichiaratamente, audit come
+job con id, errori uniformi con chiave+parametri, documentazione
+della spec con solo Scalar vendorizzato (Swagger UI scartato per
+scelta — non rivalutare).
 
 ### Fase 1 — Il contratto (lo "swagger")
 
-- [ ] **Registro dichiarativo delle rotte e generatore OpenAPI**
-      (decisione di Fase 0): il censimento della superficie
-      attuale entra nel registro — GET `/api/env`, `/api/me`,
-      `/api/status`, `/api/history`, `/api/history/report`,
-      `/api/history/compare`, `/api/citations`, `/api/events`
-      (SSE), `/api/report/{html,json,text,md,csv}`; POST
-      `/api/register`, `/api/login`, `/api/logout`,
-      `/api/profile`, `/api/citations/events`, `/api/cancel`,
-      `/api/audit` — con schemi di richiesta/risposta, codici
-      (401/403/409/422), cookie e limiti; il generatore emette la
-      spec dal registro e lo snapshot `docs/openapi.json` è il
-      golden verificato dalla suite.
+Registro, generatore, spec servita, golden, validazione runtime e
+contract test sono **fatti** (censimento completo delle 17 rotte,
+`API_CONTRACT_VERSION` 1.0.0 — vedi AS-IS "API — contratto e
+registro"). Resta:
+
 - [ ] **Gap di parità CLI↔API da colmare e specificare**: lingua
       del referto (`lang` sui download, oggi solo it), soglie di
       prassi (blocco `soglie` nel POST, validato dal registro
       `CONFIG_THRESHOLDS` — equivalente di `--config`), query
       reali da Search Console (upload CSV), `fail_under`
       echeggiato nell'esito del job.
-- [ ] Schemi riusati, non duplicati: il referto JSON
-      (`schema_version`), le righe dello storico, il blocco
-      citazioni; l'SSE documentato come `text/event-stream` con lo
-      schema dello snapshot.
-- [ ] La spec servita dal backend: `GET /api/v1/openapi.json`,
-      generata al volo dal registro (mai letta da file: il file è
-      solo lo snapshot golden).
 - [ ] **Scalar vendorizzato** (decisione di Fase 0): script
       `tools/update-scalar.sh` sul modello di update-vendor che
       scarica `@scalar/api-reference` (MIT) da npm, pota ai soli
@@ -130,13 +66,9 @@ batch (P3).
 - [ ] Rotta `/api/docs`: Scalar in modalità markup (`data-url`
       verso la spec, niente JS inline: CSP stretta), con
       `withDefaultFonts: false` e `--scalar-font` sul Titillium
-      Web del brand già vendorizzato.
-- [ ] Suite: la spec si carica, i riferimenti si risolvono, ogni
-      esempio valida contro il proprio schema; contract test per
-      endpoint (pattern golden: le risposte non derivano in
-      silenzio); la pagina di documentazione serve, punta alla
-      spec e non contiene origini esterne (grep automatico,
-      pattern anti-telemetria del fork Lighthouse).
+      Web del brand già vendorizzato; test che la pagina serve,
+      punta alla spec e non contiene origini esterne (grep
+      automatico, pattern anti-telemetria del fork Lighthouse).
 
 ### Fase 2 — Backend puro
 

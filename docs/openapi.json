@@ -1,0 +1,1945 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MARS Beacon API",
+    "version": "1.0.0",
+    "description": "Contratto dell'API locale di MARS Beacon, generato dal registro dichiarativo delle rotte (marsbeacon/api.py): spec e codice non possono divergere per costruzione. Gli errori sono {\"error\": messaggio in italiano} (piu' \"code\" macchina dove indicato). Un audit alla volta; slot orario per utente; download dei referti riservato alla registrazione completa.",
+    "license": {
+      "name": "Apache 2.0",
+      "identifier": "Apache-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8765",
+      "description": "Server locale (binding predefinito; non esporre su reti non fidate senza un reverse proxy con autenticazione)."
+    }
+  ],
+  "tags": [
+    {
+      "name": "contratto",
+      "description": "La spec stessa."
+    },
+    {
+      "name": "ambiente",
+      "description": "Capacita' e versioni del server."
+    },
+    {
+      "name": "account",
+      "description": "Registrazione, sessione, profilo."
+    },
+    {
+      "name": "audit",
+      "description": "Avvio, stato, annullamento e referti degli audit."
+    },
+    {
+      "name": "storico",
+      "description": "Esecuzioni salvate: righe, referti completi, confronti."
+    },
+    {
+      "name": "citazioni",
+      "description": "Monitoraggio delle citazioni IA."
+    }
+  ],
+  "paths": {
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "get-api-v1-openapi-json",
+        "summary": "Spec OpenAPI 3.1 del contratto",
+        "tags": [
+          "contratto"
+        ],
+        "description": "Generata al volo dal registro dichiarativo delle rotte: e' sempre allineata al codice per costruzione. Lo snapshot versionato nel repository (docs/openapi.json) e' un golden verificato dalla suite.",
+        "responses": {
+          "200": {
+            "description": "La spec OpenAPI.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/env": {
+      "get": {
+        "operationId": "get-api-env",
+        "summary": "Capacita' del server e valori suggeriti",
+        "tags": [
+          "ambiente"
+        ],
+        "description": "Versioni, RAM disponibile, disponibilita' delle dipendenze opzionali (embedding, rendering, giudizio LLM, ancora di realta', Lighthouse) con i motivi dichiarati quando mancano.",
+        "responses": {
+          "200": {
+            "description": "Stato dell'ambiente di esecuzione.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tool_version": {
+                      "type": "string"
+                    },
+                    "gui_version": {
+                      "type": "string"
+                    },
+                    "default_max_body_mb": {
+                      "type": "integer"
+                    },
+                    "available_ram_mb": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "suggested_max_body_mb": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "embeddings_available": {
+                      "type": "boolean"
+                    },
+                    "render_available": {
+                      "type": "boolean"
+                    },
+                    "judge_available": {
+                      "type": "boolean"
+                    },
+                    "judge_reason": {
+                      "type": "string"
+                    },
+                    "lighthouse_available": {
+                      "type": "boolean"
+                    },
+                    "lighthouse_reason": {
+                      "type": "string"
+                    },
+                    "lighthouse_version": {
+                      "type": "string"
+                    },
+                    "search_check_available": {
+                      "type": "boolean"
+                    },
+                    "search_check_reason": {
+                      "type": "string"
+                    },
+                    "default_embeddings_model": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "tool_version",
+                    "gui_version",
+                    "default_max_body_mb",
+                    "available_ram_mb",
+                    "suggested_max_body_mb",
+                    "embeddings_available",
+                    "render_available",
+                    "judge_available",
+                    "judge_reason",
+                    "lighthouse_available",
+                    "lighthouse_reason",
+                    "lighthouse_version",
+                    "search_check_available",
+                    "search_check_reason",
+                    "default_embeddings_model"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "operationId": "get-api-me",
+        "summary": "Utente della sessione corrente",
+        "tags": [
+          "account"
+        ],
+        "description": "Con sessione valida restituisce l'utente; senza, authenticated=false (mai 401: e' la rotta con cui il frontend scopre lo stato).",
+        "responses": {
+          "200": {
+            "description": "Stato di autenticazione.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authenticated": {
+                      "type": "boolean"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "nome": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "azienda": {
+                          "type": "string"
+                        },
+                        "telefono": {
+                          "type": "string"
+                        },
+                        "profile_complete": {
+                          "type": "boolean"
+                        },
+                        "next_check_in_s": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "nome",
+                        "email",
+                        "azienda",
+                        "telefono",
+                        "profile_complete",
+                        "next_check_in_s"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "authenticated"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cancel": {
+      "post": {
+        "operationId": "post-api-cancel",
+        "summary": "Annulla l'audit in corso",
+        "tags": [
+          "audit"
+        ],
+        "description": "Annullamento cooperativo: interrompe richieste e attese alla prima occasione utile, senza risultati parziali; non consuma lo slot orario.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Annullamento avviato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nessun audit in corso da annullare.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/citations/events": {
+      "post": {
+        "operationId": "post-api-citations-events",
+        "summary": "Annota un evento sul grafico delle citazioni",
+        "tags": [
+          "citazioni"
+        ],
+        "description": "Aggiunge un pin-evento allo storico (eventi.jsonl): data, etichetta e sito facoltativo.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "site": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "date",
+                  "label"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Evento registrato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "event": {
+                      "type": "object",
+                      "properties": {
+                        "date": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "site": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "date",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "event"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida (motivo nel messaggio).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Evento non salvabile su disco.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "operationId": "post-api-register",
+        "summary": "Registrazione rapida",
+        "tags": [
+          "account"
+        ],
+        "description": "Crea l'account e apre la sessione. La registrazione include l'accettazione delle condizioni di servizio con la dichiarazione di titolarita' dei siti da analizzare; azienda e telefono (facoltativi qui) completano il profilo e sbloccano il download dei referti.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nome": {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  "email": {
+                    "type": "string",
+                    "pattern": "^[\\w.+-]+@[\\w-]+\\.[a-zA-Z]{2,}$"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "tos": {
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "azienda": {
+                    "type": "string"
+                  },
+                  "telefono": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "nome",
+                  "email",
+                  "password",
+                  "tos"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account creato, sessione aperta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "nome": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "azienda": {
+                          "type": "string"
+                        },
+                        "telefono": {
+                          "type": "string"
+                        },
+                        "profile_complete": {
+                          "type": "boolean"
+                        },
+                        "next_check_in_s": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "nome",
+                        "email",
+                        "azienda",
+                        "telefono",
+                        "profile_complete",
+                        "next_check_in_s"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Cookie di sessione (HttpOnly, SameSite=Strict).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dati non validi (motivo nel messaggio).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email gia' registrata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "operationId": "post-api-login",
+        "summary": "Accesso con email e password",
+        "tags": [
+          "account"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sessione aperta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "nome": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "azienda": {
+                          "type": "string"
+                        },
+                        "telefono": {
+                          "type": "string"
+                        },
+                        "profile_complete": {
+                          "type": "boolean"
+                        },
+                        "next_check_in_s": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "nome",
+                        "email",
+                        "azienda",
+                        "telefono",
+                        "profile_complete",
+                        "next_check_in_s"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Cookie di sessione (HttpOnly, SameSite=Strict).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corpo della richiesta non valido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenziali errate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/logout": {
+      "post": {
+        "operationId": "post-api-logout",
+        "summary": "Chiusura della sessione",
+        "tags": [
+          "account"
+        ],
+        "description": "Sempre 200: il cookie viene fatto scadere anche se la sessione non esiste piu'.",
+        "responses": {
+          "200": {
+            "description": "Sessione chiusa.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Cookie di sessione (HttpOnly, SameSite=Strict).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profile": {
+      "post": {
+        "operationId": "post-api-profile",
+        "summary": "Completamento del profilo",
+        "tags": [
+          "account"
+        ],
+        "description": "Azienda e telefono completano la registrazione e sbloccano il download dei referti.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "azienda": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "telefono": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "azienda",
+                  "telefono"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profilo aggiornato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "nome": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "azienda": {
+                          "type": "string"
+                        },
+                        "telefono": {
+                          "type": "string"
+                        },
+                        "profile_complete": {
+                          "type": "boolean"
+                        },
+                        "next_check_in_s": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "nome",
+                        "email",
+                        "azienda",
+                        "telefono",
+                        "profile_complete",
+                        "next_check_in_s"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Azienda o telefono mancanti.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "post": {
+        "operationId": "post-api-audit",
+        "summary": "Avvia un audit",
+        "tags": [
+          "audit"
+        ],
+        "description": "Un audit alla volta (409 se occupato) e uno slot orario per utente (429 con retry_in_s). L'avanzamento arriva da GET /api/status o dall'SSE di GET /api/events; i referti dei cinque formati da GET /api/report/{formato}. I campi numerici accettano anche stringhe numeriche; i campi omessi usano i default indicati.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Sito da analizzare (https:// implicito se manca lo schema)."
+                  },
+                  "max_pages": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 500,
+                    "default": 25
+                  },
+                  "rrf_k": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 60
+                  },
+                  "top_n": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "default": 5
+                  },
+                  "chunk_words": {
+                    "type": "number",
+                    "minimum": 80,
+                    "maximum": 600,
+                    "default": 220
+                  },
+                  "w_lex": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10,
+                    "default": 1.0
+                  },
+                  "w_vec": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 10,
+                    "default": 1.0
+                  },
+                  "delay": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 0.5
+                  },
+                  "max_body": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 10240,
+                    "default": 10
+                  },
+                  "retries": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "default": 2
+                  },
+                  "workers": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 16,
+                    "default": 4
+                  },
+                  "render": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "auto",
+                      "always"
+                    ],
+                    "default": "off"
+                  },
+                  "market": {
+                    "type": "string",
+                    "enum": [
+                      "globale",
+                      "occidentale",
+                      "orientale"
+                    ],
+                    "default": "occidentale"
+                  },
+                  "judge": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "on",
+                      "off"
+                    ],
+                    "default": "auto"
+                  },
+                  "lighthouse": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "auto",
+                      "always"
+                    ],
+                    "default": "off"
+                  },
+                  "lighthouse_pages": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 9,
+                    "default": 3
+                  },
+                  "lighthouse_device": {
+                    "type": "string",
+                    "enum": [
+                      "mobile",
+                      "desktop"
+                    ],
+                    "default": "mobile"
+                  },
+                  "search_check": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "on",
+                      "off"
+                    ],
+                    "default": "auto"
+                  },
+                  "robots": {
+                    "type": "string",
+                    "enum": [
+                      "respect",
+                      "own",
+                      "force"
+                    ],
+                    "default": "own",
+                    "description": "Default 'own': la titolarita' e' dichiarata in registrazione."
+                  },
+                  "robots_ack": {
+                    "type": "boolean",
+                    "description": "Obbligatorio true con robots=force: assunzione esplicita di responsabilita'."
+                  },
+                  "queries": {
+                    "type": "string",
+                    "description": "Query di prova, una per riga."
+                  },
+                  "competitors": {
+                    "type": "string",
+                    "description": "Siti concorrenti, uno per riga (max 3)."
+                  },
+                  "embeddings": {
+                    "type": "string",
+                    "description": "Modello sentence-transformers; vuoto = auto, 'none' = proxy."
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Audit avviato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Configurazione non valida (motivo nel messaggio).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Un audit e' gia' in corso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Slot orario gia' consumato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "retry_in_s": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "retry_in_s"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "operationId": "get-api-status",
+        "summary": "Stato e sintesi dell'audit",
+        "tags": [
+          "audit"
+        ],
+        "description": "Snapshot del job: stato, log completo e — a fine audit — sintesi, rilievi, piano di remediation, esiti RRF e confronto competitivo. Il polling e' il ripiego dichiarato dell'SSE di GET /api/events.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshot corrente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "running",
+                        "done",
+                        "error",
+                        "cancelled"
+                      ]
+                    },
+                    "log": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "config": {
+                      "type": "object",
+                      "description": "Configurazione dell'audit avviato (echo del POST validato)."
+                    },
+                    "summary": {
+                      "type": "object",
+                      "description": "Sintesi a fine audit: punteggi, citabilita', giudizio, Lighthouse, ancora di realta', delta — stessa natura del referto JSON (schema_version)."
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "remediation": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "rrf": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "competitive": {
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "log",
+                    "error",
+                    "config",
+                    "summary",
+                    "findings",
+                    "remediation",
+                    "rrf",
+                    "competitive"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "operationId": "get-api-events",
+        "summary": "Avanzamento push (Server-Sent Events)",
+        "tags": [
+          "audit"
+        ],
+        "description": "Invia lo snapshot di GET /api/status a ogni variazione (payload JSON nel campo data) e chiude il flusso allo stato terminale; il client ripiega sul polling se il flusso non e' disponibile.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flusso di eventi con lo snapshot serializzato.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/report/{formato}": {
+      "get": {
+        "operationId": "get-api-report-formato",
+        "summary": "Referto dell'ultimo audit concluso",
+        "tags": [
+          "audit"
+        ],
+        "description": "Una sola scansione produce tutti i formati. Riservato alla registrazione completa (azienda e telefono nel profilo). L'HTML e' servito con la CSP dedicata del referto (script inline autonomo, nessuna origine esterna).",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "formato",
+            "in": "path",
+            "required": true,
+            "description": "Formato del referto.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "html",
+                "json",
+                "text",
+                "md",
+                "csv"
+              ]
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "description": "Se presente, risposta come allegato (Content-Disposition).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Il referto nel formato richiesto.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Registrazione completa richiesta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referto non disponibile (nessun audit concluso o formato sconosciuto).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/history": {
+      "get": {
+        "operationId": "get-api-history",
+        "summary": "Storico degli audit dell'utente",
+        "tags": [
+          "storico"
+        ],
+        "description": "Le esecuzioni dell'utente dalla piu' recente (max 50), con punteggi e conteggi dei rilievi.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Righe dello storico.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "site": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "number"
+                          },
+                          "overall": {
+                            "type": "number"
+                          },
+                          "scores": {
+                            "type": "object"
+                          },
+                          "critical": {
+                            "type": "integer"
+                          },
+                          "warning": {
+                            "type": "integer"
+                          },
+                          "info": {
+                            "type": "integer"
+                          },
+                          "has_report": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "site",
+                          "created_at",
+                          "overall",
+                          "scores",
+                          "critical",
+                          "warning",
+                          "info",
+                          "has_report"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "runs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/history/report": {
+      "get": {
+        "operationId": "get-api-history-report",
+        "summary": "Referto JSON completo di un'esecuzione",
+        "tags": [
+          "storico"
+        ],
+        "description": "Il referto salvato nello storico, riservato al proprietario con registrazione completa.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "description": "Id della riga di storico.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "description": "Se presente, risposta come allegato.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Referto JSON completo (schema_version).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Id non valido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Registrazione completa richiesta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referto non trovato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/history/compare": {
+      "get": {
+        "operationId": "get-api-history-compare",
+        "summary": "Confronto fra due audit dello storico",
+        "tags": [
+          "storico"
+        ],
+        "description": "Delta completo (punteggi, rilievi risolti/nuovi) fra due esecuzioni dello stesso sito; l'ordine temporale lo decide il server.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "a",
+            "in": "query",
+            "required": true,
+            "description": "Id della prima esecuzione.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "b",
+            "in": "query",
+            "required": true,
+            "description": "Id della seconda esecuzione.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confronto calcolato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "site": {
+                      "type": "string"
+                    },
+                    "older_at": {
+                      "type": "number"
+                    },
+                    "newer_at": {
+                      "type": "number"
+                    },
+                    "delta": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "site",
+                    "older_at",
+                    "newer_at",
+                    "delta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Id non validi o siti diversi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Audit non confrontabili.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Referto salvato illeggibile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/citations": {
+      "get": {
+        "operationId": "get-api-citations",
+        "summary": "Storico del monitoraggio citazioni IA",
+        "tags": [
+          "citazioni"
+        ],
+        "description": "Serie per sito dallo storico JSONL di mars_citations.py e pin-evento annotati; file assenti o righe malformate producono liste vuote, mai errori.",
+        "security": [
+          {
+            "cookieSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Serie e eventi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sites": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "site": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "sites",
+                    "events"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Accesso richiesto.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "mars_session",
+        "description": "Cookie di sessione emesso da /api/register e /api/login (HttpOnly, SameSite=Strict)."
+      }
+    }
+  }
+}

@@ -69,7 +69,9 @@ from typing import Dict, List, Optional, Tuple
 
 import mars_audit as sra
 
-__version__ = "2.30.0"
+from marsbeacon import api as mars_api
+
+__version__ = "2.31.0"
 
 GUI_DIR = Path(__file__).resolve().parent / "gui"
 
@@ -935,7 +937,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 - firma di BaseHTTPServer
         path = self.path.split("?", 1)[0]
-        if path == "/api/env":
+        if path == "/api/v1/openapi.json":
+            # Contratto API generato al volo dal registro delle
+            # rotte (marsbeacon/api.py): mai letto da file.
+            self._send_json(200, mars_api.openapi_spec())
+        elif path == "/api/env":
             ram = sra.available_ram_mb()
             suggested = (max(1, round(ram * 0.1))
                          if ram is not None else None)
@@ -1134,18 +1140,18 @@ class Handler(BaseHTTPRequestHandler):
             date = str(raw.get("date", "")).strip()
             label = str(raw.get("label", "")).strip()
             site = str(raw.get("site", "")).strip()
-            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
-                self._send_json(400, {"error": "Data non valida: "
-                                               "usa AAAA-MM-GG."})
-                return
-            if not label or len(label) > 120:
-                self._send_json(400, {"error": "Etichetta "
-                                               "mancante o troppo "
-                                               "lunga (max 120)."})
-                return
             evento = {"date": date, "label": label}
             if site:
                 evento["site"] = site
+            # Validazione dal registro del contratto: stessi
+            # schemi della spec OpenAPI, messaggi storici
+            # preservati via x-errore.
+            rotta = mars_api.route_for("POST",
+                                       "/api/citations/events")
+            errori = mars_api.validate_request(rotta, evento)
+            if errori:
+                self._send_json(400, {"error": errori[0]})
+                return
             try:
                 with open(CITATIONS_HISTORY.with_name(
                         "eventi.jsonl"), "a",

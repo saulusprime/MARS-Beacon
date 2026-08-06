@@ -34,7 +34,7 @@ una lista sola (con k=60: 2° lessicale + 3° semantico = 1/62 + 1/63 ≈ 0,0320
 | File | Descrizione |
 |---|---|
 | [mars_audit.py](mars_audit.py) | Lo strumento: facciata con la CLI (`python3 mars_audit.py URL`), PEP8, `flake8` pulito |
-| [marsbeacon/](marsbeacon/) | Il codice dello strumento, scomposto in moduli: `base`, `crawler`, `indexes`, `audits`, `render`, `i18n` |
+| [marsbeacon/](marsbeacon/) | Il codice dello strumento, scomposto in moduli: `base`, `crawler`, `indexes`, `audits`, `render`, `i18n` (piu' `api`: registro delle rotte e contratto OpenAPI del server) |
 | [mars_gui.py](mars_gui.py) | Interfaccia web locale: server stdlib che pilota lo script ed espone i referti |
 | [mars_citations.py](mars_citations.py) | Monitoraggio periodico delle citazioni IA effettive (Claude, Perplexity) con storico e soglie |
 | [gui/](gui/) | Frontend Bootstrap Italia in vanilla JS (asset vendorizzati, funziona offline) con tema Lympha Technologies |
@@ -590,7 +590,7 @@ modello di embedding alla prima esecuzione).
 
 ```bash
 pip install -r requirements-dev.txt
-pytest            # 363 test, ~30 s, nessun accesso alla rete esterna
+pytest            # 381 test, ~30 s, nessun accesso alla rete esterna
 flake8            # lint dei tre script e dei test
 ```
 
